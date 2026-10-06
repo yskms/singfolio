@@ -22,3 +22,29 @@ private/
 *.ipa
 *.apk
 *.aab
+
+# 依存関係
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native（expo prebuild の生成物。設定は app.json / config plugin 側で行う）
+/ios
+/android
+.kotlin/
+*.orig.*
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# TypeScript
+*.tsbuildinfo
