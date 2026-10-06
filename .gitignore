@@ -1,0 +1,24 @@
+# macOS
+.DS_Store
+
+# 公開しないローカル専用ファイル（秘密情報・個人情報・下書き・メモ）
+docs/_local/
+private/
+
+# 環境変数・秘密情報
+.env
+.env.*
+!.env.example
+
+# 署名鍵・証明書・プロビジョニング
+*.keystore
+*.jks
+*.p8
+*.p12
+*.pem
+*.mobileprovision
+
+# ビルド成果物（最終成果物）
+*.ipa
+*.apk
+*.aab
