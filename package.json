@@ -22,5 +22,8 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "test": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test \"src/**/*.test.ts\""
   },
-  "private": true
+  "private": true,
+  "engines": {
+    "node": ">=22.18"
+  }
 }
