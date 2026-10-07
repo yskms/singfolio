@@ -113,6 +113,15 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
 
 -   English First。ただし最初から日本語対応を前提とし、画面の文言は直書きせず
     多言語化の仕組みを通す。初期言語は端末設定から決める。
+-   文言は `src/i18n/en.ts` が正（キーの一覧）。`ja.ts` は同じキーを型で強制される。
+    画面は `ui/i18n.tsx` の `useI18n()` の `t` から取る。`Intl.PluralRules` は使わない
+    （Hermesには無い。iOS・Androidで確認）。件数の形は `src/i18n/translate.ts` の `pluralRules` で選ぶ。
+-   言語を足すときは、`LANGUAGES`（`src/domain/types.ts`）と、app.json の
+    expo-localization の `supportedLocales`（ios）の両方に足す。後者はJSから読めず
+    手で写していて、`npm test` が食い違いを検出する。
+-   選んだ言語だけを保存し、選ぶまでは端末の言語に従う（`getLanguage` は未選択で
+    `null`）。初回起動で端末の言語を保存しない（保存すると、端末の言語の変更に
+    追従できなくなる）。
 
 ### ネイティブビルド
 
