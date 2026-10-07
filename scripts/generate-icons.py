@@ -11,6 +11,8 @@
   android-icon-foreground.png    アダプティブアイコンの前景（シンボルのみ、透過）
   android-icon-monochrome.png    テーマアイコン用（シンボルの形のみ。色はAndroidが付けるので黒でよい）
   splash-icon.png                スプラッシュ用（シンボルのみ、透過）
+  splash-icon-dark.png           ダークのスプラッシュ用（同上。色は原画の背景色＝Mint。
+                                 ブランド資料のDarkアイコン（黒地にMintのシンボル）に合わせる）
 
 Androidの背景は画像ではなく単色（app.json の android.adaptiveIcon.backgroundColor）。
 その値は原画の背景色で、実行時に表示する。
@@ -126,6 +128,7 @@ def main() -> None:
         OUT / "android-icon-monochrome.png"
     )
     place_symbol(alpha, center, radius, fg, SPLASH_SAFE_RATIO).save(OUT / "splash-icon.png")
+    place_symbol(alpha, center, radius, bg, SPLASH_SAFE_RATIO).save(OUT / "splash-icon-dark.png")
 
     hex_ = lambda c: "#%02X%02X%02X" % c
     print(f"原画の背景色: {hex_(bg)}（android.adaptiveIcon.backgroundColor に設定する）")
