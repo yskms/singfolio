@@ -93,8 +93,20 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
 -   ログインを要求しない（v1.0）。
 -   画面（ルート）は `app/`（Expo Router）に置く。`src/` はNodeのテストから直接
     実行するため、画面（RN・Expoのimport）を置かない。
--   `app/_layout.tsx` は、DB初期化（`getServices()`）が終わるまで画面を出さない。
-    Serviceが使えない状態で画面を描画させない（エラー画面は WBS 1.7）。
+-   `app/_layout.tsx` は、DB初期化（`getServices()`）と、保存済みのAppearanceの
+    端末への反映が終わるまで画面を出さない。Serviceが使えない状態で画面を描画させない
+    （エラー画面は WBS 1.7）。反映前に描くと、既定の配色が一瞬見える。
+-   RN・Expoに依存するUIの部品・hookは、`src/` に置けないため `ui/`（ルート直下）に置く。
+-   色は `src/theme/colors.ts`（Nodeでも実行できる）に集約し、画面は `ui/theme.tsx` の
+    `useTheme()` から取る。直書きしない。ライト/ダークは、JSの色の上書きではなく、
+    `Appearance.setColorScheme()`（`applyAppearance`）で端末側のカラースキームごと
+    切り替える（ステータスバー・OSのダイアログ・Androidのウィンドウ背景も揃えるため）。
+-   JSから読めない場所（app.json の `backgroundColor`・スプラッシュ、
+    `plugins/withAndroidNightColors.js`）には、色を手で写している。`colors.ts` を
+    変えたら、`npm test`（`src/theme/nativeConfig.test.ts`）が食い違いを検出するので、
+    その箇所を同じ値に直す。
+-   Purple（`#9C70FE`）は白の上で約3.4:1で、小さな文字の色には使わない（アイコン・
+    大きな文字・塗りに使い、紫の面の上の文字は濃い色にする。詳細は `colors.ts`）。
 
 ### 言語
 
@@ -144,4 +156,6 @@ grepできないので、値はここに転記している）。色は定数に�
 -   PNG上のSurfaceの文字は「#F7F778」と崩れて読めるが、色見本はほぼ白のため
     `#F7F7F8` と解釈している。
 -   ダークモードの色コードはPNGに記載がなく、モックアップ（暗い背景に明るいミント/
-    パープル）のみ。実装時に決めたら、ここに追記する。
+    パープル）のみ。実装ではそこから決めた値を `src/theme/colors.ts` の `darkColors`
+    に置いている（Purpleはライトと同じ）。ダークのスプラッシュのシンボルはMint
+    （ブランド資料のDarkアイコンに合わせ、`scripts/generate-icons.py` が生成）。
