@@ -2,7 +2,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { getDatabase } from './src/db/database';
+import { getServices } from './src/services';
 
 export default function App() {
   const [ready, setReady] = useState(false);
@@ -10,8 +10,9 @@ export default function App() {
   const [failure, setFailure] = useState<{ error: unknown } | null>(null);
 
   // DBを開いてマイグレーションが終わるまで、画面を出さない。
+  // 画面からDB（getDatabase）を直接使わず、Serviceだけを使う。
   useEffect(() => {
-    getDatabase().then(
+    getServices().then(
       () => setReady(true),
       (error) => setFailure({ error }),
     );
