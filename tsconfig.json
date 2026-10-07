@@ -1,10 +1,20 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    "strict": true
+    "strict": true,
+    // src/ のコードはNodeでも直接実行する（`npm test`。型除去での実行）ので、
+    // Nodeが解釈できる書き方に限る。
+    // - import は拡張子（.ts）付きで書く（Nodeは拡張子なしを解決しない）。
+    // - 型だけのimportは `import type`（型除去はimportを消さないため、実行時に失敗する）。
+    // - enum・クラスのコンストラクタ引数プロパティ（`constructor(private x)`）など、
+    //   型を消すだけでは実行できない構文は使わない。
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true
   },
-  // テストはNodeの型が必要なため tsconfig.test.json で別に型チェックする。
-  // ここに含めると、Nodeのグローバル型（process など）がアプリ本体にも漏れる。
+  // テスト（と、テスト専用の src/testing）はNodeの型が必要なため、tsconfig.test.json で
+  // 別に型チェックする。ここに含めると、Nodeのグローバル型（process など）が
+  // アプリ本体にも漏れる。
   // exclude は継承されず置き換わるため、expo/tsconfig.base の既定分も書き直している。
   "exclude": [
     "${configDir}/node_modules",
@@ -13,6 +23,7 @@
     "${configDir}/jest.config.js",
     "${configDir}/android",
     "${configDir}/ios",
-    "${configDir}/**/*.test.ts"
+    "${configDir}/**/*.test.ts",
+    "${configDir}/src/testing"
   ]
 }
