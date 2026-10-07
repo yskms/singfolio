@@ -1,13 +1,16 @@
 import type { Database } from '../db/appDatabase.ts';
 import type { RepositoryEnv } from '../repositories/env.ts';
+import { createSettingsRepository } from '../repositories/settingsRepository.ts';
 import { createSongRepository } from '../repositories/songRepository.ts';
 import { createTagRepository } from '../repositories/tagRepository.ts';
+import { createSettingsService, type SettingsService } from './settingsService.ts';
 import { createSongService, type SongService } from './songService.ts';
 import { createTagService, type TagService } from './tagService.ts';
 
 export interface Services {
   songs: SongService;
   tags: TagService;
+  settings: SettingsService;
 }
 
 /**
@@ -19,8 +22,10 @@ export interface Services {
 export function createServices(db: Database, env: RepositoryEnv): Services {
   const songRepository = createSongRepository(env);
   const tagRepository = createTagRepository(env);
+  const settingsRepository = createSettingsRepository();
   return {
     songs: createSongService({ db, songs: songRepository, tags: tagRepository }),
     tags: createTagService({ db, tags: tagRepository }),
+    settings: createSettingsService({ db, settings: settingsRepository }),
   };
 }

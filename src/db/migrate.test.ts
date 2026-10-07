@@ -66,7 +66,7 @@ describe('runMigrations', () => {
         .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
         .all() as { name: string }[]
     ).map((t) => t.name);
-    assert.deepEqual(tables, ['song_tags', 'songs', 'tags']);
+    assert.deepEqual(tables, ['settings', 'song_tags', 'songs', 'tags']);
 
     await runMigrations(db, migrations);
     assert.equal(userVersion(raw), migrations.length);

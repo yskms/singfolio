@@ -8,7 +8,8 @@ export type ServiceErrorCode =
   | 'song-not-found'
   | 'tag-not-found'
   | 'tag-name-required'
-  | 'tag-name-duplicate';
+  | 'tag-name-duplicate'
+  | 'invalid-appearance';
 
 export class ServiceError extends Error {
   readonly code: ServiceErrorCode;

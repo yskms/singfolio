@@ -33,4 +33,13 @@ export const migrations: readonly Migration[] = [
       CREATE INDEX idx_song_tags_tag_id ON song_tags (tag_id);
     `,
   },
+  {
+    version: 2,
+    sql: `
+      CREATE TABLE settings (
+        key TEXT PRIMARY KEY NOT NULL,
+        value TEXT NOT NULL
+      ) WITHOUT ROWID;
+    `,
+  },
 ];

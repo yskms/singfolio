@@ -67,6 +67,21 @@ UIの表示名「My Key」は、モデル・DBでは `keyOffset` / `key_offset` 
 この動作には接続ごとの `PRAGMA foreign_keys = ON` が必要で、
 `src/db/database.ts` でDBを開くたびに設定している。
 
+### settings
+
+端末の設定（Appearanceなど）のキーと値。曲・タグとは独立で、公開用データにも含めない。
+
+| カラム | 型 | 内容 |
+|---|---|---|
+| `key` | TEXT PK | 設定の名前。現在は `appearance` |
+| `value` | TEXT NOT NULL | 値（文字列） |
+
+-   値の意味・検証はService層（`settingsService`）で行う。DBには制約を置かない
+    （新しい設定を足すたびにマイグレーションが要らないように、キーと値だけの表にしている）。
+-   `appearance`: `system` / `light` / `dark`。未保存の場合は `system`（端末の設定に従う）。
+    保存された値が上の3つ以外（将来のバージョンが書いた値など）でも、エラーにせず `system`
+    として読む（起動を止めない）。
+
 ## Repository / Service層
 
 UI → Service → Repository → SQLite の一方向。UIはRepositoryとDBに触れず、Service
@@ -99,11 +114,13 @@ expo-sqliteの `withTransactionAsync` は排他ではなく、トランザクシ
 -   `songs`: `getSong` / `listSongs` / `countSongsByStatus` / `createSong` /
     `updateSong`（編集画面の保存。全項目を置き換える）/ `setStatus`（Song Detail・
     Practiceの「Mark as Ready」）/ `deleteSong`
+-   `settings`: `getAppearance` / `setAppearance`（`system` / `light` / `dark`）
 -   `tags`: `listTags` / `getOrCreateTag`（曲の編集画面の「新規タグ作成」。同じ名前の
     タグがあればそれを返す）/ `renameTag` / `deleteTag`
 -   不正な入力・存在しない対象は、`ServiceError` で reject する。`code` は
     `title-required` / `artist-required` / `invalid-status` / `invalid-key-offset` /
-    `song-not-found` / `tag-not-found` / `tag-name-required` / `tag-name-duplicate`。
+    `song-not-found` / `tag-not-found` / `tag-name-required` / `tag-name-duplicate` /
+    `invalid-appearance`。
     利用者向けの文言は、UI側で多言語化の仕組みを通して `code` から作る。
 -   曲・タグの削除は、既に無い対象でも何もせず成功する（二重タップで失敗にしない）。
     タグの削除は、付いていた曲から外すだけで曲は残る。曲の削除でタグは残る。

@@ -8,6 +8,14 @@ export function isSongStatus(value: unknown): value is SongStatus {
   return SONG_STATUSES.some((status) => status === value);
 }
 
+/** 外観の設定。`system` は端末の設定に従う（既定）。 */
+export const APPEARANCES = ['system', 'light', 'dark'] as const;
+export type Appearance = (typeof APPEARANCES)[number];
+
+export function isAppearance(value: unknown): value is Appearance {
+  return APPEARANCES.some((appearance) => appearance === value);
+}
+
 export interface Tag {
   id: string;
   name: string;
