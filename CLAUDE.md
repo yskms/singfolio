@@ -8,6 +8,7 @@
 -   `docs/singfolio-requirements.md` --- 要件・対象外・UI/ブランド方針
 -   `docs/singfolio-screen-flow.md` --- v1.0の画面設計
 -   `docs/singfolio-publishing-backend.md` --- 公開機能・バックエンド方針（未確定事項を含む）
+-   `docs/singfolio-data-model.md` --- ローカルDB（SQLite）のスキーマ・マイグレーション方針
 -   `docs/singfolio-wbs.md` --- v1.0の作業分解と進捗
 -   `docs/Singfolio ブランドスタイルガイドとアプリ展示板.png` --- ブランドカラー・フォント（確定。
     ただしMint・Purpleはアイコンの色が正。「ブランド」節参照）、
@@ -60,6 +61,8 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
 -   LocalデータとPublished（公開）データは別モデル。My KeyとPrivate Noteを
     公開モデルへ含めない（「Webで隠す」ではなく、最初から公開用DBに保存しない）。
 -   UIとDBを密結合させない。
+-   一度リリースしたマイグレーション（`src/db/migrations.ts`）は書き換えない。
+    スキーマを変えるときは末尾に次の番号を追加する。
 -   Published Songに `status` を持たせない（公開対象はReadyのみ）。公開内容は
     最後に正常にPublishされたスナップショットで、ローカル状態の即時の鏡ではない。
 -   タグに公開/非公開などの可視性属性（`isPublic` 等）をv1.0で追加しない。
