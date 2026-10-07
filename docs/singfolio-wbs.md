@@ -6,7 +6,7 @@ v1.0（完全ローカル）の作業を、機能単位に分解した進捗表�
 v1.0より後（公開機能・Requests）の実装順序は、
 `singfolio-publishing-backend.md` §9 を参照。
 
-**現在地**：1. 基盤（1.4 ナビゲーションから）
+**現在地**：1. 基盤（1.5 テーマから）
 
 ## 0. 企画・設計
 
@@ -21,7 +21,7 @@ v1.0より後（公開機能・Requests）の実装順序は、
 -   [x] 1.1 Expoプロジェクトの初期化（TypeScript）
 -   [x] 1.2 SQLite導入、スキーマ・マイグレーション（Song / Tag、IDはUUID）
 -   [x] 1.3 Repository / Service層
--   [ ] 1.4 ナビゲーション（Songs / Practice / Profile の3タブ）
+-   [x] 1.4 ナビゲーション（Songs / Practice / Profile の3タブ）
 -   [ ] 1.5 テーマ（System / Light / Dark、ブランドカラーの定数化、スプラッシュのダーク版）
 -   [ ] 1.6 多言語化の仕組み（English / 日本語）
 -   [ ] 1.7 起動時の例外処理（DB初期化に失敗した場合・DBがアプリより新しい場合の

@@ -91,6 +91,10 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
 -   ボトムタブはSongs / Practice / Profileの3つ。Wantは独立タブにせず
     Songs内のステータスとして扱う（Practiceのみ独立タブ）。
 -   ログインを要求しない（v1.0）。
+-   画面（ルート）は `app/`（Expo Router）に置く。`src/` はNodeのテストから直接
+    実行するため、画面（RN・Expoのimport）を置かない。
+-   `app/_layout.tsx` は、DB初期化（`getServices()`）が終わるまで画面を出さない。
+    Serviceが使えない状態で画面を描画させない（エラー画面は WBS 1.7）。
 
 ### 言語
 
@@ -105,6 +109,15 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     （未対応だと起動直後にクラッシュする）への対応で、削除しない。Expo SDK 58 の
     テンプレートが同じ配線を持つので、SDK 58 へ上げるときにこのプラグインと
     app.json の登録を撤去する。
+-   `react-native-reanimated` / `react-native-gesture-handler` /
+    `react-native-worklets` は画面から直接使っていないが、Expo Routerの依存
+    （`react-native-drawer-layout`）のpeerなので消さない。バージョンは
+    `npx expo install` が決める値（SDK 57では reanimated 4.5.1 / worklets 0.10.1 /
+    gesture-handler ~2.32.0）に固定する。`npm install` が自動で入れる最新版は
+    SDK 57の想定外で、ネイティブビルドを壊しうる。
+-   `package.json` の `overrides.react-dom` は消さない。Expo Routerのpeerとして
+    react-dom 19.3.0 が入り、react 19.2.3 と食い違って `npm install` が
+    ERESOLVEで失敗するのを防いでいる（ネイティブでは使わない）。
 
 ## ブランド
 
