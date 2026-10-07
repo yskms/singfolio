@@ -13,9 +13,8 @@
     モックアップ（参考イメージ）
 -   `docs/singfolio ミント背景のアイコン.png` --- アプリアイコンの原画（1254×1254、透過なし）。
     `assets/` のアイコン・スプラッシュ画像はここから `scripts/generate-icons.py` で
-    生成する（手で編集しない）。原画の色（背景 `#C9FCED`、シンボル `#9C70FE`）は
-    下のブランド色の表と異なるが、原画をそのまま使う方針のため、Androidの
-    `adaptiveIcon.backgroundColor` もブランドのMintではなく原画の背景色に揃えている
+    生成する（手で編集しない）。原画の色（背景 `#C9FCED`、シンボル `#9C70FE`）が
+    Mint / Purpleの確定値で、Androidの `adaptiveIcon.backgroundColor` もこの値
 
 設計判断が変わったら、コードだけでなく該当のdocsも更新する。
 
@@ -83,13 +82,16 @@ grepできないので、値はここに転記している）。色は定数に�
 
 | 用途 | 色 |
 |---|---|
-| Mint（Brand） | `#CFF7E9` |
-| Purple（Primary） | `#A78BFA` |
+| Mint（Brand） | `#C9FCED` |
+| Purple（Primary） | `#9C70FE` |
 | Text Primary | `#17171A` |
 | Text Secondary | `#71717A` |
 | Surface | `#F7F7F8` |
 | Background | `#FFFFFF` |
 
+-   MintとPurpleは、アイコン原画の色で確定している。PNGの色見本に書かれた
+    `#CFF7E9` / `#A78BFA` は使わない（PNG上の見本の実際の色が、ラベルの値と
+    ずれていたため）。
 -   フォントは英語がInter、日本語がNoto Sans JP。
 -   PNG上のSurfaceの文字は「#F7F778」と崩れて読めるが、色見本はほぼ白のため
     `#F7F7F8` と解釈している。
