@@ -110,14 +110,18 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     テンプレートが同じ配線を持つので、SDK 58 へ上げるときにこのプラグインと
     app.json の登録を撤去する。
 -   `react-native-reanimated` / `react-native-gesture-handler` /
-    `react-native-worklets` は画面から直接使っていないが、Expo Routerの依存
-    （`react-native-drawer-layout`）のpeerなので消さない。バージョンは
-    `npx expo install` が決める値（SDK 57では reanimated 4.5.1 / worklets 0.10.1 /
-    gesture-handler ~2.32.0）に固定する。`npm install` が自動で入れる最新版は
-    SDK 57の想定外で、ネイティブビルドを壊しうる。
+    `react-native-worklets` は画面から直接使っていないが、消さない。Expo Routerの
+    依存（`react-native-drawer-layout`）がgesture-handlerとreanimatedをpeerに
+    持ち（optionalではない）、reanimatedがworkletsをpeerに持つ（`0.10.x`）。
+    package.jsonから消すと、`npm install` が最新版を自動で入れる（SDK 57の想定外で、
+    workletsは expo-modules-core のpeer範囲外の0.13.0になり、ネイティブビルドを
+    壊しうる）。バージョンは `npx expo install` が決める値のままにする。
 -   `package.json` の `overrides.react-dom` は消さない。Expo Routerのpeerとして
     react-dom 19.3.0 が入り、react 19.2.3 と食い違って `npm install` が
-    ERESOLVEで失敗するのを防いでいる（ネイティブでは使わない）。
+    ERESOLVEで失敗するのを防いでいる（ネイティブでは使わない）。値は固定で、
+    **reactを上げるときは同時に同じバージョンへ直す**（上げ忘れると、逆向きに食い違う）。
+    `"$react"` で追従させる書き方は使えない（ロックファイルが無い新規解決で
+    `Unable to resolve reference $react` になる。npm 10.9.8で確認）。
 
 ## ブランド
 
