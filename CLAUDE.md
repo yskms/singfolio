@@ -68,6 +68,21 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
 -   タグに公開/非公開などの可視性属性（`isPublic` 等）をv1.0で追加しない。
     Webへ送るタグはローカルのタグとは別に `publicTags` として扱う。
 
+### Repository / Service層
+
+詳細は `docs/singfolio-data-model.md`「Repository / Service層」。
+
+-   UI → Service → Repository → SQLite の一方向。画面はRepository・DBに触れず、
+    `getServices()` のServiceだけを使う。
+-   DBへの書き込みは、必ず `Database.transaction` の中で行う（expo-sqliteの
+    `withTransactionAsync` は排他ではないため）。`Database` を読み取り専用の型に
+    しているのはこのためで、`runAsync` を直接呼べるように型を緩めない。
+-   `src/` のコードはNodeのテスト（`npm test`）からも直接実行する。importは
+    `.ts` 付き、型だけは `import type`、enumやコンストラクタ引数プロパティは使わない
+    （tsconfigで検出する）。
+-   タグ名の正規化は `normalize('NFKD').normalize('NFC')`。`normalize('NFKC')` 1回に
+    「簡略化」しない（iOSのHermesは半角カナの濁点を合成しない。Nodeのテストでは検出できない）。
+
 ### 画面
 
 -   「管理する画面」と「人に見せる画面」を分離する。Show Modeは閲覧専用で、
