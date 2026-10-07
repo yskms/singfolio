@@ -1,11 +1,11 @@
 import type { Language } from '../domain/types.ts';
 import { en, type MessageKey } from './en.ts';
 import { ja } from './ja.ts';
+import { createTranslator, type Translator } from './translate.ts';
 import type { Message } from './types.ts';
 
-export { errorMessageKey } from './errors.ts';
+export { errorMessageKey, type ErrorMessageKey } from './errors.ts';
 export { resolveLanguage } from './resolveLanguage.ts';
-export { createTranslator, type TranslateParams } from './translate.ts';
 export type { MessageKey } from './en.ts';
 
 /** 言語ごとの文言。言語を足すと、ここに足すまで型エラーになる。 */
@@ -19,3 +19,11 @@ export const languageNames: Record<Language, string> = {
   en: 'English',
   ja: '日本語',
 };
+
+/** アプリの文言を引く関数。キーごとに、必要な値（`{name}`、件数の `count`）を型で要求する。 */
+export type Translate = Translator<typeof en>;
+
+/** `language` の文言を引く関数。型（必要な値）は、キーの正である English から決まる。 */
+export function createAppTranslator(language: Language): Translate {
+  return createTranslator<typeof en>(catalogs[language], language);
+}

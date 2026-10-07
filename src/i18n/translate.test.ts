@@ -1,4 +1,5 @@
-// 文言の置き換え・件数による形の選び方のテスト。`npm test` で実行する。
+// 文言の置き換え・件数による形の選び方・必要な値の型のテスト。`npm test` で実行する。
+// 型のテストは `@ts-expect-error`（型エラーにならないと、`npm run typecheck` が失敗する）。
 /// <reference types="node" />
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -10,63 +11,97 @@ const catalog = {
   plain: 'Songs',
   hello: 'Hello, {name}!',
   twice: '{name} and {name}',
+  both: '{name}: {count}',
   songs: { one: '{count} song', other: '{count} songs' },
+  songsBy: { one: '{count} song by {artist}', other: '{count} songs by {artist}' },
   songsOnlyOther: { other: '{count}曲' },
-} satisfies Record<string, Message>;
+  constructorName: '{constructor}',
+} as const satisfies Record<string, Message>;
+
+const en = createTranslator<typeof catalog>(catalog, 'en');
+const ja = createTranslator<typeof catalog>(catalog, 'ja');
 
 describe('createTranslator', () => {
-  it('置き換えの要らない文言は、そのまま返す（値を渡しても変わらない）', () => {
-    const t = createTranslator(catalog, 'en');
-    assert.equal(t('plain'), 'Songs');
-    assert.equal(t('plain', { name: 'x' }), 'Songs');
+  it('置き換えの要らない文言は、そのまま返す', () => {
+    assert.equal(en('plain'), 'Songs');
   });
 
   it('{name} を値で置き換える。同じ名前が複数あれば、すべて置き換える。数も文字にする', () => {
-    const t = createTranslator(catalog, 'en');
-    assert.equal(t('hello', { name: 'Ann' }), 'Hello, Ann!');
-    assert.equal(t('twice', { name: 7 }), '7 and 7');
+    assert.equal(en('hello', { name: 'Ann' }), 'Hello, Ann!');
+    assert.equal(en('twice', { name: 7 }), '7 and 7');
+    assert.equal(en('both', { name: 'x', count: 3 }), 'x: 3');
   });
 
-  it('値の足りない {name} は、そのまま残す。値が空文字や 0 でも置き換える', () => {
-    const t = createTranslator(catalog, 'en');
-    assert.equal(t('hello'), 'Hello, {name}!');
-    assert.equal(t('hello', { other: 'x' }), 'Hello, {name}!');
-    assert.equal(t('hello', { name: '' }), 'Hello, !');
-    assert.equal(t('twice', { name: 0 }), '0 and 0');
+  it('値が空文字や 0 でも置き換える', () => {
+    assert.equal(en('hello', { name: '' }), 'Hello, !');
+    assert.equal(en('twice', { name: 0 }), '0 and 0');
   });
 
   it('値の中の {…} や $ は、解釈しない', () => {
-    const t = createTranslator(catalog, 'en');
-    assert.equal(t('hello', { name: '{name}$&' }), 'Hello, {name}$&!');
+    assert.equal(en('hello', { name: '{name}$&' }), 'Hello, {name}$&!');
   });
 
   it('Object のプロパティ名（constructor など）は、値として扱わない', () => {
-    const t = createTranslator({ x: '{constructor}' }, 'en');
-    assert.equal(t('x', { name: 'a' }), '{constructor}');
+    // @ts-expect-error constructor の値が無い
+    assert.equal(en('constructorName', { name: 'a' }), '{constructor}');
   });
 
   it('English: 1 は one、それ以外（0 を含む）は other', () => {
-    const t = createTranslator(catalog, 'en');
-    assert.equal(t('songs', { count: 1 }), '1 song');
-    assert.equal(t('songs', { count: 0 }), '0 songs');
-    assert.equal(t('songs', { count: 2 }), '2 songs');
-    assert.equal(t('songs', { count: 84 }), '84 songs');
+    assert.equal(en('songs', { count: 1 }), '1 song');
+    assert.equal(en('songs', { count: 0 }), '0 songs');
+    assert.equal(en('songs', { count: 2 }), '2 songs');
+    assert.equal(en('songs', { count: 84 }), '84 songs');
+    assert.equal(en('songsBy', { count: 1, artist: 'Ann' }), '1 song by Ann');
   });
 
   it('日本語: 件数によらず other。other だけの文言も使える', () => {
-    const t = createTranslator(catalog, 'ja');
-    assert.equal(t('songs', { count: 1 }), '1 songs');
-    assert.equal(t('songsOnlyOther', { count: 1 }), '1曲');
+    assert.equal(ja('songs', { count: 1 }), '1 songs');
+    assert.equal(ja('songsOnlyOther', { count: 1 }), '1曲');
   });
 
   it('English でも、その形が無ければ other を使う', () => {
-    const t = createTranslator(catalog, 'en');
-    assert.equal(t('songsOnlyOther', { count: 1 }), '1曲');
+    assert.equal(en('songsOnlyOther', { count: 1 }), '1曲');
   });
 
-  it('件数の文言に count が無い（または数でない）ときは other。止めない', () => {
-    const t = createTranslator(catalog, 'en');
-    assert.equal(t('songs'), '{count} songs');
-    assert.equal(t('songs', { count: '1' }), '1 songs');
+  it('型で防いでいても、実行時は止めない: 値の足りない {name} はそのまま残す', () => {
+    // @ts-expect-error name が要る
+    assert.equal(en('hello'), 'Hello, {name}!');
+    // @ts-expect-error name が要る（別の名前は置き換えに使わない）
+    assert.equal(en('hello', { other: 'x' }), 'Hello, {name}!');
+    // @ts-expect-error count が要る
+    assert.equal(en('songs'), '{count} songs');
+    // @ts-expect-error count は数
+    assert.equal(en('songs', { count: '1' }), '1 songs');
+  });
+
+  it('型で防いでいても、実行時は止めない: カタログに無いキーは、キーそのものを返す', () => {
+    // @ts-expect-error unknown は文言に無い
+    assert.equal(en('unknown'), 'unknown');
+  });
+});
+
+describe('t の引数の型', () => {
+  // 実行しても何も検証しない。型エラーの有無（`@ts-expect-error`）が検証。
+  it('必要な値を渡さない呼び出しは型エラー', () => {
+    // @ts-expect-error name が要る
+    en('hello');
+    // @ts-expect-error 件数の文言は count が要る
+    en('songs');
+    // @ts-expect-error count だけでは足りない（artist が要る）
+    en('songsBy', { count: 1 });
+    // @ts-expect-error name が足りない（count だけ）
+    en('both', { count: 1 });
+  });
+
+  it('値の要らない文言に値を渡すのは型エラー（キーの取り違えに気づける）', () => {
+    // @ts-expect-error plain は値を取らない
+    en('plain', { name: 'x' });
+  });
+
+  it('count は数でなければ型エラー。{name} は文字でも数でもよい', () => {
+    // @ts-expect-error count は数
+    en('songs', { count: '1' });
+    en('hello', { name: 'x' });
+    en('hello', { name: 1 });
   });
 });

@@ -3,6 +3,8 @@ import type { Message } from './types.ts';
 
 // キーは en.ts と同じ。足りないキーも、余分なキーも、型エラーになる。
 export const ja: Record<MessageKey, Message> = {
+  // tabs.* は仮の訳。ステータスの表示名（Practice＝練習中。要件定義 §4）と揃えるかは、
+  // 文言を決める画面（WBS 2.1・3.1）で決める。
   'tabs.songs': '曲',
   'tabs.practice': '練習',
   'tabs.profile': 'プロフィール',
