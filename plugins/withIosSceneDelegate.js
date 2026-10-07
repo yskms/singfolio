@@ -14,9 +14,9 @@ const path = require('path');
 //   - SceneDelegate.swift（ExpoAppSceneDelegate のサブクラス）を追加する
 //   - AppDelegate.swift を、window生成とReact Native起動をSceneDelegateへ任せる形に直す
 //     （ExpoReactNativeFactoryProvider に適合させ、didFinishLaunching内のwindow生成と
-//     startReactNative を除く。URL・Universal Linksの上書きも除く。シーン採用後は
-//     UIKitがAppDelegate側を呼ばなくなり、ExpoAppSceneDelegateがExpoAppDelegateと
-//     RCTLinkingManagerへ転送する）
+//     startReactNative を除く。URL・Universal Linksの上書きも、SDK 58 のテンプレートに
+//     合わせて除く。シーン採用後はUIKitがAppDelegate側を呼ばなくなり、
+//     ExpoAppSceneDelegateがExpoAppDelegateとRCTLinkingManagerへ転送する）
 //
 // ios/ は `expo prebuild` の自動生成物（gitignore）なので、手で直さずここで注入する。
 //
@@ -41,8 +41,11 @@ class ${SCENE_DELEGATE_CLASS_NAME}: ExpoAppSceneDelegate {
 const PROVIDER_PROTOCOL = 'ExpoReactNativeFactoryProvider';
 
 // SDK 57 のテンプレートが生成するAppDelegate.swiftの、書き換える箇所。
-// テンプレートが変わって一致しなくなった場合は、黙って壊れたAppDelegateを作らず、
-// ビルドの時点で失敗させる。
+// クラス宣言とwindow生成・startReactNativeの2箇所は、書き換えないとシーン対応が
+// 成り立たない。テンプレートが変わって一致しなくなった場合は、黙って壊れた
+// AppDelegateを作らず、prebuildの時点で失敗させる。
+// URL・Universal Linksの上書きは、撤去できなくても動くため、一致したときだけ撤去する
+// （LINKING_OVERRIDES の説明を参照）。
 const CLASS_DECLARATION = 'class AppDelegate: ExpoAppDelegate {';
 const CLASS_DECLARATION_PATCHED = `class AppDelegate: ExpoAppDelegate, ${PROVIDER_PROTOCOL} {`;
 
@@ -58,6 +61,10 @@ const WINDOW_AND_START_REACT_NATIVE_PATCHED = `    // The window is created and 
     // scene-based life cycle (required by the iOS 27 SDK).
 `;
 
+// SDK 57 のテンプレートが持つ、URL・Universal Linksの上書き。シーン採用後は
+// UIKitから呼ばれなくなり、代わりに ExpoAppSceneDelegate（SceneEventForwarder）が
+// ExpoAppDelegateへ転送する。転送側は、残った上書きが RCTLinkingManager を呼んだことを
+// 検知して二重に通知しないため、撤去できなくても動作は変わらない。
 const LINKING_OVERRIDES = `
 
   // Linking API
@@ -102,8 +109,7 @@ function patchAppDelegate(contents) {
     WINDOW_AND_START_REACT_NATIVE_PATCHED,
     'window生成とstartReactNativeの呼び出し'
   );
-  patched = replaceOrThrow(patched, LINKING_OVERRIDES, '', 'Linking API / Universal Linksのoverride');
-  return patched;
+  return patched.replace(LINKING_OVERRIDES, '');
 }
 
 function withIosSceneManifest(config) {
