@@ -10,11 +10,22 @@ import { colorsByScheme, type ColorSchemeName, type ThemeColors } from '../src/t
 /**
  * 外観の設定（System / Light / Dark）をアプリ全体へ反映する。
  *
- * JSの色だけでなく、ステータスバー・OSのダイアログ・Androidのウィンドウ背景など、
- * ネイティブ側も同じ配色にする必要があるため、JSだけで上書きせず、端末側のカラー
- * スキームを切り替える（iOSはウィンドウのスタイル、AndroidはAppCompatのNightモード）。
- * `System` は端末の設定に戻す（`unspecified`）。以降は `useColorScheme()` が、
- * 設定を反映した実際の配色を返す。
+ * JSの色だけでなく、ステータスバー・ダイアログ・Androidのウィンドウ背景など、
+ * ネイティブ側も同じ配色にする必要があるため、JSだけで上書きせず、アプリ全体の
+ * カラースキームを切り替える（iOSは自アプリのウィンドウのスタイル、Androidは自アプリの
+ * AppCompatのNightモード）。OS自体の設定は変えない。`System` は、アプリを端末の設定に
+ * 従う状態へ戻す（`unspecified`）。以降は `useColorScheme()` が、設定を反映した実際の
+ * 配色を返す。
+ *
+ * 反映するまでの間は、次のとおり、直前や端末の配色が見える（どちらもiOSシミュレータ・
+ * Androidエミュレータで確認済み。最終的には正しい配色になる）。
+ * - `System` へ戻した直後は、ネイティブのイベントが届くまでの数十ms、`useColorScheme()`
+ *   が直前の配色のままになる（`setColorScheme` の同期の戻りが切り替え前の値で、
+ *   イベントも発火しないため）。Light / Dark への切り替えは、JSの値がすぐ変わる。
+ * - 起動の直後は、この関数が呼ばれるまで、端末の配色になる。Androidでは、Activityを
+ *   作り直したとき（バックキーで終了して、同じプロセスで再び開いたときなど）も同じ。
+ *   Expoの SystemUI が、Activityの作成のたびにNightモードを端末に従う状態へ戻すため
+ *   （Reactのルートも作り直されるので、`app/_layout.tsx` の起動処理が再び反映する）。
  */
 export function applyAppearance(appearance: Appearance): void {
   NativeAppearance.setColorScheme(appearance === 'system' ? 'unspecified' : appearance);
@@ -65,6 +76,9 @@ export function ThemeProvider({
 
   // ネイティブのルートビューの背景。画面（Stack・Tabs）の背景より下に見える
   // 部分（遷移中・キーボードの出入りなど）が、別の配色の色にならないようにする。
+  // expo-system-ui は、渡した色を保存し、次の起動でJSより先に復元する。前回と別の配色で
+  // 起動すると、この effect が走るまで前回の色になる（iOSで確認した限り、スプラッシュに
+  // 隠れて見えなかった）。
   useEffect(() => {
     SystemUI.setBackgroundColorAsync(colors.background).catch((error) => {
       console.warn('ルートビューの背景色を設定できませんでした', error);

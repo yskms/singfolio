@@ -99,8 +99,9 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
 -   RN・Expoに依存するUIの部品・hookは、`src/` に置けないため `ui/`（ルート直下）に置く。
 -   色は `src/theme/colors.ts`（Nodeでも実行できる）に集約し、画面は `ui/theme.tsx` の
     `useTheme()` から取る。直書きしない。ライト/ダークは、JSの色の上書きではなく、
-    `Appearance.setColorScheme()`（`applyAppearance`）で端末側のカラースキームごと
-    切り替える（ステータスバー・OSのダイアログ・Androidのウィンドウ背景も揃えるため）。
+    `Appearance.setColorScheme()`（`applyAppearance`）でアプリ全体（ネイティブの描画を
+    含む）のカラースキームごと切り替える（ステータスバー・ダイアログ・Androidの
+    ウィンドウ背景も揃えるため。OS自体の設定は変えない）。
 -   JSから読めない場所（app.json の `backgroundColor`・スプラッシュ、
     `plugins/withAndroidNightColors.js`）には、色を手で写している。`colors.ts` を
     変えたら、`npm test`（`src/theme/nativeConfig.test.ts`）が食い違いを検出するので、
