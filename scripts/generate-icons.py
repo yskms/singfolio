@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""アイコン原画から、アプリ用のアイコン・スプラッシュ画像を生成する。
+"""アイコン原画から、Android用アイコンとスプラッシュの画像を生成する。
 
     python3 scripts/generate-icons.py      # 要 Pillow（pip install pillow）
 
-入力  docs/singfolio ミント背景のアイコン.png（1254x1254、透過なし）
+入力  assets/icon.png（1024x1024、透過なし。iOS・ストア用のアイコンで、これが原画）
 出力  assets/ 配下（app.json から参照される。手で編集せず、このスクリプトで再生成する）
 
-  icon.png                       iOS・ストア用。原画を1024x1024へ縮小しただけ（透過なし）
   android-icon-foreground.png    アダプティブアイコンの前景（シンボルのみ、透過）
   android-icon-monochrome.png    テーマアイコン用（シンボルの形のみ。色はAndroidが付けるので黒でよい）
   splash-icon.png                スプラッシュ用（シンボルのみ、透過）
@@ -23,8 +22,8 @@ from statistics import median
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
-SOURCE = ROOT / "docs" / "singfolio ミント背景のアイコン.png"
 OUT = ROOT / "assets"
+SOURCE = OUT / "icon.png"
 CANVAS = 1024
 
 # アダプティブアイコンは108dpのキャンバスのうち、直径66dpの円の内側だけが
@@ -35,8 +34,8 @@ SPLASH_SAFE_RATIO = 160 / 240
 
 
 # 原画の色を取る位置（原画のレイアウトに依存する。原画を描き直したら見直すこと）。
-BG_SAMPLE_BOX = (0, 0, 100, 100)  # 左上の背景
-FG_SAMPLE_BOX = (260, 780, 420, 880)  # 左下の音符の頭
+BG_SAMPLE_BOX = (0, 0, 80, 80)  # 左上の背景
+FG_SAMPLE_BOX = (212, 637, 343, 719)  # 左下の音符の頭
 MAX_SAMPLE_SPREAD = 16  # 単色のはずの範囲内で許容する、中央値からの最大のずれ
 MIN_BG_FG_DISTANCE = 60  # 背景色とシンボル色の最小距離（RGB空間）
 
@@ -102,8 +101,8 @@ def place_symbol(
 
 def main() -> None:
     src = Image.open(SOURCE).convert("RGB")
-    if src.width != src.height:
-        sys.exit(f"原画が正方形ではありません: {src.size}")
+    if src.size != (CANVAS, CANVAS):
+        sys.exit(f"原画は {CANVAS}x{CANVAS} である必要があります: {src.size}")
 
     # 原画の背景色と、シンボル（左下の音符の頭）の色
     bg = sample_color(src, BG_SAMPLE_BOX, "背景色")
@@ -114,7 +113,6 @@ def main() -> None:
     center, radius = symbol_geometry(alpha)
 
     OUT.mkdir(exist_ok=True)
-    src.resize((CANVAS, CANVAS), Image.LANCZOS).save(OUT / "icon.png")
     place_symbol(alpha, center, radius, fg, ANDROID_SAFE_RATIO).save(
         OUT / "android-icon-foreground.png"
     )
