@@ -16,6 +16,18 @@ export function isAppearance(value: unknown): value is Appearance {
   return APPEARANCES.some((appearance) => appearance === value);
 }
 
+/**
+ * 表示言語。端末の言語は、これのどれかに当てはめて使う（src/i18n）。
+ * 足すときは、src/i18n の文言と、app.json の expo-localization の
+ * `supportedLocales`（ios）にも足す（後者は `npm test` が食い違いを検出する）。
+ */
+export const LANGUAGES = ['en', 'ja'] as const;
+export type Language = (typeof LANGUAGES)[number];
+
+export function isLanguage(value: unknown): value is Language {
+  return LANGUAGES.some((language) => language === value);
+}
+
 export interface Tag {
   id: string;
   name: string;

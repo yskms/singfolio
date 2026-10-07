@@ -2,21 +2,23 @@ import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import type { ComponentProps } from 'react';
 
+import type { MessageKey } from '../../src/i18n';
+import { useI18n } from '../../ui/i18n';
 import { useTheme } from '../../ui/theme';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
 
 // ボトムタブはSongs / Practice / Profileの3つ（Wantは独立タブにしない）。
 // 並び順がそのままタブの並びで、先頭のSongsがメイン導線。
-// タブ名は直書きしている。多言語化の仕組み（WBS 1.6）ができたらそちらへ移す。
-const TABS: { name: string; title: string; icon: IconName; iconFocused: IconName }[] = [
-  { name: 'index', title: 'Songs', icon: 'musical-notes-outline', iconFocused: 'musical-notes' },
-  { name: 'practice', title: 'Practice', icon: 'repeat-outline', iconFocused: 'repeat' },
-  { name: 'profile', title: 'Profile', icon: 'person-outline', iconFocused: 'person' },
+const TABS: { name: string; titleKey: MessageKey; icon: IconName; iconFocused: IconName }[] = [
+  { name: 'index', titleKey: 'tabs.songs', icon: 'musical-notes-outline', iconFocused: 'musical-notes' },
+  { name: 'practice', titleKey: 'tabs.practice', icon: 'repeat-outline', iconFocused: 'repeat' },
+  { name: 'profile', titleKey: 'tabs.profile', icon: 'person-outline', iconFocused: 'person' },
 ];
 
 export default function TabsLayout() {
   const { colors } = useTheme();
+  const { t } = useI18n();
   return (
     <Tabs
       screenOptions={{
@@ -31,7 +33,7 @@ export default function TabsLayout() {
           key={tab.name}
           name={tab.name}
           options={{
-            title: tab.title,
+            title: t(tab.titleKey),
             tabBarIcon: ({ color, size, focused }) => (
               <Ionicons name={focused ? tab.iconFocused : tab.icon} size={size} color={color} />
             ),

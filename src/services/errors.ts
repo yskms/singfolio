@@ -9,7 +9,8 @@ export type ServiceErrorCode =
   | 'tag-not-found'
   | 'tag-name-required'
   | 'tag-name-duplicate'
-  | 'invalid-appearance';
+  | 'invalid-appearance'
+  | 'invalid-language';
 
 export class ServiceError extends Error {
   readonly code: ServiceErrorCode;

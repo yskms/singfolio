@@ -41,7 +41,15 @@
       "./plugins/withIosSceneDelegate.js",
       "./plugins/withAndroidNightColors.js",
       "expo-router",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-localization",
+        {
+          "supportedLocales": {
+            "ios": ["en", "ja"]
+          }
+        }
+      ]
     ]
   }
 }

@@ -69,11 +69,11 @@ UIの表示名「My Key」は、モデル・DBでは `keyOffset` / `key_offset` 
 
 ### settings
 
-端末の設定（Appearanceなど）のキーと値。曲・タグとは独立で、公開用データにも含めない。
+端末の設定（Appearance・Languageなど）のキーと値。曲・タグとは独立で、公開用データにも含めない。
 
 | カラム | 型 | 内容 |
 |---|---|---|
-| `key` | TEXT PK | 設定の名前。現在は `appearance` |
+| `key` | TEXT PK | 設定の名前。現在は `appearance` / `language` |
 | `value` | TEXT NOT NULL | 値（文字列） |
 
 -   値の意味・検証はService層（`settingsService`）で行う。DBには制約を置かない
@@ -81,6 +81,11 @@ UIの表示名「My Key」は、モデル・DBでは `keyOffset` / `key_offset` 
 -   `appearance`: `system` / `light` / `dark`。未保存の場合は `system`（端末の設定に従う）。
     保存された値が上の3つ以外（将来のバージョンが書いた値など）でも、エラーにせず `system`
     として読む（起動を止めない）。
+-   `language`: `en` / `ja`。**利用者が選んだときだけ保存する**。未保存は「選んでいない」
+    （端末の言語に従う。決め方は `singfolio-screen-flow.md` のLanguage）で、初回起動時に
+    端末の言語を書き込まない（書くと、端末の言語が後で変わっても追従できなくなる）。
+    Serviceは未保存を `null` で返す。保存された値が上の2つ以外（将来のバージョンが
+    追加した言語など）でも、エラーにせず `null` として読む（起動を止めない）。
 
 ## Repository / Service層
 
@@ -114,14 +119,16 @@ expo-sqliteの `withTransactionAsync` は排他ではなく、トランザクシ
 -   `songs`: `getSong` / `listSongs` / `countSongsByStatus` / `createSong` /
     `updateSong`（編集画面の保存。全項目を置き換える）/ `setStatus`（Song Detail・
     Practiceの「Mark as Ready」）/ `deleteSong`
--   `settings`: `getAppearance` / `setAppearance`（`system` / `light` / `dark`）
+-   `settings`: `getAppearance` / `setAppearance`（`system` / `light` / `dark`）、
+    `getLanguage`（未選択は `null`）/ `setLanguage`（`en` / `ja`）
 -   `tags`: `listTags` / `getOrCreateTag`（曲の編集画面の「新規タグ作成」。同じ名前の
     タグがあればそれを返す）/ `renameTag` / `deleteTag`
 -   不正な入力・存在しない対象は、`ServiceError` で reject する。`code` は
     `title-required` / `artist-required` / `invalid-status` / `invalid-key-offset` /
     `song-not-found` / `tag-not-found` / `tag-name-required` / `tag-name-duplicate` /
-    `invalid-appearance`。
-    利用者向けの文言は、UI側で多言語化の仕組みを通して `code` から作る。
+    `invalid-appearance` / `invalid-language`。
+    利用者向けの文言は、UI側で多言語化の仕組みを通して `code` から作る
+    （`src/i18n/errors.ts`。コードを足すと、文言の対応を足すまで型エラーになる）。
 -   曲・タグの削除は、既に無い対象でも何もせず成功する（二重タップで失敗にしない）。
     タグの削除は、付いていた曲から外すだけで曲は残る。曲の削除でタグは残る。
 
