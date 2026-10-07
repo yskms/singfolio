@@ -26,7 +26,7 @@ export interface Song {
   keyOffset: number;
   /** 非公開メモ。空文字 = メモなし */
   privateNote: string;
-  /** タグ名の昇順（大文字小文字を区別しない） */
+  /** タグ名の昇順（ASCIIの大文字小文字は区別しない） */
   tags: Tag[];
   /** 登録日時（Unixエポックのミリ秒） */
   createdAt: number;

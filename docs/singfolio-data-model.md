@@ -110,8 +110,12 @@ expo-sqliteの `withTransactionAsync` は排他ではなく、トランザクシ
 
 ### 曲の入力
 
--   Title・Artist: 前後の空白（全角空白を含む）を除く。空は `title-required` /
-    `artist-required`。それ以外の加工はしない（全角半角の統一などはしない）。
+-   Title・Artist: 前後の空白（全角空白を含む）を除き、濁点などが分解された形（NFD。
+    macOSのファイル名からの貼り付けなど）を、普通に入力した形（NFC）にそろえる。
+    見た目は変わらない。分解形のままだと、検索・並び替え・重複の判定で同じ文字が別の
+    文字になる。データが入ってからでは、そろえ直すのにマイグレーションが必要になる
+    ため、最初から行う。空は `title-required` / `artist-required`。それ以外の加工は
+    しない（全角半角の統一はしない。`Ｔ.Ｍ.Revolution` は入力どおりに保存する）。
 -   Status: 追加でも省略できない（既定値はUI側で決める）。
 -   My Key: 整数（範囲の制限はしない）。省略は `0`。
 -   Private Note: 前後の空白を除く。空白だけは「メモなし」（空文字）。
@@ -128,6 +132,9 @@ expo-sqliteの `withTransactionAsync` は排他ではなく、トランザクシ
     `COLLATE NOCASE` はASCIIしか同一視しないため、`Ä` と `ä`、`Rock` と `Ｒock` は、
     DBに任せず、Serviceが重複として扱う（DBの一意制約は最後の砦）。
     ひらがなとカタカナ（`あにめ` / `アニメ`）は別のタグ。
+-   NFKCは全角半角だけでなく、互換文字も変換する（`①` → `1`、`™` → `TM`、`㈱` → `(株)`、
+    `½` → `1⁄2`）。タグ名は、見た目の揺れをそろえる目的で、これを許容する。
+    Title・Artistには、この変換をかけない（上の「曲の入力」）。
 -   `renameTag` は、別のタグと重複する名前を `tag-name-duplicate` にする。大文字小文字
     だけの変更（`rock` → `Rock`）は重複ではない。
 -   **iOSのHermesは、`normalize('NFKC')` が半角カナの濁点を合成しない**（`ﾎﾞ` が
@@ -141,11 +148,13 @@ expo-sqliteの `withTransactionAsync` は排他ではなく、トランザクシ
 `listSongs` の条件はすべて満たす曲だけを返す（AND）。
 
 -   絞り込み: `status`、`tagId`（1つだけ。複数タグの絞り込みは未対応）、`search`
-    （曲名またはアーティストの部分一致。前後の空白は無視し、`% _ \` は文字として扱う）。
+    （曲名またはアーティストの部分一致。検索語は保存する曲名と同じ正規化（NFC・
+    前後の空白の除去）をかけ、`% _ \` は文字として扱う）。
     一致は `LIKE` で、ASCIIの大文字小文字だけを区別しない。全角半角・ひらがな/カタカナの
     違いは吸収しない。検索の一致の扱いは、WBS 2.1で決める。
 -   並び替え: `title` / `artist` / `createdAt` / `updatedAt` と昇順・降順。既定は
-    `updatedAt` の降順。同順位の曲は、曲名・アーティスト・IDの昇順で、毎回同じ並びになる。
+    `updatedAt` の降順。一覧にないキー・方向（端末に保存した設定の読み戻しなど、型の
+    外から来た値）は、エラーにせず既定にする。同順位の曲は、曲名・アーティスト・IDの昇順で、毎回同じ並びになる。
     日本語の読み順は未対応（上の「songs」の並び替えの項目を参照）。
 -   曲とタグは1回のクエリで取る（別々のクエリだと、間の書き込みで食い違いうるため）。
 
@@ -192,13 +201,20 @@ Node標準の `node:sqlite`（`src/testing/testDatabase.ts` が `RawDatabase` �
 
 -   TypeScriptのまま直接実行するため、Node 22.18以降が必要（`package.json` の
     `engines`。`.node-version` は22系を指す）。
--   Nodeの型除去での実行のため、`src/` のコードは次のように書く（`tsconfig.json` の
-    `allowImportingTsExtensions` / `verbatimModuleSyntax` / `erasableSyntaxOnly` で
-    型チェック時に検出する。Metroも `.ts` 付きのimportを解決できる）。
-    -   import は拡張子（`.ts`）付き。型だけのimportは `import type`。
-    -   enum・クラスのコンストラクタ引数プロパティなど、型を消すだけでは実行できない
-        構文は使わない。
+-   Nodeの型除去での実行のため、`src/` のコードは次のように書く。
+    -   型だけのimportは `import type`、enum・クラスのコンストラクタ引数プロパティなど
+        型を消すだけでは実行できない構文は使わない。どちらも `tsconfig.json` の
+        `verbatimModuleSyntax` / `erasableSyntaxOnly` で、型チェック時に検出する。
+    -   import は拡張子（`.ts`）付き（`allowImportingTsExtensions`。Metroも解決できる）。
+        **付け忘れは型チェックを通る**（`moduleResolution: "bundler"` は拡張子なしも許す）。
+        Nodeから読まれるファイル（テストが読むもの）では、`npm test` が実行時に
+        失敗して分かる。
 -   テストはNodeの型を使うので、テストと `src/testing/` の型チェックは
     `tsconfig.test.json` で別に行う（`npm run typecheck` が両方を実行する）。
     アプリ本体の `tsconfig.json` には含めない。含めると、`Buffer` などNodeだけの型が
     アプリ側でも通ってしまう。
+-   エディタ（tsserver）は `tsconfig.json` しか読まず、そこから除外したテストを
+    `tsconfig.test.json` では解析しない。Nodeの型が無いと、`node:test` などのimportが
+    エディタでエラー表示になる（`npm run typecheck` の結果とは食い違う）。そのため、
+    テストファイルと `src/testing/` のファイルは、先頭（コメントの後、importの前）に
+    `/// <reference types="node" />` を書く。

@@ -77,9 +77,10 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
 -   DBへの書き込みは、必ず `Database.transaction` の中で行う（expo-sqliteの
     `withTransactionAsync` は排他ではないため）。`Database` を読み取り専用の型に
     しているのはこのためで、`runAsync` を直接呼べるように型を緩めない。
--   `src/` のコードはNodeのテスト（`npm test`）からも直接実行する。importは
-    `.ts` 付き、型だけは `import type`、enumやコンストラクタ引数プロパティは使わない
-    （tsconfigで検出する）。
+-   `src/` のコードはNodeのテスト（`npm test`）からも直接実行する。型だけのimportは
+    `import type`、enumやコンストラクタ引数プロパティは使わない（tsconfigで検出する）。
+    importは `.ts` 付き（付け忘れは型チェックを通り、`npm test` の実行時にだけ失敗する）。
+    テストファイルの先頭には `/// <reference types="node" />` を置く（エディタ用）。
 -   タグ名の正規化は `normalize('NFKD').normalize('NFC')`。`normalize('NFKC')` 1回に
     「簡略化」しない（iOSのHermesは半角カナの濁点を合成しない。Nodeのテストでは検出できない）。
 
