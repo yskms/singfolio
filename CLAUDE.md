@@ -78,6 +78,15 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
 -   English First。ただし最初から日本語対応を前提とし、画面の文言は直書きせず
     多言語化の仕組みを通す。初期言語は端末設定から決める。
 
+### ネイティブビルド
+
+-   `ios/`・`android/` は `expo prebuild` の生成物（gitignore）。直接直さず、
+    app.json と `plugins/` で設定する。
+-   `plugins/withIosSceneDelegate.js` は、iOS 27 SDK（Xcode 27）の UIScene 必須化
+    （未対応だと起動直後にクラッシュする）への対応で、削除しない。Expo SDK 58 の
+    テンプレートが同じ配線を持つので、SDK 58 へ上げるときにこのプラグインと
+    app.json の登録を撤去する。
+
 ## ブランド
 
 元データは `docs/Singfolio ブランドスタイルガイドとアプリ展示板.png`（画像のため
