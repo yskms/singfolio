@@ -33,7 +33,9 @@
         }
       ],
       "expo-sqlite",
-      "./plugins/withIosSceneDelegate.js"
+      "./plugins/withIosSceneDelegate.js",
+      "expo-router",
+      "expo-font"
     ]
   }
 }

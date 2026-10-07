@@ -1,10 +1,12 @@
+import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
 
-import { getServices } from './src/services';
+import { getServices } from '../src/services';
 
-export default function App() {
+// 画面は、全タブをこのStackの1画面（(tabs)）として載せる。Song Detail・Add / Edit・
+// Show Mode・Settingsは、このStackに足していく（タブバーを隠して全画面で出す）。
+export default function RootLayout() {
   const [ready, setReady] = useState(false);
   // reject の値が undefined などでも失敗を検知できるよう、包んで保持する。
   const [failure, setFailure] = useState<{ error: unknown } | null>(null);
@@ -24,18 +26,9 @@ export default function App() {
   if (!ready) return null;
 
   return (
-    <View style={styles.container}>
-      <Text>Singfolio</Text>
+    <>
       <StatusBar style="auto" />
-    </View>
+      <Stack screenOptions={{ headerShown: false }} />
+    </>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
