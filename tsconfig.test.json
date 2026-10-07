@@ -1,0 +1,11 @@
+{
+  // テスト（`npm test`、Nodeで直接実行）の型チェック用。アプリ本体の型チェックは tsconfig.json。
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"],
+    // Nodeの型除去での実行には、import に拡張子（.ts）が必要。
+    "allowImportingTsExtensions": true
+  },
+  "include": ["${configDir}/src/**/*.test.ts"],
+  "exclude": ["${configDir}/node_modules"]
+}

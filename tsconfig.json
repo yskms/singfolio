@@ -1,7 +1,18 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    "strict": true,
-    "allowImportingTsExtensions": true
-  }
+    "strict": true
+  },
+  // テストはNodeの型が必要なため tsconfig.test.json で別に型チェックする。
+  // ここに含めると、Nodeのグローバル型（process など）がアプリ本体にも漏れる。
+  // exclude は継承されず置き換わるため、expo/tsconfig.base の既定分も書き直している。
+  "exclude": [
+    "${configDir}/node_modules",
+    "${configDir}/babel.config.js",
+    "${configDir}/metro.config.js",
+    "${configDir}/jest.config.js",
+    "${configDir}/android",
+    "${configDir}/ios",
+    "${configDir}/**/*.test.ts"
+  ]
 }

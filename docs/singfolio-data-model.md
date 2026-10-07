@@ -95,5 +95,10 @@ SQLiteで列の型や制約を変えるには、新テーブルを作ってコ�
 
 `npm test` で、実行器とv1スキーマのテスト（`src/db/migrate.test.ts`）を実行する。
 Node標準の `node:sqlite` で動かしており、実機の `expo-sqlite` とは別の実装のため、
-通っても実機での確認の代わりにはならない。マイグレーションを追加したときは、
+通っても実機での確認の代わりにはならない。
+
+-   TypeScriptのまま直接実行するため、Node 22.18以降が必要（`.node-version`）。
+-   テストはNodeの型を使うので、型チェックは `tsconfig.test.json` で別に行う
+    （`npm run typecheck` が両方を実行する）。アプリ本体の `tsconfig.json` には
+    含めない。含めると、`Buffer` などNodeだけの型がアプリ側でも通ってしまう。マイグレーションを追加したときは、
 実機（iOS / Android）で起動して、DBが期待のバージョンになることも確認する。
