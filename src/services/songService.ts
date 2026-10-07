@@ -8,6 +8,7 @@ import {
 import type { SongRepository } from '../repositories/songRepository.ts';
 import type { TagRepository } from '../repositories/tagRepository.ts';
 import { ServiceError } from './errors.ts';
+import { normalizeText } from './text.ts';
 
 /** 曲の編集画面で保存する内容。 */
 export interface SongInput {
@@ -30,11 +31,11 @@ export interface SongServiceDeps {
   tags: TagRepository;
 }
 
-/** 入力を検証し、保存する形（前後の空白の除去、タグIDの重複の除去）にする。 */
+/** 入力を検証し、保存する形（曲名・アーティストの正規化、タグIDの重複の除去など）にする。 */
 function normalizeInput(input: SongInput): SongInput {
-  const title = input.title.trim();
+  const title = normalizeText(input.title);
   if (title === '') throw new ServiceError('title-required');
-  const artist = input.artist.trim();
+  const artist = normalizeText(input.artist);
   if (artist === '') throw new ServiceError('artist-required');
   if (!isSongStatus(input.status)) throw new ServiceError('invalid-status');
   if (!Number.isSafeInteger(input.keyOffset)) {
@@ -114,7 +115,9 @@ export function createSongService({ db, songs, tags }: SongServiceDeps) {
     },
 
     listSongs(query: SongListQuery = {}): Promise<Song[]> {
-      return songs.list(db, { ...query, search: query.search?.trim() });
+      // 検索語も、保存する曲名・アーティストと同じ正規化にそろえる。
+      const search = query.search === undefined ? undefined : normalizeText(query.search);
+      return songs.list(db, { ...query, search });
     },
 
     countSongsByStatus(): Promise<Record<SongStatus, number>> {

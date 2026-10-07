@@ -1,5 +1,6 @@
 // SongService（とSongRepository）のテスト。`npm test` で実行する。
 // 実際のSQL（node:sqlite）に対して動かす。実機のexpo-sqliteでの確認の代わりにはならない。
+/// <reference types="node" />
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
@@ -93,6 +94,20 @@ describe('createSong', () => {
       privateNote: '  1行目\n2行目\n',
     });
     assert.equal(noted.privateNote, '1行目\n2行目', '内側の改行は残す');
+  });
+
+  it('Title / Artist の分解された濁点（NFD）は、合成した形にそろえて保存する', async () => {
+    const { services } = await setup();
+    const song = await services.songs.createSong({
+      title: 'ホ\u3099カロ',
+      artist: 'ハ\u309aスピッツ',
+      status: 'ready',
+    });
+    assert.equal(song.title, 'ボカロ');
+    assert.equal(song.artist, 'パスピッツ');
+    // 普通に入力した形でも、分解した形で貼り付けた検索語でも、見つかる。
+    assert.equal((await services.songs.listSongs({ search: 'ボカ' })).length, 1);
+    assert.equal((await services.songs.listSongs({ search: 'ホ\u3099カ' })).length, 1);
   });
 
   it('Title / Artist が空（空白だけを含む）なら保存しない', async () => {
@@ -485,6 +500,23 @@ describe('listSongs', () => {
     assert.deepEqual(await sorted('updatedAt', 'desc'), ['Cherry', 'Zeal', 'Sign', 'hanabi']);
     assert.deepEqual(await sorted('updatedAt', 'asc'), ['hanabi', 'Sign', 'Zeal', 'Cherry']);
     assert.deepEqual(await sorted('createdAt', 'asc'), ['Cherry', 'hanabi', 'Sign', 'Zeal']);
+  });
+
+  it('一覧にない並び替えのキー・方向は、既定（更新日の降順）にする', async () => {
+    const { services } = await seeded();
+    const expected = ['Zeal', 'Sign', 'hanabi', 'Cherry'];
+    // 型の外から来た値（保存した設定の読み戻しなど）。プロトタイプ上の名前も含める。
+    for (const sortBy of ['nope', 'constructor', 'toString', '__proto__', '']) {
+      assert.deepEqual(
+        titles(await services.songs.listSongs({ sortBy: sortBy as never })),
+        expected,
+        sortBy,
+      );
+    }
+    assert.deepEqual(
+      titles(await services.songs.listSongs({ direction: 'sideways' as never })),
+      expected,
+    );
   });
 
   it('並べ替えの値が同じ曲は、毎回同じ順序になる', async () => {

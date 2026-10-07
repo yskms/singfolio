@@ -1,8 +1,27 @@
 // タグ名の正規化（text.ts）のテスト。`npm test` で実行する。
+/// <reference types="node" />
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { normalizeTagName, tagNameKey } from './text.ts';
+import { normalizeTagName, normalizeText, tagNameKey } from './text.ts';
+
+describe('normalizeText（曲名・アーティスト）', () => {
+  it('前後の空白（全角を含む）を除く', () => {
+    assert.equal(normalizeText('  チェリー\u3000'), 'チェリー');
+    assert.equal(normalizeText(' \u3000 '), '');
+  });
+
+  it('分解された濁点（NFD）を、合成した形（NFC）にそろえる', () => {
+    assert.equal(normalizeText('ホ\u3099ウイ'), 'ボウイ');
+    assert.equal(normalizeText('e\u0301'), 'é');
+  });
+
+  it('全角半角・大文字小文字・内側の空白は変えない', () => {
+    assert.equal(normalizeText('Ｔ.Ｍ.Revolution'), 'Ｔ.Ｍ.Revolution');
+    assert.equal(normalizeText('ﾎﾞｶﾛ'), 'ﾎﾞｶﾛ');
+    assert.equal(normalizeText('Hard   Rock'), 'Hard   Rock');
+  });
+});
 
 describe('normalizeTagName', () => {
   it('前後の空白（全角を含む）を除き、連続する空白を半角空白1つにする', () => {
@@ -26,6 +45,13 @@ describe('normalizeTagName', () => {
     assert.equal(normalizeTagName('ﾎﾞ'), 'ボ');
     assert.equal(normalizeTagName('ﾊﾟ'), 'パ');
     assert.equal(normalizeTagName('ﾎﾞ'), 'ボ');
+  });
+
+  it('NFKCは互換文字も変換する（タグ名ではこれを許容する）', () => {
+    assert.equal(normalizeTagName('①'), '1');
+    assert.equal(normalizeTagName('™'), 'TM');
+    assert.equal(normalizeTagName('㈱'), '(株)');
+    assert.equal(normalizeTagName('½'), '1\u20442');
   });
 
   it('大文字小文字は変えない', () => {

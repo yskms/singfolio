@@ -78,6 +78,15 @@ const SORT_COLUMNS: Record<SongSortKey, string> = {
   updatedAt: 's.updated_at',
 };
 
+// 型の外から来た値（端末に保存した並び順の設定の読み戻しなど）でも、SQLを壊さない
+// よう、一覧にないキーは既定（更新日）にする。`SORT_COLUMNS['constructor']` のような
+// プロトタイプ上の名前は、自身のプロパティだけを見て弾く。
+function sortColumn(key: SongSortKey | undefined): string {
+  return key !== undefined && Object.prototype.hasOwnProperty.call(SORT_COLUMNS, key)
+    ? SORT_COLUMNS[key]
+    : SORT_COLUMNS.updatedAt;
+}
+
 // LIKE のワイルドカード（% _）とエスケープ文字を、文字そのものとして扱う。
 function escapeLike(text: string): string {
   return text.replace(/[\\%_]/g, '\\$&');
@@ -119,8 +128,9 @@ export function createSongRepository(env: RepositoryEnv) {
       }
 
       const where = conditions.length > 0 ? ` WHERE ${conditions.join(' AND ')}` : '';
-      const primary = SORT_COLUMNS[query.sortBy ?? 'updatedAt'];
-      const direction = (query.direction ?? 'desc') === 'asc' ? 'ASC' : 'DESC';
+      const primary = sortColumn(query.sortBy);
+      // 'asc' 以外（不正な値を含む）は降順。
+      const direction = query.direction === 'asc' ? 'ASC' : 'DESC';
       // 主キー以外は常に昇順で、同順位の曲の並びが毎回同じになるようにする。
       const orderBy =
         ` ORDER BY ${primary} ${direction}, s.title COLLATE NOCASE, ` +
