@@ -1,4 +1,4 @@
-import type { Migration } from './migrate';
+import type { Migration } from './migrate.ts';
 
 // 一度リリースしたマイグレーションは書き換えない。スキーマを変える場合は、
 // 末尾に次の番号のマイグレーションを追加する。

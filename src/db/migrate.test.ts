@@ -4,6 +4,7 @@
 // 実機での確認の代わりにはならない（特にトランザクションまわり）。
 // そのためアダプターは、expo-sqliteの withTransactionAsync と同じく
 // BEGIN / COMMIT / ROLLBACK を発行するだけの形にしている。
+/// <reference types="node" />
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { DatabaseSync } from 'node:sqlite';

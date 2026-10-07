@@ -1,7 +1,7 @@
 import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
 
-import { runMigrations } from './migrate';
-import { migrations } from './migrations';
+import { runMigrations } from './migrate.ts';
+import { migrations } from './migrations.ts';
 
 const DATABASE_NAME = 'singfolio.db';
 

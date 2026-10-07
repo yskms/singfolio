@@ -4,6 +4,7 @@
 // 実機のexpo-sqliteとは別実装なので、ここで通っても実機での確認の代わりには
 // ならない。アダプターは、expo-sqliteの withTransactionAsync と同じく
 // BEGIN / COMMIT / ROLLBACK を発行するだけの形にしている。
+/// <reference types="node" />
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
 
 import { createDatabase, type RawDatabase } from '../db/appDatabase.ts';

@@ -1,5 +1,6 @@
 // TagService（とTagRepository）のテスト。`npm test` で実行する。
 // 実際のSQL（node:sqlite）に対して動かす。実機のexpo-sqliteでの確認の代わりにはならない。
+/// <reference types="node" />
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
