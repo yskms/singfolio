@@ -114,14 +114,23 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
 -   English First。ただし最初から日本語対応を前提とし、画面の文言は直書きせず
     多言語化の仕組みを通す。初期言語は端末設定から決める。
 -   文言は `src/i18n/en.ts` が正（キーの一覧）。`ja.ts` は同じキーを型で強制される。
-    画面は `ui/i18n.tsx` の `useI18n()` の `t` から取る。`Intl.PluralRules` は使わない
-    （Hermesには無い。iOS・Androidで確認）。件数の形は `src/i18n/translate.ts` の `pluralRules` で選ぶ。
+    画面は `ui/i18n.tsx` の `useI18n()` の `t` から取る。`t` は、文言の `{name}`（件数の
+    文言は `count`）の値を型で必須にする（`en.ts` の `as const` を外さない）。
+    `Intl.PluralRules` は使わない（Hermesには無い。iOS・Androidで確認）。件数の形は
+    `src/i18n/translate.ts` の `pluralRules` で選ぶ。
 -   言語を足すときは、`LANGUAGES`（`src/domain/types.ts`）と、app.json の
     expo-localization の `supportedLocales`（ios）の両方に足す。後者はJSから読めず
     手で写していて、`npm test` が食い違いを検出する。
 -   選んだ言語だけを保存し、選ぶまでは端末の言語に従う（`getLanguage` は未選択で
     `null`）。初回起動で端末の言語を保存しない（保存すると、端末の言語の変更に
-    追従できなくなる）。
+    追従できなくなる）。選んだ後に端末の言語へ戻す操作は、意図して持たない
+    （理由は `docs/singfolio-screen-flow.md` の Language）。
+-   DBが使えない画面（起動時の失敗を出すエラー画面。`ErrorBoundary` は `app/_layout.tsx`
+    の Provider の外で描画される）は、`<I18nProvider initialLanguage={null}>` で包んで
+    端末の言語で出す。`+not-found` は Stack の中の画面なので、普通に `useI18n()` が使える。
+-   OS標準の部品の文言は端末の言語に従い、アプリ内の言語とずれる。`Alert.alert` のボタン
+    など、文言を指定できるものは省略せず `t` で渡す（省略すると既定の「OK」が端末の言語で
+    出る）。
 
 ### ネイティブビルド
 
