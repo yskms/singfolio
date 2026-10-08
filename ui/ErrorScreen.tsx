@@ -32,7 +32,9 @@ function ErrorContent({ error, retry }: ErrorBoundaryProps) {
  * Expo Router の `ErrorBoundary`（`app/_layout.tsx` が export する）として使う。
  *
  * ルートの `ErrorBoundary` は `app/_layout.tsx` の Provider の外で描画される。DBが使えない
- * 場面もあるため、保存した設定は読まず、端末の言語（`system`）で出す（配色も、端末の設定に従う）。
+ * 場面もあるため、保存した設定は読まず、言語は常に端末の言語（`system`）で出す。配色は
+ * `useColorScheme()` に従うので、起動に失敗したときは端末の設定、起動が終わった後の描画の
+ * 失敗では、`applyAppearance` で反映済みの保存したAppearance。
  */
 export function ErrorScreen(props: ErrorBoundaryProps) {
   return (

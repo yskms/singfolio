@@ -1,5 +1,4 @@
-import { DatabaseTooNewError } from '../db/errors.ts';
-import { ServiceError, type ServiceErrorCode } from '../services/errors.ts';
+import { DatabaseTooNewError, ServiceError, type ServiceErrorCode } from '../services/errors.ts';
 import type { MessageKey } from './en.ts';
 
 /** エラーの文言のキー。値（`{name}`）の要らない文言だけなので、`t(key)` とそのまま呼べる。 */

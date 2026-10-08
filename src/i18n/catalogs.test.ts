@@ -5,9 +5,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
-import { DatabaseTooNewError } from '../db/errors.ts';
 import { LANGUAGES } from '../domain/types.ts';
-import { ServiceError } from '../services/errors.ts';
+import { DatabaseTooNewError, ServiceError } from '../services/errors.ts';
 import { catalogs, createAppTranslator, errorMessageKey, errorScreenContent, type MessageKey } from './index.ts';
 import { en } from './en.ts';
 import { placeholderNames } from './translate.ts';
