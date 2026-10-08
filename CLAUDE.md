@@ -145,18 +145,24 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
 
 -   書体は表示言語で決める（English → Inter、日本語 → Noto Sans JP。`src/theme/fonts.ts`）。
     言語の設定（`system` を含む）に従い、切り替えは全画面にすぐ反映する。ユーザーが入力した
-    日本語を English の画面で出すときは、Inter にその字が無いため OS のフォントで表示される
-    （内容に応じた書体の切り替えはしていない）。
--   文字は React Native の `Text` ではなく `ui/Text.tsx` の `Text` を使う（直接importすると
-    OS既定の書体になる）。`TextInput` も `useFontFamily()` を `style` に渡して同じ書体にする。
-    ナビゲーション（ヘッダー・タブのラベル）の書体は `ui/theme.tsx` が渡す。
+    日本語を English の画面で出すときは、Inter にその字が無いため OS のフォントで表示される。
+    端末の言語に日本語が無いと、漢字が中国語の字形になりうる（未確認）が、許容している。
+    内容に応じた書体の切り替えはしない（決定済み。蒸し返さない）。
+-   文字は React Native の `Text` ではなく `ui/Text.tsx` の `Text` を使い、入力欄は
+    `ui/TextInput.tsx` の `TextInput` を使う（直接importするとOS既定の書体になる。RNの
+    `Button`・`Animated.Text` も同じ。`npm test` が検出する）。ナビゲーション（ヘッダー・
+    タブのラベル）の書体は `ui/theme.tsx` が渡す。
 -   `ui/Text.tsx` は Androidの `includeFontPadding: false` を既定にしている。外すと、
-    Noto Sans JP の行間がInterの約1.8倍に開く（日本語だけ画面が間延びする）。
+    Noto Sans JP の行間がInterの約1.8倍に開く（日本語だけ画面が間延びする）。ヘッダー・
+    タブのラベルは React Navigation が描くので、この指定は効かない（Androidの日本語で、
+    縦位置のずれ・切れは出ないことを確認済み）。
     Noto Sans JP は、`lineHeight` を指定しない行の高さも Inter より大きい（iOSで約1.2倍）。
     行の高さが要る画面は `lineHeight` を明示する。
 -   `fontWeight` は '400' / '700' だけ（Regular / Bold）。同梱しない太さ（'500'・'600' など）は、
     iOSとAndroidで近い太さの選び方が違い、見た目がずれる。SemiBold(600)は、サイズのため
-    同梱しない（700との違いがほとんど無く、並べて見比べて確認した）。
+    同梱しない（700との違いがほとんど無く、並べて見比べて確認した）。ナビゲーションの
+    テーマでは `medium` も Bold に寄るため、タブのラベルだけ `app/(tabs)/_layout.tsx` で
+    '400' にしている（モックアップは細い字）。
 -   フォントファイル（`assets/fonts/`）は、`useFonts` などで実行時に読み込まず、
     `expo prebuild` でネイティブに埋め込む（app.json の expo-font）。読み込みの待ち合わせが
     要らず、最初の画面から正しい書体で出る。`app/_layout.tsx` にフォントの待ち合わせは無い。
@@ -164,8 +170,11 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     `src/theme/fonts.test.ts` が検出する。起動はするが、OS既定の書体になる）。
 -   `assets/fonts/` は `scripts/generate-fonts.py` の生成物で、手で編集しない。Noto Sans JP は
     サイズのため（1ファイル約5.7MB → 約2.5MB）サブセット化していて（Windows日本語の
-    cp932 = JIS X 0208 + NEC・IBM拡張）、JIS X 0213 の第3・第4水準の漢字などは OS のフォントで
-    出る。丸ごとのフォントに戻さない。
+    cp932 = JIS X 0208 + NEC・IBM拡張。記号（♥♡™€など）と、結合用の記号も入れている）、
+    JIS X 0213 の第3・第4水準の漢字などは OS のフォントで出る。丸ごとのフォントに戻さない。
+    字を足すときは、サブセットに無い文字が混ざると、同じ行で書体が混ざる（♥が赤い絵文字に
+    なるなど）ことに注意する。生成は fonttools 4.66.1 で、同じ版なら何度作っても同じ
+    バイナリになる（版が違うと変わりうる）。
 -   `assets/fonts/OFL-*.txt` はフォントのライセンス（SIL OFL。再配布に付ける必要がある）。
     消さない。アプリ内のAbout（WBS 5.2）にも、同梱フォントのライセンスを表記する。
 

@@ -6,7 +6,7 @@ import type { Language } from '../domain/types.ts';
  * 同梱していない太さ（'500'・'600' など）は、iOS・Androidで近い太さの選び方が違い、
  * 見た目がずれる（`fontFamily` を指定すると、OSが太さを合成することもない）。
  * 増減するときは、scripts/generate-fonts.py と app.json の expo-font も同じにする
- * （`npm test` の src/theme/nativeConfig.test.ts が、app.json との食い違いを検出する）。
+ * （`npm test` の src/theme/fonts.test.ts が、app.json との食い違いを検出する）。
  */
 export const FONT_WEIGHTS = [400, 700] as const;
 

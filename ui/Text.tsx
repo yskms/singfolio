@@ -19,7 +19,7 @@ export function useFontFamily(): string {
  * 寸法（上下の余白）が大きく、行間が Inter の約1.8倍に開く（Androidエミュレータで確認）。
  * iOSには無い指定で、無視される。
  *
- * `TextInput` も同じ書体にする（`useFontFamily()` を `style` に渡す）。
+ * 入力欄は、同じ理由で `ui/TextInput.tsx` の `TextInput` を使う。
  */
 export function Text({ style, ...props }: TextProps) {
   const fontFamily = useFontFamily();

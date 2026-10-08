@@ -26,6 +26,10 @@ export default function TabsLayout() {
         // 選択中だけPurple、それ以外は控えめな色にする。
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,
+        // ラベルは Regular。ナビゲーションのテーマ（ui/theme.tsx）では、タブのラベルの
+        // `medium` が Bold に寄るため、ここで上書きする（ブランド資料のモックアップは、
+        // 選択中か否かを色だけで分けた細い字）。
+        tabBarLabelStyle: { fontWeight: '400' },
       }}
     >
       {TABS.map((tab) => (
