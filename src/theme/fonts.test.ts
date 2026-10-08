@@ -94,13 +94,17 @@ function fontUsageViolations(path: string, text: string): string[] {
   const violations: string[] = [];
   // `import ... from 'react-native'`（シングル・ダブルクォートの両方）
   // 節は、`import` の直後の、取りうる形（名前空間・`{...}`・既定+`{...}`・既定）だけを見る。
+  // 名前空間と既定のimportは、どちらも `RN.Text` と書けて、個別に確認できないので不可にする。
   // セミコロンで区切らない（無い書き方でも、前の行の import に続けて読まない）。
   const clausePattern = /import\s+((?:type\s+)?(?:\*\s*as\s+\w+|\w+\s*,\s*\{[^}]*\}|\{[^}]*\}|\w+))\s*from\s*['"]react-native['"]/g;
   for (const [, clause] of text.matchAll(clausePattern)) {
     if (/^type\s/.test(clause)) continue;
     if (/\*\s*as\s/.test(clause)) {
-      violations.push(`${path}: react-native を名前空間でimportしている（Text などを個別に確認できない）`);
+      violations.push(`${path}: react-native を名前空間でimportしている（RN.Text のように書けて、確認できない）`);
       continue;
+    }
+    if (/^\w+\s*(,|$)/.test(clause)) {
+      violations.push(`${path}: react-native を既定でimportしている（RN.Text のように書けて、確認できない）`);
     }
     const names = (clause.match(/\{([^}]*)\}/)?.[1] ?? '')
       .split(',')
@@ -169,9 +173,11 @@ const s = { fontWeight: '700', other: { fontWeight: "400" } };`),
     assert.deepEqual(violations(`import { Text } from '../ui/Text'\nimport { View } from 'react-native'`), []);
   });
 
-  it('既定のimportと並べた書き方も検出する', () => {
-    assert.equal(violations(`import RN, { Text } from 'react-native';`).length, 1);
-    assert.deepEqual(violations(`import RN from 'react-native';`), []);
+  it('既定のimportも、名前空間と同じく検出する（`RN.Text` と書けるため）。並べた Text も別に検出する', () => {
+    assert.equal(violations(`import RN from 'react-native';`).length, 1);
+    assert.equal(violations(`import RN, { View } from 'react-native';`).length, 1);
+    assert.equal(violations(`import RN, { Text } from 'react-native';`).length, 2);
+    assert.deepEqual(violations(`import type RN from 'react-native';`), []);
   });
 
   it('名前空間のimportと Animated.Text を検出する', () => {
