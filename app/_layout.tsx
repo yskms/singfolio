@@ -45,8 +45,8 @@ export default function RootLayout() {
   // 起動時のDB初期化に失敗したらアプリとして動作できないため、例外にして、上でexportした
   // ErrorBoundary（エラー画面）に任せる。再試行（エラー画面のボタン）はこのレイアウトを
   // 作り直すので、起動処理が最初からやり直される（getServices は失敗を覚えない）。
-  // Errorでない値は包む。undefinedなどの値だと、Expo Routerは「エラーなし」と見て、
-  // エラー画面を出さずにレイアウトを描き直す（失敗し続ける限り繰り返す）。
+  // Errorでない値は包む。Expo Routerの Try は、falsyな値（undefinedなど）を「エラーなし」と
+  // 見て、エラー画面を出さずにレイアウトを描き直す（ソースを読んで確認。実機では未確認）。
   if (failure) throw failure.error instanceof Error ? failure.error : new Error(String(failure.error));
   // スプラッシュは、Expo Routerがナビゲーションの準備完了（下のStackを描画した後）に
   // 閉じる。そのため、ここでnullを返している間（DB初期化中）はスプラッシュが残る。

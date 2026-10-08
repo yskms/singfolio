@@ -99,8 +99,8 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
 -   起動の失敗は、`app/_layout.tsx` が例外にして、`ErrorBoundary`（`ui/ErrorScreen.tsx`）に
     任せる。レイアウトが自前でエラー画面を返さない（Expo Routerは、ErrorBoundaryを描画する
     ときにスプラッシュを閉じる。自前で返すとナビゲーションが準備完了にならず、スプラッシュが
-    残り続けうる）。投げる値は `Error` に包む（undefinedなどだと、Expo Routerは「エラーなし」と
-    見て、エラー画面を出さずにレイアウトを描き直す）。アプリより新しいDB
+    残り続けうる）。投げる値は `Error` に包む（Expo Routerの `Try` は、falsyな値を「エラーなし」と
+    見てレイアウトを描き直す実装。ソースを読んで確認したもので、実機では試していない）。アプリより新しいDB
     （`DatabaseTooNewError`）は、やり直しても開けないので「もう一度試す」を出さない。
 -   RN・Expoに依存するUIの部品・hookは、`src/` に置けないため `ui/`（ルート直下）に置く。
 -   色は `src/theme/colors.ts`（Nodeでも実行できる）に集約し、画面は `ui/theme.tsx` の
