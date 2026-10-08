@@ -10,7 +10,9 @@ export interface PluralMessage {
 }
 
 /**
- * `{name}` の部分は、`translate` に渡す値で置き換える。
+ * `{name}` の部分は、`translate` に渡す値で置き換える。名前は英数字と `_` だけ
+ * （型は `{` と `}` の間をすべて名前と見るが、実行時の置き換えは `\w` だけ。食い違う
+ * 文言は `catalogs.test.ts` が検出する）。波括弧は、この形以外では使えない。
  */
 export type Message = string | PluralMessage;
 
@@ -29,7 +31,20 @@ export type MessageParams<M extends Message> = M extends string
       count: number;
     };
 
-/** 値の要らない文言は引数なし、要る文言は値を必須にする。 */
-export type TranslateArgs<M extends Message> = keyof MessageParams<M> extends never
+type UnionToIntersection<U> = (U extends unknown ? (x: U) => void : never) extends (
+  x: infer I,
+) => void
+  ? I
+  : never;
+
+/**
+ * 値の要らない文言は引数なし、要る文言は値を必須にする。キーが union のとき
+ * （`` t(`status.${status}`) `` など）は、どの文言にも足りる値（それぞれの必須の値を
+ * すべて合わせたもの）を要求する。union の `keyof` は共通のキーだけになり、値の要る文言が
+ * 混ざっていても「値なし」と判定されてしまうため、交差にしてから判定する。
+ */
+export type TranslateArgs<M extends Message> = keyof UnionToIntersection<
+  MessageParams<M>
+> extends never
   ? []
-  : [params: MessageParams<M>];
+  : [params: UnionToIntersection<MessageParams<M>>];

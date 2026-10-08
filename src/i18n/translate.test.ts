@@ -78,6 +78,15 @@ describe('createTranslator', () => {
     // @ts-expect-error unknown は文言に無い
     assert.equal(en('unknown'), 'unknown');
   });
+
+  it('Object のプロパティ名（constructor など）は、カタログのキーと見なさない', () => {
+    // @ts-expect-error constructor は文言に無い
+    assert.equal(en('constructor'), 'constructor');
+    // @ts-expect-error toString は文言に無い
+    assert.equal(en('toString', { name: 'x' }), 'toString');
+    // @ts-expect-error __proto__ は文言に無い
+    assert.equal(en('__proto__'), '__proto__');
+  });
 });
 
 describe('t の引数の型', () => {
@@ -103,5 +112,19 @@ describe('t の引数の型', () => {
     en('songs', { count: '1' });
     en('hello', { name: 'x' });
     en('hello', { name: 1 });
+  });
+
+  it('キーが union のときは、どの文言にも足りる値を要求する（値の要る文言が混ざっていても素通りしない）', () => {
+    const mixed = 'hello' as 'hello' | 'plain';
+    // @ts-expect-error hello の name が要る
+    en(mixed);
+    en(mixed, { name: 'x' });
+    const plurals = 'songs' as 'songs' | 'songsBy';
+    // @ts-expect-error songsBy の artist が要る
+    en(plurals, { count: 1 });
+    en(plurals, { count: 1, artist: 'Ann' });
+    // 値の要らない文言だけの union は、値なしで呼べる。
+    const noParams = 'plain' as 'plain';
+    en(noParams);
   });
 });

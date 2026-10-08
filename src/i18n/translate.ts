@@ -13,6 +13,11 @@ const pluralRules: Record<Language, (count: number) => PluralCategory> = {
 
 export type TranslateParams = Record<string, string | number>;
 
+// Object.hasOwn は、Hermesでの対応を確認していないため使わない。
+function hasOwn(object: object, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(object, key);
+}
+
 /** キーごとに、文言が要求する値を型で要求する関数（`Catalog` は、キーの型を決める文言の型）。 */
 export type Translator<Catalog extends Readonly<Record<string, Message>>> = <
   Key extends keyof Catalog & string,
@@ -36,9 +41,10 @@ export function createTranslator<Catalog extends Readonly<Record<string, Message
   language: Language,
 ): Translator<Catalog> {
   const translate = (key: keyof Catalog & string, params?: TranslateParams): string => {
-    const message: Message | undefined = catalog[key];
     // 型で防いでいるキーの誤り（カタログとの食い違いなど）でも、画面は止めない。
-    if (message === undefined) return key;
+    // `constructor` などObjectのプロパティ名も、カタログのキーとは見なさない。
+    if (!hasOwn(catalog, key)) return key;
+    const message: Message = catalog[key];
     let template: string;
     if (typeof message === 'string') {
       template = message;
@@ -49,7 +55,7 @@ export function createTranslator<Catalog extends Readonly<Record<string, Message
     }
     if (!params) return template;
     return template.replace(/\{(\w+)\}/g, (placeholder, name: string) =>
-      Object.hasOwn(params, name) ? String(params[name]) : placeholder,
+      hasOwn(params, name) ? String(params[name]) : placeholder,
     );
   };
   return translate as Translator<Catalog>;

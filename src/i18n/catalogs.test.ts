@@ -54,6 +54,16 @@ describe('catalogs', () => {
     }
   });
 
+  it('波括弧は {name}（英数字と _ だけの名前）の形だけ。型の読み取りと実行時の置き換えが食い違わない', () => {
+    for (const language of LANGUAGES) {
+      for (const key of keys) {
+        for (const form of forms(catalogs[language][key])) {
+          assert.doesNotMatch(form.replace(/\{\w+\}/g, ''), /[{}]/, `${language}: ${key}`);
+        }
+      }
+    }
+  });
+
   it('{name} の名前が、言語間で食い違わない（呼び出し側が渡す値は言語によらず同じ）', () => {
     const names = (message: Message) =>
       [...new Set(forms(message).flatMap(placeholderNames))].sort();
