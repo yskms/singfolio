@@ -81,11 +81,11 @@ UIの表示名「My Key」は、モデル・DBでは `keyOffset` / `key_offset` 
 -   `appearance`: `system` / `light` / `dark`。未保存の場合は `system`（端末の設定に従う）。
     保存された値が上の3つ以外（将来のバージョンが書いた値など）でも、エラーにせず `system`
     として読む（起動を止めない）。
--   `language`: `en` / `ja`。**利用者が選んだときだけ保存する**。未保存は「選んでいない」
-    （端末の言語に従う。決め方は `singfolio-screen-flow.md` のLanguage）で、初回起動時に
-    端末の言語を書き込まない（書くと、端末の言語が後で変わっても追従できなくなる）。
-    Serviceは未保存を `null` で返す。保存された値が上の2つ以外（将来のバージョンが
-    追加した言語など）でも、エラーにせず `null` として読む（起動を止めない）。
+-   `language`: `system` / `en` / `ja`。未保存の場合は `system`（端末の言語に従う。決め方は
+    `singfolio-screen-flow.md` のLanguage）。初回起動時に、端末の言語から決めた言語
+    （`en` / `ja`）を書き込まない（書くと、System のまま端末の言語に追従できなくなる）。
+    保存された値が上の3つ以外（将来のバージョンが追加した言語など）でも、エラーにせず
+    `system` として読む（起動を止めない）。
 
 ## Repository / Service層
 
@@ -120,7 +120,7 @@ expo-sqliteの `withTransactionAsync` は排他ではなく、トランザクシ
     `updateSong`（編集画面の保存。全項目を置き換える）/ `setStatus`（Song Detail・
     Practiceの「Mark as Ready」）/ `deleteSong`
 -   `settings`: `getAppearance` / `setAppearance`（`system` / `light` / `dark`）、
-    `getLanguage`（未選択は `null`）/ `setLanguage`（`en` / `ja`）
+    `getLanguageSetting` / `setLanguageSetting`（`system` / `en` / `ja`）
 -   `tags`: `listTags` / `getOrCreateTag`（曲の編集画面の「新規タグ作成」。同じ名前の
     タグがあればそれを返す）/ `renameTag` / `deleteTag`
 -   不正な入力・存在しない対象は、`ServiceError` で reject する。`code` は

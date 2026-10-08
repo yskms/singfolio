@@ -121,12 +121,12 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
 -   言語を足すときは、`LANGUAGES`（`src/domain/types.ts`）と、app.json の
     expo-localization の `supportedLocales`（ios）の両方に足す。後者はJSから読めず
     手で写していて、`npm test` が食い違いを検出する。
--   選んだ言語だけを保存し、選ぶまでは端末の言語に従う（`getLanguage` は未選択で
-    `null`）。初回起動で端末の言語を保存しない（保存すると、端末の言語の変更に
-    追従できなくなる）。選んだ後に端末の言語へ戻す操作は、意図して持たない
-    （理由は `docs/singfolio-screen-flow.md` の Language）。
+-   言語の設定は `system` / `en` / `ja`（Appearanceと同じ形）。未保存は `system`
+    （端末の言語に従う）。初回起動で、端末の言語から決めた言語を保存しない（保存すると、
+    `system` のまま端末の言語の変更に追従できなくなる）。実際に使う言語は
+    `resolveLanguage`（設定と端末の言語から決める）。
 -   DBが使えない画面（起動時の失敗を出すエラー画面。`ErrorBoundary` は `app/_layout.tsx`
-    の Provider の外で描画される）は、`<I18nProvider initialLanguage={null}>` で包んで
+    の Provider の外で描画される）は、`<I18nProvider initialSetting="system">` で包んで
     端末の言語で出す。`+not-found` は Stack の中の画面なので、普通に `useI18n()` が使える。
 -   OS標準の部品の文言は端末の言語に従い、アプリ内の言語とずれる。`Alert.alert` のボタン
     など、文言を指定できるものは省略せず `t` で渡す（省略すると既定の「OK」が端末の言語で
