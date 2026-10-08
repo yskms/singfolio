@@ -141,6 +141,34 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     など、文言を指定できるものは省略せず `t` で渡す（省略すると既定の「OK」が端末の言語で
     出る）。
 
+### フォント
+
+-   書体は表示言語で決める（English → Inter、日本語 → Noto Sans JP。`src/theme/fonts.ts`）。
+    言語の設定（`system` を含む）に従い、切り替えは全画面にすぐ反映する。ユーザーが入力した
+    日本語を English の画面で出すときは、Inter にその字が無いため OS のフォントで表示される
+    （内容に応じた書体の切り替えはしていない）。
+-   文字は React Native の `Text` ではなく `ui/Text.tsx` の `Text` を使う（直接importすると
+    OS既定の書体になる）。`TextInput` も `useFontFamily()` を `style` に渡して同じ書体にする。
+    ナビゲーション（ヘッダー・タブのラベル）の書体は `ui/theme.tsx` が渡す。
+-   `ui/Text.tsx` は Androidの `includeFontPadding: false` を既定にしている。外すと、
+    Noto Sans JP の行間がInterの約1.8倍に開く（日本語だけ画面が間延びする）。
+    Noto Sans JP は、`lineHeight` を指定しない行の高さも Inter より大きい（iOSで約1.2倍）。
+    行の高さが要る画面は `lineHeight` を明示する。
+-   `fontWeight` は '400' / '700' だけ（Regular / Bold）。同梱しない太さ（'500'・'600' など）は、
+    iOSとAndroidで近い太さの選び方が違い、見た目がずれる。SemiBold(600)は、サイズのため
+    同梱しない（700との違いがほとんど無く、並べて見比べて確認した）。
+-   フォントファイル（`assets/fonts/`）は、`useFonts` などで実行時に読み込まず、
+    `expo prebuild` でネイティブに埋め込む（app.json の expo-font）。読み込みの待ち合わせが
+    要らず、最初の画面から正しい書体で出る。`app/_layout.tsx` にフォントの待ち合わせは無い。
+    app.json の書体名・太さは `src/theme/fonts.ts` と手で揃える（食い違いは `npm test` の
+    `src/theme/fonts.test.ts` が検出する。起動はするが、OS既定の書体になる）。
+-   `assets/fonts/` は `scripts/generate-fonts.py` の生成物で、手で編集しない。Noto Sans JP は
+    サイズのため（1ファイル約5.7MB → 約2.5MB）サブセット化していて（Windows日本語の
+    cp932 = JIS X 0208 + NEC・IBM拡張）、JIS X 0213 の第3・第4水準の漢字などは OS のフォントで
+    出る。丸ごとのフォントに戻さない。
+-   `assets/fonts/OFL-*.txt` はフォントのライセンス（SIL OFL。再配布に付ける必要がある）。
+    消さない。アプリ内のAbout（WBS 5.2）にも、同梱フォントのライセンスを表記する。
+
 ### ネイティブビルド
 
 -   `ios/`・`android/` は `expo prebuild` の生成物（gitignore）。直接直さず、
@@ -180,7 +208,7 @@ grepできないので、値はここに転記している）。色は定数に�
 -   MintとPurpleは、`assets/icon.png` の色で確定している。PNGに書かれた
     `#CFF7E9` / `#A78BFA` は使わない（Mintはラベルの値だけがずれており、
     Purpleはラベルの値も色見本の実際の色もアイコンと一致せず、どちらも正確ではないため）。
--   フォントは英語がInter、日本語がNoto Sans JP。
+-   フォントは英語がInter、日本語がNoto Sans JP（実装は「フォント」節）。
 -   PNG上のSurfaceの文字は「#F7F778」と崩れて読めるが、色見本はほぼ白のため
     `#F7F7F8` と解釈している。
 -   ダークモードの色コードはPNGに記載がなく、モックアップ（暗い背景に明るいミント/

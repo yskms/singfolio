@@ -1,4 +1,4 @@
-import { DefaultTheme, ThemeProvider as NavigationThemeProvider, type Theme } from 'expo-router';
+import { ThemeProvider as NavigationThemeProvider, type Theme } from 'expo-router';
 import * as SystemUI from 'expo-system-ui';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Appearance as NativeAppearance, useColorScheme } from 'react-native';
@@ -6,6 +6,8 @@ import { Appearance as NativeAppearance, useColorScheme } from 'react-native';
 import type { Appearance } from '../src/domain/types';
 import { getServices } from '../src/services';
 import { colorsByScheme, type ColorSchemeName, type ThemeColors } from '../src/theme/colors';
+import { navigationFonts } from '../src/theme/fonts';
+import { useFontFamily } from './Text';
 
 /**
  * 外観の設定（System / Light / Dark）をアプリ全体へ反映する。
@@ -54,8 +56,9 @@ export function useAppearance(): AppearanceContextValue {
 
 /**
  * ナビゲーション（ヘッダー・タブバー・画面の背景）と、ルートビューの背景に、
- * テーマの色を渡す。`initialAppearance` は、最初の画面を描く前に `applyAppearance` で
- * 端末へ反映済みの値（起動時に、既定の配色が一瞬見えないようにするため）。
+ * テーマの色を渡す。ナビゲーションの文字（ヘッダーの題・タブのラベル）の書体は、表示言語の
+ * 書体にする（`I18nProvider` の内側で使う）。`initialAppearance` は、最初の画面を描く前に
+ * `applyAppearance` で端末へ反映済みの値（起動時に、既定の配色が一瞬見えないようにするため）。
  */
 export function ThemeProvider({
   initialAppearance,
@@ -66,6 +69,7 @@ export function ThemeProvider({
 }) {
   const [appearance, setAppearanceState] = useState(initialAppearance);
   const { scheme, colors } = useTheme();
+  const fontFamily = useFontFamily();
 
   const setAppearance = useCallback(async (next: Appearance) => {
     const { settings } = await getServices();
@@ -96,9 +100,9 @@ export function ThemeProvider({
         border: colors.border,
         notification: colors.primary,
       },
-      fonts: DefaultTheme.fonts,
+      fonts: navigationFonts(fontFamily),
     }),
-    [scheme, colors],
+    [scheme, colors, fontFamily],
   );
 
   const appearanceValue = useMemo(() => ({ appearance, setAppearance }), [appearance, setAppearance]);

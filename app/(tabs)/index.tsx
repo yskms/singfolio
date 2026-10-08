@@ -1,6 +1,7 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { useI18n } from '../../ui/i18n';
+import { Text } from '../../ui/Text';
 import { useTheme } from '../../ui/theme';
 
 // 曲一覧（WBS 2.1）までのプレースホルダー。

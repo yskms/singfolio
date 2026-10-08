@@ -1,6 +1,7 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { useI18n } from '../../ui/i18n';
+import { Text } from '../../ui/Text';
 import { useTheme } from '../../ui/theme';
 
 // Profile（WBS 5.1）までのプレースホルダー。

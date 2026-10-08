@@ -57,11 +57,12 @@ export default function RootLayout() {
   if (settings === null) return null;
 
   return (
-    <ThemeProvider initialAppearance={settings.appearance}>
-      <I18nProvider initialSetting={settings.language}>
+    // ThemeProvider は、ナビゲーションの書体を表示言語から決めるため、I18nProvider の内側。
+    <I18nProvider initialSetting={settings.language}>
+      <ThemeProvider initialAppearance={settings.appearance}>
         <StatusBar style="auto" />
         <Stack screenOptions={{ headerShown: false }} />
-      </I18nProvider>
-    </ThemeProvider>
+      </ThemeProvider>
+    </I18nProvider>
   );
 }

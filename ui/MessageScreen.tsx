@@ -1,6 +1,7 @@
-import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
+import { Pressable, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Text } from './Text';
 import { useTheme } from './theme';
 
 /**
@@ -64,5 +65,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  buttonLabel: { fontSize: 16, fontWeight: '600' },
+  buttonLabel: { fontSize: 16, fontWeight: '700' },
 });
