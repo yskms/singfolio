@@ -1,5 +1,10 @@
 import type { Database } from '../db/appDatabase.ts';
-import { isAppearance, isLanguage, type Appearance, type Language } from '../domain/types.ts';
+import {
+  isAppearance,
+  isLanguageSetting,
+  type Appearance,
+  type LanguageSetting,
+} from '../domain/types.ts';
 import type { SettingsRepository } from '../repositories/settingsRepository.ts';
 import { ServiceError } from './errors.ts';
 
@@ -30,19 +35,19 @@ export function createSettingsService({ db, settings }: SettingsServiceDeps) {
     },
 
     /**
-     * 利用者が選んだ表示言語。選んでいなければ `null`（端末の言語から決める。
-     * `src/i18n` の `resolveLanguage`）。保存された値が型の外のもの（将来のバージョンが
-     * 保存した言語など）でも、起動を止めないよう `null` にする。
+     * 言語の設定（`system` / `en` / `ja`）。未設定や、型の外から来た値（アプリの将来の
+     * バージョンが保存した言語など）は、起動を止めないよう `system`（端末の言語に従う）に
+     * する。実際に使う言語は、これと端末の言語から `src/i18n` の `resolveLanguage` が決める。
      */
-    async getLanguage(): Promise<Language | null> {
+    async getLanguageSetting(): Promise<LanguageSetting> {
       const value = await settings.get(db, LANGUAGE_KEY);
-      return isLanguage(value) ? value : null;
+      return isLanguageSetting(value) ? value : 'system';
     },
 
     /** 不正な値は `invalid-language`。 */
-    async setLanguage(language: Language): Promise<void> {
-      if (!isLanguage(language)) throw new ServiceError('invalid-language');
-      await db.transaction((tx) => settings.set(tx, LANGUAGE_KEY, language));
+    async setLanguageSetting(setting: LanguageSetting): Promise<void> {
+      if (!isLanguageSetting(setting)) throw new ServiceError('invalid-language');
+      await db.transaction((tx) => settings.set(tx, LANGUAGE_KEY, setting));
     },
   };
 }

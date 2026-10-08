@@ -28,6 +28,14 @@ export function isLanguage(value: unknown): value is Language {
   return LANGUAGES.some((language) => language === value);
 }
 
+/** 言語の設定。`system` は端末の言語に従う（既定）。`Appearance` と同じ形。 */
+export const LANGUAGE_SETTINGS = ['system', ...LANGUAGES] as const;
+export type LanguageSetting = (typeof LANGUAGE_SETTINGS)[number];
+
+export function isLanguageSetting(value: unknown): value is LanguageSetting {
+  return LANGUAGE_SETTINGS.some((setting) => setting === value);
+}
+
 export interface Tag {
   id: string;
   name: string;

@@ -1,15 +1,17 @@
 import { useLocales } from 'expo-localization';
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 
-import type { Language } from '../src/domain/types';
+import type { Language, LanguageSetting } from '../src/domain/types';
 import { createAppTranslator, resolveLanguage, type Translate } from '../src/i18n';
 import { getServices } from '../src/services';
 
 interface I18nContextValue {
-  /** 実際に使っている表示言語。 */
+  /** 実際に使っている表示言語（`system` のときは、端末の言語から決めたもの）。 */
   language: Language;
+  /** 言語の設定（Settingsの Language 用）。 */
+  languageSetting: LanguageSetting;
   /** 保存してから反映する。保存に失敗したら reject し、表示は変えない。 */
-  setLanguage(next: Language): Promise<void>;
+  setLanguageSetting(next: LanguageSetting): Promise<void>;
   /** 文言を、表示言語で返す。画面の文言は直書きせず、これを通す。 */
   t: Translate;
 }
@@ -24,37 +26,40 @@ export function useI18n(): I18nContextValue {
 }
 
 /**
- * 表示言語を決めて、文言（`t`）を渡す。`initialLanguage` は、保存済みの、利用者が選んだ
- * 言語（選んでいなければ `null`）。`null` のあいだは端末の言語に従い、端末側で言語が
- * 変わったとき（Androidなどで、アプリを開いたまま変えたとき）も追従する。選んだ後は、
- * 端末の言語が変わっても選んだ言語のまま。
+ * 表示言語を決めて、文言（`t`）を渡す。`initialSetting` は、保存済みの言語の設定。
+ * `system` のあいだは端末の言語に従い、端末側で言語が変わったとき（Androidなどで、
+ * アプリを開いたまま変えたとき）も追従する。言語を選んだ後は、端末の言語が変わっても
+ * 選んだ言語のまま。
  *
  * DBが使えない場面（起動時の失敗を出すエラー画面。`ErrorBoundary` は、`app/_layout.tsx`
- * の Provider の外で描画される）では、`initialLanguage={null}` で使う。端末の言語に従い、
- * `setLanguage` を呼ばない限りDBに触れない。
+ * の Provider の外で描画される）では、`initialSetting="system"` で使う。端末の言語に従い、
+ * `setLanguageSetting` を呼ばない限りDBに触れない。
  */
 export function I18nProvider({
-  initialLanguage,
+  initialSetting,
   children,
 }: {
-  initialLanguage: Language | null;
+  initialSetting: LanguageSetting;
   children: ReactNode;
 }) {
-  const [saved, setSaved] = useState(initialLanguage);
+  const [languageSetting, setLanguageSettingState] = useState(initialSetting);
   const deviceLocales = useLocales();
   const language = resolveLanguage(
-    saved,
+    languageSetting,
     deviceLocales.map((locale) => locale.languageTag),
   );
 
-  const setLanguage = useCallback(async (next: Language) => {
+  const setLanguageSetting = useCallback(async (next: LanguageSetting) => {
     const { settings } = await getServices();
-    await settings.setLanguage(next);
-    setSaved(next);
+    await settings.setLanguageSetting(next);
+    setLanguageSettingState(next);
   }, []);
 
   const t = useMemo(() => createAppTranslator(language), [language]);
-  const value = useMemo(() => ({ language, setLanguage, t }), [language, setLanguage, t]);
+  const value = useMemo(
+    () => ({ language, languageSetting, setLanguageSetting, t }),
+    [language, languageSetting, setLanguageSetting, t],
+  );
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }

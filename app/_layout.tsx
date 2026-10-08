@@ -2,7 +2,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 
-import type { Appearance, Language } from '../src/domain/types';
+import type { Appearance, LanguageSetting } from '../src/domain/types';
 import { getServices } from '../src/services';
 import { I18nProvider } from '../ui/i18n';
 import { applyAppearance, ThemeProvider } from '../ui/theme';
@@ -14,10 +14,10 @@ import { applyAppearance, ThemeProvider } from '../ui/theme';
 // 戻る操作でアプリが終了する。
 export default function RootLayout() {
   // 保存済みの設定。読み込み（と、外観の端末への反映）が終わるまでは null。
-  // language は、利用者が選んだ言語（選んでいなければ null。端末の言語に従う）。
-  const [settings, setSettings] = useState<{ appearance: Appearance; language: Language | null } | null>(
-    null,
-  );
+  const [settings, setSettings] = useState<{
+    appearance: Appearance;
+    language: LanguageSetting;
+  } | null>(null);
   // reject の値が undefined などでも失敗を検知できるよう、包んで保持する。
   const [failure, setFailure] = useState<{ error: unknown } | null>(null);
 
@@ -27,7 +27,7 @@ export default function RootLayout() {
     getServices()
       .then(async ({ settings: service }) => ({
         appearance: await service.getAppearance(),
-        language: await service.getLanguage(),
+        language: await service.getLanguageSetting(),
       }))
       .then((saved) => {
         // 最初の画面を描く前に端末へ反映する。描いた後だと、既定の配色が一瞬見える。
@@ -49,7 +49,7 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider initialAppearance={settings.appearance}>
-      <I18nProvider initialLanguage={settings.language}>
+      <I18nProvider initialSetting={settings.language}>
         <StatusBar style="auto" />
         <Stack screenOptions={{ headerShown: false }} />
       </I18nProvider>
