@@ -16,4 +16,16 @@ export const ja: Record<MessageKey, Message> = {
   'error.tagNameRequired': 'タグ名を入力してください。',
   'error.tagNameDuplicate': '同じ名前のタグがすでにあります。',
   'error.unexpected': '問題が発生しました。もう一度お試しください。',
+
+  'errorScreen.title': '問題が発生しました',
+  'errorScreen.message':
+    'Singfolioで問題が起きました。もう一度お試しください。繰り返し起きる場合は、アプリを終了して開き直してください。',
+  'errorScreen.retry': 'もう一度試す',
+  'errorScreen.updateTitle': 'アプリの更新が必要です',
+  'errorScreen.updateMessage':
+    '曲のデータが新しいバージョンのSingfolioで保存されているため、このバージョンでは開けません。アプリを更新してください。曲のデータは変更されていません。',
+
+  'notFound.title': '画面が見つかりません',
+  'notFound.message': 'この画面は存在しません。',
+  'notFound.home': '曲の一覧へ',
 };

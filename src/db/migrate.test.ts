@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
 
+import { DatabaseTooNewError } from './errors.ts';
 import { runMigrations, type Migration, type MigrationDb } from './migrate.ts';
 import { migrations } from './migrations.ts';
 
@@ -106,7 +107,14 @@ describe('runMigrations', () => {
     raw.exec('PRAGMA user_version = 99');
     await assert.rejects(
       runMigrations(db, migrations),
-      /newer than this app supports/,
+      (error) => {
+        // エラー画面が、再試行ではなくアプリの更新を促せるよう、専用の型で区別する。
+        assert.ok(error instanceof DatabaseTooNewError);
+        assert.equal(error.found, 99);
+        assert.equal(error.supported, migrations.length);
+        assert.match(error.message, /newer than this app supports/);
+        return true;
+      },
     );
     assert.equal(
       count(raw, 'sqlite_master'),

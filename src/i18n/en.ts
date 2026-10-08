@@ -19,6 +19,20 @@ export const en = {
   'error.tagNameRequired': 'Enter a tag name.',
   'error.tagNameDuplicate': 'A tag with this name already exists.',
   'error.unexpected': 'Something went wrong. Please try again.',
+
+  // 起動時の失敗などで画面全体に出すエラー画面。内容の決め方は errors.ts の errorScreenContent。
+  'errorScreen.title': 'Something went wrong',
+  'errorScreen.message':
+    'Singfolio ran into a problem. Try again, or close and reopen the app if it keeps happening.',
+  'errorScreen.retry': 'Try again',
+  'errorScreen.updateTitle': 'Update Singfolio',
+  'errorScreen.updateMessage':
+    'Your songs were saved by a newer version of Singfolio, so this version can’t open them. Update the app to continue. Your songs haven’t been changed.',
+
+  // 存在しない画面を開いたとき（app/+not-found.tsx）。
+  'notFound.title': 'Screen not found',
+  'notFound.message': 'This screen doesn’t exist.',
+  'notFound.home': 'Go to Songs',
 } as const satisfies Record<string, Message>;
 
 export type MessageKey = keyof typeof en;

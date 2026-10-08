@@ -38,6 +38,13 @@ describe('colors', () => {
   }
 
   for (const scheme of ['light', 'dark'] as const) {
+    it(`${scheme}: onPrimary は primary の上でAA（4.5:1）を満たす（Purpleの面の上の文字）`, () => {
+      const colors = colorsByScheme[scheme];
+      assert.ok(contrast(colors.onPrimary, colors.primary) >= 4.5, `${colors.onPrimary} on ${colors.primary}`);
+    });
+  }
+
+  for (const scheme of ['light', 'dark'] as const) {
     it(`${scheme}: Purpleは、背景・面の上で、アイコン等の非テキスト（3:1）を満たす`, () => {
       const colors = colorsByScheme[scheme];
       assert.ok(contrast(colors.primary, colors.background) >= 3);

@@ -4,7 +4,12 @@ import { ja } from './ja.ts';
 import { createTranslator, type Translator } from './translate.ts';
 import type { Message } from './types.ts';
 
-export { errorMessageKey, type ErrorMessageKey } from './errors.ts';
+export {
+  errorMessageKey,
+  errorScreenContent,
+  type ErrorMessageKey,
+  type ErrorScreenContent,
+} from './errors.ts';
 export { resolveLanguage } from './resolveLanguage.ts';
 export type { MessageKey } from './en.ts';
 

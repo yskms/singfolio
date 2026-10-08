@@ -7,6 +7,11 @@ import { getServices } from '../src/services';
 import { I18nProvider } from '../ui/i18n';
 import { applyAppearance, ThemeProvider } from '../ui/theme';
 
+// 起動時の失敗（DBを開けない・アプリより新しいDB）や、画面の描画の失敗を出すエラー画面。
+// このレイアウトが例外を投げると、Expo Routerがレイアウトの代わりに描画する（このとき
+// スプラッシュも閉じる）。Providerの外で描画されるため、端末の言語で出す（ui/ErrorScreen）。
+export { ErrorScreen as ErrorBoundary } from '../ui/ErrorScreen';
+
 // 画面は、全タブをこのStackの1画面（(tabs)）として載せる。Song Detail・Add / Edit・
 // Show Mode・Settingsは、このStackに足していく（タブバーを隠して全画面で出す）。
 // 足すときは `export const unstable_settings = { initialRouteName: '(tabs)' }` も
@@ -37,14 +42,18 @@ export default function RootLayout() {
       .catch((error) => setFailure({ error }));
   }, []);
 
-  // 起動時のDB初期化に失敗したらアプリとして動作できないため、
-  // そのまま例外にする（専用のエラー画面は未実装。WBS 1.7）。
-  if (failure) throw failure.error;
+  // 起動時のDB初期化に失敗したらアプリとして動作できないため、例外にして、上でexportした
+  // ErrorBoundary（エラー画面）に任せる。再試行（エラー画面のボタン）はこのレイアウトを
+  // 作り直すので、起動処理が最初からやり直される（getServices は失敗を覚えない）。
+  // Errorでない値は包む。undefinedなどの値だと、Expo Routerは「エラーなし」と見て、
+  // エラー画面を出さずにレイアウトを描き直す（失敗し続ける限り繰り返す）。
+  if (failure) throw failure.error instanceof Error ? failure.error : new Error(String(failure.error));
   // スプラッシュは、Expo Routerがナビゲーションの準備完了（下のStackを描画した後）に
   // 閉じる。そのため、ここでnullを返している間（DB初期化中）はスプラッシュが残る。
+  // 失敗したときは、上のエラー画面を描画するときにExpo Routerが閉じる。
   // settings より前に別のナビゲーターを描画したり、アプリ側で
   // SplashScreen.preventAutoHideAsync() を呼んだりすると、閉じるタイミングが変わる
-  // （後者はアプリ自身がhideAsync()を呼ぶ必要がある。WBS 1.7）。
+  // （後者はアプリ自身がhideAsync()を呼ぶ必要がある）。
   if (settings === null) return null;
 
   return (

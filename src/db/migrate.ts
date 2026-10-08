@@ -1,3 +1,5 @@
+import { DatabaseTooNewError } from './errors.ts';
+
 // マイグレーション実行器。expo-sqlite には依存せず、必要なメソッドだけを持つ
 // インターフェースで受ける（SQLiteDatabase はそのまま渡せる）。
 export interface MigrationDb {
@@ -50,11 +52,7 @@ export async function runMigrations(
 
   // 新しいバージョンのアプリで作られたDBを、古いアプリで開いた場合。
   // 知らないスキーマを書き換えないよう、起動を止める。
-  if (current > latest) {
-    throw new Error(
-      `Database schema version ${current} is newer than this app supports (${latest})`,
-    );
-  }
+  if (current > latest) throw new DatabaseTooNewError(current, latest);
 
   const pending = migrations.filter((migration) => migration.version > current);
   if (pending.length === 0) return;

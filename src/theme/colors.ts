@@ -22,6 +22,8 @@ export interface ThemeColors {
   textSecondary: string;
   /** アクセント（選択中のタブ・主要なボタンなど）。Purple */
   primary: string;
+  /** primary の面（主要なボタンの塗りなど）の上の文字。ダークでも濃い色（textPrimary は明るい色になる） */
+  onPrimary: string;
 }
 
 // textPrimary / textSecondary は、同じテーマの background・surface の上でWCAG AA
@@ -36,6 +38,7 @@ export const lightColors: ThemeColors = {
   textPrimary: '#17171A',
   textSecondary: '#71717A',
   primary: brand.purple,
+  onPrimary: '#17171A',
 };
 
 // ダークの値は、ブランド資料にはモックアップ（暗い背景に明るいミント/パープル）しか
@@ -47,6 +50,7 @@ export const darkColors: ThemeColors = {
   textPrimary: '#F4F4F5',
   textSecondary: '#A1A1AA',
   primary: brand.purple,
+  onPrimary: '#17171A',
 };
 
 export type ColorSchemeName = 'light' | 'dark';

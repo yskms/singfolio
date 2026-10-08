@@ -94,8 +94,14 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
 -   画面（ルート）は `app/`（Expo Router）に置く。`src/` はNodeのテストから直接
     実行するため、画面（RN・Expoのimport）を置かない。
 -   `app/_layout.tsx` は、DB初期化（`getServices()`）と、保存済みのAppearanceの
-    端末への反映が終わるまで画面を出さない。Serviceが使えない状態で画面を描画させない
-    （エラー画面は WBS 1.7）。反映前に描くと、既定の配色が一瞬見える。
+    端末への反映が終わるまで画面を出さない。Serviceが使えない状態で画面を描画させない。
+    反映前に描くと、既定の配色が一瞬見える。
+-   起動の失敗は、`app/_layout.tsx` が例外にして、`ErrorBoundary`（`ui/ErrorScreen.tsx`）に
+    任せる。レイアウトが自前でエラー画面を返さない（Expo Routerは、ErrorBoundaryを描画する
+    ときにスプラッシュを閉じる。自前で返すとナビゲーションが準備完了にならず、スプラッシュが
+    残り続けうる）。投げる値は `Error` に包む（undefinedなどだと、Expo Routerは「エラーなし」と
+    見て、エラー画面を出さずにレイアウトを描き直す）。アプリより新しいDB
+    （`DatabaseTooNewError`）は、やり直しても開けないので「もう一度試す」を出さない。
 -   RN・Expoに依存するUIの部品・hookは、`src/` に置けないため `ui/`（ルート直下）に置く。
 -   色は `src/theme/colors.ts`（Nodeでも実行できる）に集約し、画面は `ui/theme.tsx` の
     `useTheme()` から取る。直書きしない。ライト/ダークは、JSの色の上書きではなく、
@@ -127,7 +133,8 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     `resolveLanguage`（設定と端末の言語から決める）。
 -   DBが使えない画面（起動時の失敗を出すエラー画面。`ErrorBoundary` は `app/_layout.tsx`
     の Provider の外で描画される）は、`<I18nProvider initialSetting="system">` で包んで
-    端末の言語で出す。`+not-found` は Stack の中の画面なので、普通に `useI18n()` が使える。
+    端末の言語で出す（`ui/ErrorScreen.tsx`）。`+not-found` は Stack の中の画面なので、
+    普通に `useI18n()` が使える。
 -   OS標準の部品の文言は端末の言語に従い、アプリ内の言語とずれる。`Alert.alert` のボタン
     など、文言を指定できるものは省略せず `t` で渡す（省略すると既定の「OK」が端末の言語で
     出る）。

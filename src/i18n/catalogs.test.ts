@@ -5,9 +5,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
+import { DatabaseTooNewError } from '../db/errors.ts';
 import { LANGUAGES } from '../domain/types.ts';
 import { ServiceError } from '../services/errors.ts';
-import { catalogs, createAppTranslator, errorMessageKey, type MessageKey } from './index.ts';
+import { catalogs, createAppTranslator, errorMessageKey, errorScreenContent, type MessageKey } from './index.ts';
 import { en } from './en.ts';
 import { placeholderNames } from './translate.ts';
 import type { Message } from './types.ts';
@@ -104,6 +105,26 @@ describe('errorMessageKey', () => {
   it('ServiceError 以外（DBの失敗・undefined など）は汎用の文言', () => {
     assert.equal(errorMessageKey(new Error('disk full')), 'error.unexpected');
     assert.equal(errorMessageKey(undefined), 'error.unexpected');
+  });
+});
+
+describe('errorScreenContent', () => {
+  it('アプリより新しいDBは、再試行ではなくアプリの更新を促す（やり直しても開けない）', () => {
+    assert.deepEqual(errorScreenContent(new DatabaseTooNewError(99, 1)), {
+      titleKey: 'errorScreen.updateTitle',
+      messageKey: 'errorScreen.updateMessage',
+      canRetry: false,
+    });
+  });
+
+  it('それ以外（DBを開けない・描画の失敗・Error以外の値）は、汎用の文言で、やり直せる', () => {
+    for (const error of [new Error('disk full'), new ServiceError('song-not-found'), undefined, 'x']) {
+      assert.deepEqual(errorScreenContent(error), {
+        titleKey: 'errorScreen.title',
+        messageKey: 'errorScreen.message',
+        canRetry: true,
+      });
+    }
   });
 });
 
