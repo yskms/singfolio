@@ -93,7 +93,10 @@ const FORBIDDEN = ['Button'];
 function fontUsageViolations(path: string, text: string): string[] {
   const violations: string[] = [];
   // `import ... from 'react-native'`（シングル・ダブルクォートの両方）
-  for (const [, clause] of text.matchAll(/import\s+([^;]*?)\s+from\s*['"]react-native['"]/gs)) {
+  // 節は、`import` の直後の、取りうる形（名前空間・`{...}`・既定+`{...}`・既定）だけを見る。
+  // セミコロンで区切らない（無い書き方でも、前の行の import に続けて読まない）。
+  const clausePattern = /import\s+((?:type\s+)?(?:\*\s*as\s+\w+|\w+\s*,\s*\{[^}]*\}|\{[^}]*\}|\w+))\s*from\s*['"]react-native['"]/g;
+  for (const [, clause] of text.matchAll(clausePattern)) {
     if (/^type\s/.test(clause)) continue;
     if (/\*\s*as\s/.test(clause)) {
       violations.push(`${path}: react-native を名前空間でimportしている（Text などを個別に確認できない）`);
@@ -158,6 +161,17 @@ const s = { fontWeight: '700', other: { fontWeight: "400" } };`),
     assert.deepEqual(violations(`import { Text as NativeText } from 'react-native';`, 'ui/Text.tsx'), []);
     assert.deepEqual(violations(`import { TextInput as N } from 'react-native';`, 'ui/TextInput.tsx'), []);
     assert.equal(violations(`import { TextInput } from 'react-native';`, 'ui/Text.tsx').length, 1);
+  });
+
+  it('セミコロンの無い書き方も、前の行のimportに続けず、検出する', () => {
+    assert.equal(violations(`import { View } from 'react'\nimport { Text } from 'react-native'`).length, 1);
+    assert.equal(violations(`import { Text } from 'react-native'\nimport { View } from 'react'`).length, 1);
+    assert.deepEqual(violations(`import { Text } from '../ui/Text'\nimport { View } from 'react-native'`), []);
+  });
+
+  it('既定のimportと並べた書き方も検出する', () => {
+    assert.equal(violations(`import RN, { Text } from 'react-native';`).length, 1);
+    assert.deepEqual(violations(`import RN from 'react-native';`), []);
   });
 
   it('名前空間のimportと Animated.Text を検出する', () => {

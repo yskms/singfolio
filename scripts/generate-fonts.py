@@ -27,6 +27,10 @@ Noto Sans JP のサブセット
     全角・半角形
   - Windows日本語（cp932）の文字: JIS X 0208（第1・第2水準の漢字6,355字を含む）に、
     NEC・IBM拡張（髙・﨑など、人名に使う異体字）を足したもの
+  - ただし、絵文字として出る字（Unicode の Emoji_Presentation）は入れない。入れると、
+    絵文字キーボードで入れた⚽⚾が、色付きの絵文字ではなく、Notoの白黒の字で描かれる
+    （iOSで確認）。サブセットの範囲では、⚽（U+26BD）と⚾（U+26BE）の2字だけが当たる
+    （Unicode emoji-data 2026-01-30 版で確認。範囲を広げるときは、当たる字が増えないか調べる）。
   曲名・アーティスト名はユーザーが入力するため、サブセットに無い文字（JIS X 0213の
   第3・第4水準の漢字など）は出うる。その文字だけは、OSのフォントで表示される。
   （第3・第4水準まで入れると、1ファイル約4MBになる）
@@ -70,6 +74,10 @@ EXTRA_RANGES = [
 ]
 
 
+# サブセットの範囲に入るが、絵文字として出したい字（Emoji_Presentation）。入れない。
+EMOJI_PRESENTATION = {0x26BD, 0x26BE}  # ⚽ ⚾
+
+
 def cp932_codepoints() -> set[int]:
     """cp932（Windows日本語）で表せる文字のコードポイント。"""
     chars = set()
@@ -88,7 +96,7 @@ def noto_codepoints() -> list[int]:
     chars = cp932_codepoints()
     for lo, hi in EXTRA_RANGES:
         chars.update(range(lo, hi + 1))
-    return sorted(chars)
+    return sorted(chars - EMOJI_PRESENTATION)
 
 
 def subset_font(src: Path, dst: Path, codepoints: list[int]) -> None:
@@ -114,6 +122,9 @@ def check_subset(src: Path, dst: Path, codepoints: list[int]) -> int:
     for sample in "あいうえおアイウエオ日本語歌檸檬髙﨑ABCabc0123♪♥♡™€−é\u1ea1\u0301":
         if ord(sample) not in kept:
             sys.exit(f"{dst.name}: 「{sample}」が含まれていません。元データを確認してください。")
+    for emoji in EMOJI_PRESENTATION:
+        if emoji in kept:
+            sys.exit(f"{dst.name}: 絵文字として出す字 {chr(emoji)} が含まれています。")
     return len(after.getGlyphOrder())
 
 
