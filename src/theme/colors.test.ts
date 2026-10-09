@@ -52,3 +52,19 @@ describe('colors', () => {
     });
   }
 });
+
+describe('選択中の色（selected）', () => {
+  for (const scheme of ['light', 'dark'] as const) {
+    const colors = colorsByScheme[scheme];
+
+    it(`${scheme}: onSelected は selected の上でAA（4.5:1）を満たす（件数タイル・チップの文字）`, () => {
+      assert.ok(contrast(colors.onSelected, colors.selected) >= 4.5, `${colors.onSelected} on ${colors.selected}`);
+    });
+
+    it(`${scheme}: 縁（primary）は selected・background・surface の上で非テキスト（3:1）を満たす`, () => {
+      for (const base of ['selected', 'background', 'surface'] as const) {
+        assert.ok(contrast(colors.primary, colors[base]) >= 3, `primary on ${base}`);
+      }
+    });
+  }
+});

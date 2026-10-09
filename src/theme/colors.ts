@@ -24,6 +24,12 @@ export interface ThemeColors {
   primary: string;
   /** primary の面（主要なボタンの塗りなど）の上の文字。ダークでも濃い色（textPrimary は明るい色になる） */
   onPrimary: string;
+  /** 選択中の面（件数タイル・絞り込みのチップ）。Mint系。縁には primary を使う */
+  selected: string;
+  /** selected の面の上の文字 */
+  onSelected: string;
+  /** モーダルの背後を暗くする幕。不透明度を下げて重ねる（色そのものは不透明） */
+  scrim: string;
 }
 
 // textPrimary / textSecondary は、同じテーマの background・surface の上でWCAG AA
@@ -31,6 +37,8 @@ export interface ThemeColors {
 // primary（Purple）は白の上で約3.4:1、surfaceの上で約3.2:1で、小さな文字の色には
 // 足りない。アイコン・大きな文字・塗りとして使い、紫の面の上の文字は
 // textPrimary側の濃い色（#17171A、約5.3:1）にする。ダークの背景の上では約5.5:1ある。
+// selected は、色だけで選択中を伝えないよう、縁を primary にして使う（ライトでは、Mintと
+// 白・surface の輝度の差が小さく、色だけでは見分けにくいため）。
 export const lightColors: ThemeColors = {
   background: '#FFFFFF',
   surface: '#F7F7F8',
@@ -39,6 +47,9 @@ export const lightColors: ThemeColors = {
   textSecondary: '#71717A',
   primary: brand.purple,
   onPrimary: '#17171A',
+  selected: brand.mint,
+  onSelected: '#17171A',
+  scrim: '#000000',
 };
 
 // ダークの値は、ブランド資料にはモックアップ（暗い背景に明るいミント/パープル）しか
@@ -51,6 +62,10 @@ export const darkColors: ThemeColors = {
   textSecondary: '#A1A1AA',
   primary: brand.purple,
   onPrimary: '#17171A',
+  // モックアップ（暗い背景の選択中のタイル）に合わせて、暗いMint系の面に明るいMintの文字。
+  selected: '#1D3B34',
+  onSelected: brand.mint,
+  scrim: '#000000',
 };
 
 export type ColorSchemeName = 'light' | 'dark';

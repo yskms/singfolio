@@ -81,6 +81,9 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     `import type`、enumやコンストラクタ引数プロパティは使わない（tsconfigで検出する）。
     importは `.ts` 付き（付け忘れは型チェックを通り、`npm test` の実行時にだけ失敗する）。
     テストファイルの先頭には `/// <reference types="node" />` を置く（エディタ用）。
+-   曲の検索は、SQLの `LIKE` ではなく、Serviceが `searchKey`（`src/services/text.ts`）で
+    行う。`LIKE` へ「簡略化」しない（ひらがな/カタカナ・全角半角を同一視できなくなる）。
+    Repositoryは検索の条件を持たない。
 -   タグ名の正規化は `normalize('NFKD').normalize('NFC')`。`normalize('NFKC')` 1回に
     「簡略化」しない（iOSのHermesは半角カナの濁点を合成しない。Nodeのテストでは検出できない）。
 
@@ -105,6 +108,9 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     このErrorBoundaryは、起動後の画面の描画の失敗も拾う（再試行でレイアウトが作り直され、
     先頭の画面から始まる。詳細は screen-flow「起動時の例外」）。
 -   RN・Expoに依存するUIの部品・hookは、`src/` に置けないため `ui/`（ルート直下）に置く。
+-   装飾のアイコンは `{...decorative}`（`ui/decorative.ts`）で読み上げから外す。外さないと、
+    字形（`\uf55f` など）が読み上げの対象になる（iOSのアクセシビリティツリーで確認。
+    読み上げ自体と、TalkBackは未確認）。
 -   色は `src/theme/colors.ts`（Nodeでも実行できる）に集約し、画面は `ui/theme.tsx` の
     `useTheme()` から取る。直書きしない。ライト/ダークは、JSの色の上書きではなく、
     `Appearance.setColorScheme()`（`applyAppearance`）でアプリ全体（ネイティブの描画を
