@@ -443,6 +443,32 @@ describe('listSongs', () => {
     assert.deepEqual(await search('no match'), []);
   });
 
+  it('検索は、全角半角・ひらがな/カタカナ・ASCII以外の大文字小文字の違いを同一視する', async () => {
+    const { services } = await setup();
+    for (const [title, artist] of [
+      ['チェリー', 'スピッツ'],
+      ['ＨＡＮＡＢＩ', 'Mr.Children'],
+      ['ボカロ', 'ﾎﾞｶﾛP'],
+      ['Ärger', 'Ä'],
+      ['天体観測', 'BUMP OF CHICKEN'],
+    ] as const) {
+      await services.songs.createSong({ title, artist, status: 'ready' });
+    }
+    const search = async (text: string) =>
+      titles(await services.songs.listSongs({ search: text, sortBy: 'title', direction: 'asc' }));
+    assert.deepEqual(await search('ちぇりー'), ['チェリー'], 'ひらがなでカタカナを探す');
+    assert.deepEqual(await search('すぴっつ'), ['チェリー'], 'アーティストも同じ');
+    assert.deepEqual(await search('チェリー'), ['チェリー']);
+    assert.deepEqual(await search('hanabi'), ['ＨＡＮＡＢＩ'], '半角で全角を探す');
+    assert.deepEqual(await search('ｈａｎａ'), ['ＨＡＮＡＢＩ'], '全角で探す');
+    assert.deepEqual(await search('ﾁｪﾘｰ'), ['チェリー'], '半角カナで探す');
+    assert.deepEqual(await search('ぼかろ'), ['ボカロ']);
+    assert.deepEqual(await search('ボカロp'), ['ボカロ'], '半角カナのアーティスト');
+    assert.deepEqual(await search('ä'), ['Ärger'], 'ASCII以外の大文字小文字');
+    assert.deepEqual(await search('bump  of'), ['天体観測'], '空白の量は問わない');
+    assert.deepEqual(await search('てんたいかんそく'), [], '漢字の読みでは探せない');
+  });
+
   it('検索の前後の空白は無視し、空の検索は絞り込まない', async () => {
     const { services } = await seeded();
     assert.deepEqual(titles(await services.songs.listSongs({ search: '  sign ' })), ['Sign']);

@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { normalizeTagName, normalizeText, tagNameKey } from './text.ts';
+import { normalizeTagName, normalizeText, searchKey, tagNameKey } from './text.ts';
 
 describe('normalizeText（曲名・アーティスト）', () => {
   it('前後の空白（全角を含む）を除く', () => {
@@ -80,5 +80,48 @@ describe('tagNameKey', () => {
 
   it('ひらがなとカタカナは同一視しない', () => {
     assert.notEqual(tagNameKey('あにめ'), tagNameKey('アニメ'));
+  });
+});
+
+describe('searchKey', () => {
+  it('大文字小文字を同一視する（ASCII以外も）', () => {
+    assert.equal(searchKey('HANABI'), searchKey('hanabi'));
+    assert.equal(searchKey('Ä'), searchKey('ä'));
+  });
+
+  it('全角半角を同一視する', () => {
+    assert.equal(searchKey('ＲＯＣＫ'), searchKey('rock'));
+    assert.equal(searchKey('Ｔ.Ｍ.Revolution'), searchKey('T.M.Revolution'));
+    assert.equal(searchKey('ﾁｪﾘｰ'), searchKey('チェリー'));
+  });
+
+  it('半角カナの濁点・半濁点、分解された濁点も合成する（Hermesの NFKC は合成しない）', () => {
+    assert.equal(searchKey('ﾎﾞｶﾛ'), searchKey('ボカロ'));
+    assert.equal(searchKey('ﾊﾟ'), searchKey('パ'));
+    assert.equal(searchKey('ホ\u3099カロ'), searchKey('ボカロ'));
+  });
+
+  it('ひらがなとカタカナを同一視する（長音・小書き・濁点を含む）', () => {
+    assert.equal(searchKey('ちぇりー'), searchKey('チェリー'));
+    assert.equal(searchKey('ぼからいど'), searchKey('ボカライド'));
+    assert.equal(searchKey('ゔぁ'), searchKey('ヴァ'));
+    assert.equal(searchKey('ゝ'), searchKey('ヽ'));
+  });
+
+  it('長音（ー）や、ひらがな・カタカナ以外の字は変えない', () => {
+    assert.equal(searchKey('チェリー'), 'ちぇりー');
+    assert.notEqual(searchKey('チェリー'), searchKey('ちぇりい'));
+    assert.equal(searchKey('天体観測'), '天体観測');
+    // 区切りの中黒（U+30FB）や、ヷ・ヺ（ひらがなに対応する字が無い）は、そのまま。
+    assert.equal(searchKey('・'), '・');
+  });
+
+  it('空白は、全角も含めて連続を1つにし、前後を除く', () => {
+    assert.equal(searchKey('  BUMP\u3000 OF   CHICKEN '), 'bump of chicken');
+    assert.equal(searchKey(' \u3000 '), '');
+  });
+
+  it('漢字の読みは同一視しない（読みのデータが無い）', () => {
+    assert.notEqual(searchKey('桜'), searchKey('さくら'));
   });
 });

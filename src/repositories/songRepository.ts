@@ -70,7 +70,8 @@ function rowsToSongs(rows: SongRow[]): Song[] {
 
 // 並び替えの列。文字列で組み立てるため、必ずこの一覧（ホワイトリスト）から選ぶ。
 // 曲名・アーティストは、英字の大文字小文字を区別せずに並べる。日本語は文字コード順で、
-// 読み順にはならない（読み順の扱いは、曲一覧の実装＝WBS 2.1で決める）。
+// 読み順にはならない（漢字の読みのデータが無いため。docs/singfolio-data-model.md
+// 「曲の一覧」）。
 const SORT_COLUMNS: Record<SongSortKey, string> = {
   title: 's.title COLLATE NOCASE',
   artist: 's.artist COLLATE NOCASE',
@@ -87,10 +88,12 @@ function sortColumn(key: SongSortKey | undefined): string {
     : SORT_COLUMNS.updatedAt;
 }
 
-// LIKE のワイルドカード（% _）とエスケープ文字を、文字そのものとして扱う。
-function escapeLike(text: string): string {
-  return text.replace(/[\\%_]/g, '\\$&');
-}
+/**
+ * 一覧の条件。曲名・アーティストの検索（`search`）は含まない。SQLiteの `LIKE` は、
+ * ASCII以外の大文字小文字・全角半角・ひらがな/カタカナの違いを同一視できないため、
+ * Service（`songService.listSongs`）が、`searchKey`（text.ts）で、読んだ曲を絞り込む。
+ */
+export type SongFilter = Omit<SongListQuery, 'search'>;
 
 // 読み取りは `ReadExecutor`（`Database` でよい）、書き込みは `WriteExecutor`
 // （`Database.transaction` の中でだけ得られる）を、メソッドの先頭の引数で受ける。
@@ -105,7 +108,7 @@ export function createSongRepository(env: RepositoryEnv) {
       return rowsToSongs(rows)[0] ?? null;
     },
 
-    async list(db: ReadExecutor, query: SongListQuery = {}): Promise<Song[]> {
+    async list(db: ReadExecutor, query: SongFilter = {}): Promise<Song[]> {
       const conditions: string[] = [];
       const params: SqlValue[] = [];
       if (query.status) {
@@ -118,13 +121,6 @@ export function createSongRepository(env: RepositoryEnv) {
           'EXISTS (SELECT 1 FROM song_tags f WHERE f.song_id = s.id AND f.tag_id = ?)',
         );
         params.push(query.tagId);
-      }
-      if (query.search) {
-        // LIKE は、ASCIIの大文字小文字だけを区別しない。全角/半角やひらがな/
-        // カタカナの違いは吸収しない（検索の一致の扱いは、WBS 2.1で決める）。
-        conditions.push("(s.title LIKE ? ESCAPE '\\' OR s.artist LIKE ? ESCAPE '\\')");
-        const pattern = `%${escapeLike(query.search)}%`;
-        params.push(pattern, pattern);
       }
 
       const where = conditions.length > 0 ? ` WHERE ${conditions.join(' AND ')}` : '';

@@ -8,7 +8,7 @@ import {
 import type { SongRepository } from '../repositories/songRepository.ts';
 import type { TagRepository } from '../repositories/tagRepository.ts';
 import { ServiceError } from './errors.ts';
-import { normalizeText } from './text.ts';
+import { normalizeText, searchKey } from './text.ts';
 
 /** 曲の編集画面で保存する内容。 */
 export interface SongInput {
@@ -114,10 +114,20 @@ export function createSongService({ db, songs, tags }: SongServiceDeps) {
       return songs.get(db, id);
     },
 
-    listSongs(query: SongListQuery = {}): Promise<Song[]> {
-      // 検索語も、保存する曲名・アーティストと同じ正規化にそろえる。
-      const search = query.search === undefined ? undefined : normalizeText(query.search);
-      return songs.list(db, { ...query, search });
+    /**
+     * 条件をすべて満たす曲を返す。曲名・アーティストの検索は、SQLではなくここで行う
+     * （`searchKey` が、大文字小文字・全角半角・ひらがな/カタカナの違いを同一視する。
+     * SQLiteの `LIKE` にはできない）。絞り込んだ曲を全部読んでから検索するが、端末内の
+     * 曲数（数百曲）なら問題にならない。
+     */
+    async listSongs(query: SongListQuery = {}): Promise<Song[]> {
+      const { search, ...filter } = query;
+      const found = await songs.list(db, filter);
+      const key = search === undefined ? '' : searchKey(search);
+      if (key === '') return found;
+      return found.filter(
+        (song) => searchKey(song.title).includes(key) || searchKey(song.artist).includes(key),
+      );
     },
 
     countSongsByStatus(): Promise<Record<SongStatus, number>> {

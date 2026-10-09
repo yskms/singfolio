@@ -41,3 +41,28 @@ export function normalizeTagName(name: string): string {
 export function tagNameKey(name: string): string {
   return normalizeTagName(name).toLowerCase();
 }
+
+/**
+ * 検索で、検索語と曲名・アーティストを比べるためのキー。次の違いを同一視する。
+ * - 大文字小文字（ASCII以外も。`Ä` と `ä`）
+ * - 全角半角（`ＲＯＣＫ` と `rock`、`ﾁｪﾘｰ` と `チェリー`）。互換文字も変換される
+ *   （`①` → `1`）。タグ名と同じ（`normalizeTagName`）で、見た目の揺れをそろえる目的。
+ * - ひらがなとカタカナ（`ちぇりー` と `チェリー`）。日本語は、ひらがなで入力して
+ *   カタカナの曲を探すことが多いため。長音（ー）は、そのままにする。
+ * - 空白（全角を含む）の量。連続する空白は1つ、前後は除く。
+ * 漢字の読み（`桜` と `さくら`）は、読みのデータが無いため同一視できない。
+ * 保存する形ではなく、比べるためだけのキー。
+ */
+export function searchKey(text: string): string {
+  // `normalize('NFKC')` を1回で呼ばない（理由は `normalizeTagName`）。
+  const folded = text
+    .normalize('NFKD')
+    .normalize('NFC')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+  // カタカナ（ァ〜ヶ、ヽヾ）を、0x60 離れたひらがなにする。
+  return folded.replace(/[\u30A1-\u30F6\u30FD\u30FE]/g, (char) =>
+    String.fromCharCode(char.charCodeAt(0) - 0x60),
+  );
+}
