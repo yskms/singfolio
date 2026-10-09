@@ -49,6 +49,10 @@ export function OptionSheet<Value extends string>({
         />
         <View
           accessibilityViewIsModal
+          // VoiceOverは、シートの外の幕（上の「閉じる」ボタン）に触れられないため、2本指の
+          // Zジェスチャ（escape）で、選ばずに閉じられるようにする。Androidは戻る操作
+          // （`onRequestClose`）。
+          onAccessibilityEscape={onClose}
           style={[
             styles.sheet,
             { backgroundColor: colors.surface, paddingBottom: Math.max(insets.bottom, 16) },

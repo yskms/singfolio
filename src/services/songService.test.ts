@@ -4,6 +4,9 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import type { ReadExecutor } from '../db/appDatabase.ts';
+import type { SongListQuery } from '../domain/types.ts';
+import { createSongRepository } from '../repositories/songRepository.ts';
 import { createTestServices } from '../testing/testDatabase.ts';
 import { ServiceError, type ServiceErrorCode } from './errors.ts';
 
@@ -588,5 +591,17 @@ describe('同時に呼ばれた書き込み', () => {
       titles(await services.songs.listSongs({ sortBy: 'title', direction: 'asc' })),
       ['a', 'b', 'c', 'd', 'e'],
     );
+  });
+});
+
+describe('SongRepository.list の条件（型）', () => {
+  it('検索（search）は渡せない。検索はServiceが行い、Repositoryに渡すと黙って無視されるため', () => {
+    const repository = createSongRepository({ newId: () => 'id', now: () => 0 });
+    const query: SongListQuery = { status: 'ready', search: 'x' };
+    // 下の行が型エラーにならなくなると、`@ts-expect-error` が未使用になり、
+    // `npm run typecheck` が失敗する（`SongFilter` の `search?: never` が外れた）。
+    // @ts-expect-error SongListQuery は search を持つので、Repositoryには渡せない
+    const call = (db: ReadExecutor) => repository.list(db, query);
+    assert.equal(typeof call, 'function');
   });
 });

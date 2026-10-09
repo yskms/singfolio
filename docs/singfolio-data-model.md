@@ -176,7 +176,7 @@ expo-sqliteの `withTransactionAsync` は排他ではなく、トランザクシ
     `searchKey`（`src/services/text.ts`）で絞り込む。`LIKE` が同一視するのはASCIIの大文字
     小文字だけで、`ちぇりー` で `チェリー` が見つからないなど、日本語の利用で困るため。
     端末内の曲数（数百曲）なら、全部読んでも問題にならない。Repositoryは検索の条件を持たない
-    （`SongFilter`）。`LIKE` に「簡略化」しない。
+    （`SongFilter`。`search` を渡すと型エラー）。`LIKE` に「簡略化」しない。
     -   `searchKey` が同一視するもの: 大文字小文字（ASCII以外も）、全角半角（半角カナを含む。
         互換文字も変換する）、ひらがなとカタカナ、空白の量（全角空白を含む）。
         `normalize('NFKD').normalize('NFC')` で行う（タグ名と同じ理由。「タグ名」参照）。

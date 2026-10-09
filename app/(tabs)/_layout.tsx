@@ -45,8 +45,9 @@ export default function TabsLayout() {
         tabBarLabelStyle: { fontWeight: '400' },
         // ヘッダーの題は、iOSの既定（中央）ではなく、ブランド資料のモックアップに合わせて左寄せ。
         headerTitleAlign: 'left',
-        // Songsの検索欄にキーボードが出たとき、Androidで、タブバーがキーボードの上に残って
-        // 一覧を狭めないようにする（iOSは、キーボードがタブバーに重なる）。
+        // キーボードが出ているあいだ、タブバーを隠す（iOS・Androidとも。React Navigationが
+        // キーボードの表示を見て切り替える）。Androidでは、隠さないと、タブバーがキーボードの
+        // 上に残って、Songsの検索中の一覧を狭める。全タブに効く（Practiceの検索欄も同じ）。
         tabBarHideOnKeyboard: true,
       }}
     >

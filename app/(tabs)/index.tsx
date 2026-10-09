@@ -41,6 +41,12 @@ function renderSong({ item }: { item: Song }) {
 }
 
 interface Loaded {
+  /**
+   * この一覧を読み込んだときの条件。見出し・件数・空の状態は、表示中の一覧に合わせるため、
+   * 現在の state（タイルや検索の操作で、読み込みより先に変わる）ではなく、これで決める。
+   * 食い違うと、新しい条件の見出しの下に、前の条件の一覧が一瞬出る。
+   */
+  filter: { status: SongStatus | undefined; tagId: string | undefined; search: string };
   songs: Song[];
   counts: Record<SongStatus, number>;
   tags: Tag[];
@@ -93,7 +99,7 @@ export default function SongsScreen() {
         setTagId(undefined);
         return;
       }
-      setLoaded({ songs: list, counts, tags: allTags });
+      setLoaded({ filter: { status, tagId, search }, songs: list, counts, tags: allTags });
     })().catch((error) => {
       if (!cancelled) setFailure({ error });
     });
@@ -106,7 +112,9 @@ export default function SongsScreen() {
   // Errorでない値は包む（`app/_layout.tsx` と同じ理由）。
   if (failure) throw failure.error instanceof Error ? failure.error : new Error(String(failure.error));
 
-  const sectionTitle = t(`songs.section.${status ?? 'all'}`);
+  // 読み込み前は、現在の条件。
+  const shown = loaded?.filter ?? { status, tagId, search };
+  const sectionTitle = t(`songs.section.${shown.status ?? 'all'}`);
   const songCount = loaded?.songs.length;
 
   const clearFilters = () => {
@@ -127,10 +135,12 @@ export default function SongsScreen() {
               label={t(`status.${value}`)}
               count={count}
               selected={status === value}
-              accessibilityLabel={t('songs.tileA11y', {
-                status: t(`status.${value}`),
-                count: count ?? 0,
-              })}
+              // 読み込み前は件数が空欄なので、「0曲」と読ませず、ステータス名だけにする。
+              accessibilityLabel={
+                count === undefined
+                  ? t(`status.${value}`)
+                  : t('songs.tileA11y', { status: t(`status.${value}`), count })
+              }
               onPress={() => setStatus((current) => (current === value ? undefined : value))}
             />
           );
@@ -156,6 +166,8 @@ export default function SongsScreen() {
         >
           <FilterChip
             label={t('songs.allTags')}
+            // 見た目は「すべて」だけ。読み上げでは、何の「すべて」かを伝える。
+            accessibilityLabel={t('songs.allTagsA11y')}
             selected={tagId === undefined}
             onPress={() => setTagId(undefined)}
           />
@@ -200,7 +212,7 @@ export default function SongsScreen() {
     const total = SONG_STATUSES.reduce((sum, value) => sum + loaded.counts[value], 0);
     if (total === 0) {
       empty = { title: t('songs.empty.title'), message: t('songs.empty.message') };
-    } else if (search.trim() !== '' || tagId !== undefined) {
+    } else if (shown.search.trim() !== '' || shown.tagId !== undefined) {
       empty = {
         title: t('songs.noMatch.title'),
         message: t('songs.noMatch.message', { section: sectionTitle }),
@@ -208,7 +220,7 @@ export default function SongsScreen() {
       };
     } else {
       // ステータスで絞って、その曲が無い（「すべて」で曲が無いのは、上の total === 0）。
-      empty = { message: t(`songs.emptyStatus.${status ?? 'ready'}`) };
+      empty = { message: t(`songs.emptyStatus.${shown.status ?? 'ready'}`) };
     }
   }
 

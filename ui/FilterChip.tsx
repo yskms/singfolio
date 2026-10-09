@@ -6,10 +6,13 @@ import { useTheme } from './theme';
 /** 絞り込みのチップ（Songsのタグ）。選択中の見せ方は `StatusTile` と同じ。 */
 export function FilterChip({
   label,
+  accessibilityLabel,
   selected,
   onPress,
 }: {
   label: string;
+  /** 読み上げの文言。省略すると `label` */
+  accessibilityLabel?: string;
   selected: boolean;
   onPress: () => void;
 }) {
@@ -17,6 +20,7 @@ export function FilterChip({
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       accessibilityState={{ selected }}
       onPress={onPress}
       // 見た目は36ptで、押せる範囲は44ptにする。

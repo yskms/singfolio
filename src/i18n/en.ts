@@ -33,6 +33,7 @@ export const en = {
   'songs.searchPlaceholder': 'Search songs or artists',
   'songs.searchClear': 'Clear search',
   'songs.allTags': 'All',
+  'songs.allTagsA11y': 'All tags',
   'songs.sortTitle': 'Sort by',
   'songs.sortButtonA11y': 'Sort by: {sort}',
   'songs.sort.updated': 'Recently updated',

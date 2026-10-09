@@ -25,6 +25,7 @@ export const ja: Record<MessageKey, Message> = {
   'songs.searchPlaceholder': '曲名・アーティストで検索',
   'songs.searchClear': '検索をクリア',
   'songs.allTags': 'すべて',
+  'songs.allTagsA11y': 'すべてのタグ',
   'songs.sortTitle': '並び替え',
   'songs.sortButtonA11y': '並び替え：{sort}',
   'songs.sort.updated': '更新が新しい順',

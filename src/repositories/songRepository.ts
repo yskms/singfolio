@@ -93,7 +93,11 @@ function sortColumn(key: SongSortKey | undefined): string {
  * ASCII以外の大文字小文字・全角半角・ひらがな/カタカナの違いを同一視できないため、
  * Service（`songService.listSongs`）が、`searchKey`（text.ts）で、読んだ曲を絞り込む。
  */
-export type SongFilter = Omit<SongListQuery, 'search'>;
+export type SongFilter = Omit<SongListQuery, 'search'> & {
+  // `Omit` だけだと、`search` を持つ `SongListQuery` もそのまま渡せて、検索が黙って無視される
+  // （TypeScriptは構造で型を比べる）。`never` にして、渡すと型エラーにする。
+  search?: never;
+};
 
 // 読み取りは `ReadExecutor`（`Database` でよい）、書き込みは `WriteExecutor`
 // （`Database.transaction` の中でだけ得られる）を、メソッドの先頭の引数で受ける。
