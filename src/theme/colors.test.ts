@@ -28,7 +28,7 @@ describe('colors', () => {
 
   for (const scheme of ['light', 'dark'] as const) {
     const colors = colorsByScheme[scheme];
-    for (const text of ['textPrimary', 'textSecondary'] as const satisfies (keyof ThemeColors)[]) {
+    for (const text of ['textPrimary', 'textSecondary', 'error'] as const satisfies (keyof ThemeColors)[]) {
       for (const base of ['background', 'surface'] as const satisfies (keyof ThemeColors)[]) {
         it(`${scheme}: ${text} は ${base} の上でAA（4.5:1）を満たす`, () => {
           assert.ok(contrast(colors[text], colors[base]) >= 4.5, `${colors[text]} on ${colors[base]}`);

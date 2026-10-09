@@ -30,6 +30,8 @@ export interface ThemeColors {
   onSelected: string;
   /** モーダルの背後を暗くする幕。不透明度を下げて重ねる（色そのものは不透明） */
   scrim: string;
+  /** 入力エラーの文字。background・surface の上でAA（4.5:1）を満たす */
+  error: string;
 }
 
 // textPrimary / textSecondary は、同じテーマの background・surface の上でWCAG AA
@@ -50,6 +52,7 @@ export const lightColors: ThemeColors = {
   selected: brand.mint,
   onSelected: '#17171A',
   scrim: '#000000',
+  error: '#B3261E',
 };
 
 // ダークの値は、ブランド資料にはモックアップ（暗い背景に明るいミント/パープル）しか
@@ -66,6 +69,7 @@ export const darkColors: ThemeColors = {
   selected: '#1D3B34',
   onSelected: brand.mint,
   scrim: '#000000',
+  error: '#F2B8B5',
 };
 
 export type ColorSchemeName = 'light' | 'dark';
