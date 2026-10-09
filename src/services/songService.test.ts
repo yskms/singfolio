@@ -6,7 +6,7 @@ import { describe, it } from 'node:test';
 
 import type { ReadExecutor } from '../db/appDatabase.ts';
 import type { SongListQuery } from '../domain/types.ts';
-import { createSongRepository } from '../repositories/songRepository.ts';
+import { createSongRepository, type SongFilter } from '../repositories/songRepository.ts';
 import { createTestServices } from '../testing/testDatabase.ts';
 import { ServiceError, type ServiceErrorCode } from './errors.ts';
 
@@ -595,13 +595,24 @@ describe('同時に呼ばれた書き込み', () => {
 });
 
 describe('SongRepository.list の条件（型）', () => {
-  it('検索（search）は渡せない。検索はServiceが行い、Repositoryに渡すと黙って無視されるため', () => {
+  // `@ts-expect-error` は、その行のどんな型エラーにも反応する。外れたかどうかを、別の理由の
+  // エラーと取り違えないよう、確かめる対象ごとに、エラーの原因が1つだけの行に分けている。
+  // どちらも、外れる（型エラーにならなくなる）と、`@ts-expect-error` が未使用になり、
+  // `npm run typecheck` が失敗する。
+  const query: SongListQuery = { status: 'ready', search: 'x' };
+
+  it('SongFilter は search を持てない（`search?: never` が外れていない）', () => {
+    // @ts-expect-error SongListQuery は search を持つので、SongFilter には代入できない
+    const filter: SongFilter = query;
+    assert.equal(filter.status, 'ready');
+  });
+
+  it('list は SongFilter を受け取り、search を渡せない。検索はServiceが行い、Repositoryに渡すと黙って無視されるため', () => {
     const repository = createSongRepository({ newId: () => 'id', now: () => 0 });
-    const query: SongListQuery = { status: 'ready', search: 'x' };
-    // 下の行が型エラーにならなくなると、`@ts-expect-error` が未使用になり、
-    // `npm run typecheck` が失敗する（`SongFilter` の `search?: never` が外れた）。
     // @ts-expect-error SongListQuery は search を持つので、Repositoryには渡せない
-    const call = (db: ReadExecutor) => repository.list(db, query);
-    assert.equal(typeof call, 'function');
+    const withSearch = (db: ReadExecutor) => repository.list(db, query);
+    const withoutSearch = (db: ReadExecutor, filter: SongFilter) => repository.list(db, filter);
+    assert.equal(typeof withSearch, 'function');
+    assert.equal(typeof withoutSearch, 'function');
   });
 });
