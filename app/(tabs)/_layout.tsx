@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import type { ComponentProps } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 
+import { AddSongButton } from '../../ui/AddSongButton';
 import { useI18n } from '../../ui/i18n';
 import { useTheme } from '../../ui/theme';
 
@@ -10,11 +11,13 @@ type TabTitleKey = 'tabs.songs' | 'tabs.practice' | 'tabs.profile';
 
 // ボトムタブはSongs / Practice / Profileの3つ（Wantは独立タブにしない）。
 // 並び順がそのままタブの並びで、先頭のSongsがメイン導線。
-// ヘッダーの題は、既定ではタブのラベルと同じ。Songsだけは、ホーム画面としてブランド名を出す。
+// ヘッダーの題は、既定ではタブのラベルと同じ。Songsだけは、ホーム画面としてブランド名を出し、
+// 右に曲を追加する `＋` を置く。
 const TABS: {
   name: string;
   titleKey: TabTitleKey;
   headerTitleKey?: 'app.name';
+  headerRight?: () => ReactNode;
   icon: IconName;
   iconFocused: IconName;
 }[] = [
@@ -22,6 +25,7 @@ const TABS: {
     name: 'index',
     titleKey: 'tabs.songs',
     headerTitleKey: 'app.name',
+    headerRight: () => <AddSongButton />,
     icon: 'musical-notes-outline',
     iconFocused: 'musical-notes',
   },
@@ -58,6 +62,7 @@ export default function TabsLayout() {
           options={{
             title: t(tab.titleKey),
             headerTitle: t(tab.headerTitleKey ?? tab.titleKey),
+            headerRight: tab.headerRight,
             tabBarIcon: ({ color, size, focused }) => (
               <Ionicons name={focused ? tab.iconFocused : tab.icon} size={size} color={color} />
             ),

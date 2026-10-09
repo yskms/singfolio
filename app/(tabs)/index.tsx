@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
@@ -55,6 +55,7 @@ interface Loaded {
 export default function SongsScreen() {
   const { colors } = useTheme();
   const { t } = useI18n();
+  const router = useRouter();
 
   // 絞り込み・並び替えの状態。タブは開いたままなので、アプリを終了するまで残る。
   // 起動時はReady（歌える曲）。選択中のタイルをもう一度押すと、ステータスで絞らない。
@@ -211,7 +212,11 @@ export default function SongsScreen() {
   if (loaded !== null && loaded.songs.length === 0) {
     const total = SONG_STATUSES.reduce((sum, value) => sum + loaded.counts[value], 0);
     if (total === 0) {
-      empty = { title: t('songs.empty.title'), message: t('songs.empty.message') };
+      empty = {
+        title: t('songs.empty.title'),
+        message: t('songs.empty.message'),
+        action: { label: t('songs.empty.add'), onPress: () => router.push('/song/new') },
+      };
     } else if (shown.search.trim() !== '' || shown.tagId !== undefined) {
       empty = {
         title: t('songs.noMatch.title'),

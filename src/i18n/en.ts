@@ -15,6 +15,7 @@ export const en = {
   'app.name': 'Singfolio',
 
   'common.close': 'Close',
+  'common.ok': 'OK',
 
   // ステータスの表示名（件数タイル）。一覧の見出しは songs.section.*。
   'status.ready': 'Ready',
@@ -42,6 +43,8 @@ export const en = {
   'songs.sort.artist': 'Artist',
   'songs.empty.title': 'No songs yet',
   'songs.empty.message': 'Songs you add will appear here.',
+  'songs.empty.add': 'Add a song',
+  'songs.addA11y': 'Add song',
   'songs.emptyStatus.ready': 'No songs are ready to sing yet.',
   'songs.emptyStatus.practice': 'No songs in practice.',
   'songs.emptyStatus.want': 'No songs on your want list.',
@@ -49,6 +52,33 @@ export const en = {
   'songs.noMatch.message':
     'Nothing in “{section}” matches. Try changing the search, tag, or status.',
   'songs.noMatch.clear': 'Clear search and tag',
+
+  // Add / Edit Song（ui/SongForm.tsx）。My Key・Private Note・Show Mode は機能の名前なので、
+  // 日本語でも訳さない（docs/singfolio-screen-flow.md「Add / Edit Song」の文言に合わせる）。
+  'songForm.addTitle': 'Add Song',
+  'songForm.editTitle': 'Edit Song',
+  'songForm.save': 'Save',
+  'songForm.notFoundTitle': 'Song not found',
+  'songForm.title': 'Title',
+  'songForm.artist': 'Artist',
+  // 必須の項目。見た目は「*」で、読み上げでは、この文言を添える。
+  'songForm.requiredHint': 'Required',
+  'songForm.status': 'Status',
+  'songForm.myKey': 'My Key',
+  'songForm.keyOriginal': 'Original',
+  'songForm.keyLowerA11y': 'Lower by one semitone',
+  'songForm.keyRaiseA11y': 'Raise by one semitone',
+  'songForm.tags': 'Tags',
+  'songForm.tagsNote': 'Tags may appear in Show Mode. Keep private details in Private Note.',
+  'songForm.newTagPlaceholder': 'New tag',
+  'songForm.addTag': 'Add tag',
+  'songForm.privateNote': 'Private Note',
+  'songForm.privateNotePlaceholder': 'Only you can see this',
+  'songForm.saveFailedTitle': 'Couldn’t save',
+  'songForm.discardTitle': 'Discard changes?',
+  'songForm.discardMessage': 'Your changes haven’t been saved.',
+  'songForm.keepEditing': 'Keep editing',
+  'songForm.discard': 'Discard',
 
   // ServiceErrorCode → 文言の対応は errors.ts。
   'error.titleRequired': 'Enter a title.',

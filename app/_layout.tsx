@@ -12,11 +12,13 @@ import { applyAppearance, ThemeProvider } from '../ui/theme';
 // スプラッシュも閉じる）。Providerの外で描画されるため、端末の言語で出す（ui/ErrorScreen）。
 export { ErrorScreen as ErrorBoundary } from '../ui/ErrorScreen';
 
-// 画面は、全タブをこのStackの1画面（(tabs)）として載せる。Song Detail・Add / Edit・
-// Show Mode・Settingsは、このStackに足していく（タブバーを隠して全画面で出す）。
-// 足すときは `export const unstable_settings = { initialRouteName: '(tabs)' }` も
-// 入れる。無いと、ディープリンクで詳細画面だけが開かれたとき下にタブが無く、
-// 戻る操作でアプリが終了する。
+// 画面は、全タブをこのStackの1画面（(tabs)）として載せる。Add / Edit Song（app/song/）は、
+// このStackに載せ、タブバーを隠して全画面で出す（ヘッダーは各画面が指定する）。Song Detail・
+// Show Mode・Settingsも、ここに足していく。
+// 下の `initialRouteName` は、ディープリンクで詳細画面だけが開かれたとき、下にタブが無く、
+// 戻る操作でアプリが終了するのを防ぐ。
+export const unstable_settings = { initialRouteName: '(tabs)' };
+
 export default function RootLayout() {
   // 保存済みの設定。読み込み（と、外観の端末への反映）が終わるまでは null。
   const [settings, setSettings] = useState<{

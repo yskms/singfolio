@@ -121,7 +121,8 @@ expo-sqliteの `withTransactionAsync` は排他ではなく、トランザクシ
 -   `settings`: `getAppearance` / `setAppearance`（`system` / `light` / `dark`）、
     `getLanguageSetting` / `setLanguageSetting`（`system` / `en` / `ja`）
 -   `tags`: `listTags` / `getOrCreateTag`（曲の編集画面の「新規タグ作成」。同じ名前の
-    タグがあればそれを返す）/ `renameTag` / `deleteTag`
+    タグがあればそれを返す。編集画面は、曲を保存するときに、追加した新しいタグごとに呼ぶ）/
+    `renameTag` / `deleteTag`
 -   不正な入力・存在しない対象は、`ServiceError` で reject する。`code` は
     `title-required` / `artist-required` / `invalid-status` / `invalid-key-offset` /
     `song-not-found` / `tag-not-found` / `tag-name-required` / `tag-name-duplicate` /
@@ -140,7 +141,8 @@ expo-sqliteの `withTransactionAsync` は排他ではなく、トランザクシ
     ため、最初から行う。空は `title-required` / `artist-required`。それ以外の加工は
     しない（全角半角の統一はしない。`Ｔ.Ｍ.Revolution` は入力どおりに保存する）。
 -   Status: 追加でも省略できない（既定値はUI側で決める）。
--   My Key: 整数（範囲の制限はしない）。省略は `0`。
+-   My Key: 整数（範囲の制限はしない。編集画面の `−` / `+` が選べるのは上下12半音までで、
+    これは画面の範囲）。省略は `0`。
 -   Private Note: 前後の空白を除く。空白だけは「メモなし」（空文字）。
 -   Tags: タグIDの配列。重複は1つにし、存在しないIDは `tag-not-found`。
     `Song.tags` はタグ名の昇順（ASCIIの大文字小文字は区別しない）で返す。

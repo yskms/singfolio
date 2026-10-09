@@ -6,7 +6,7 @@ v1.0（完全ローカル）の作業を、機能単位に分解した進捗表�
 v1.0より後（公開機能・Requests）の実装順序は、
 `singfolio-publishing-backend.md` §9 を参照。
 
-**現在地**：2. Songs（2.2 曲の追加・編集から）
+**現在地**：2. Songs（2.3 Song Detail から）
 
 ## 0. 企画・設計
 
@@ -34,10 +34,12 @@ v1.0より後（公開機能・Requests）の実装順序は、
 ## 2. Songs
 
 -   [x] 2.1 曲一覧（件数タイル、検索、タグ・ステータスの絞り込み、並び替え）
--   [ ] 2.2 曲の追加・編集（Title / Artist 必須、Status、My Key、Tags、
+-   [x] 2.2 曲の追加・編集（Title / Artist 必須、Status、My Key、Tags、
     Private Note、タグの注意書き。Songs画面の `＋` ボタンと、曲が1つも無いときの
-    案内の追記もここで行う）
--   [ ] 2.3 Song Detail（ステータス変更。Songs画面の行をタップして開く配線もここで行う）
+    ボタンもここで行った）
+-   [ ] 2.3 Song Detail（ステータス変更。Songs画面の行をタップして開く配線と、Edit から
+    Edit Song（`app/song/[id]/edit.tsx`。実装済み）を開く配線もここで行う。編集から戻ったとき、
+    Song Detail は曲を読み直す）
 -   [ ] 2.4 曲の削除
 
 ## 3. Practice

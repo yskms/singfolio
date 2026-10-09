@@ -12,6 +12,7 @@ export const ja: Record<MessageKey, Message> = {
   'app.name': 'Singfolio',
 
   'common.close': '閉じる',
+  'common.ok': 'OK',
 
   'status.ready': '歌える',
   'status.practice': '練習中',
@@ -34,6 +35,8 @@ export const ja: Record<MessageKey, Message> = {
   'songs.sort.artist': 'アーティスト順',
   'songs.empty.title': 'まだ曲がありません',
   'songs.empty.message': '追加した曲がここに並びます。',
+  'songs.empty.add': '曲を追加',
+  'songs.addA11y': '曲を追加',
   'songs.emptyStatus.ready': '歌える曲はまだありません。',
   'songs.emptyStatus.practice': '練習中の曲はありません。',
   'songs.emptyStatus.want': '歌いたい曲はまだありません。',
@@ -41,6 +44,31 @@ export const ja: Record<MessageKey, Message> = {
   'songs.noMatch.message':
     '「{section}」に一致する曲はありません。検索語・タグ・ステータスを変えてみてください。',
   'songs.noMatch.clear': '検索とタグをクリア',
+
+  'songForm.addTitle': '曲を追加',
+  'songForm.editTitle': '曲を編集',
+  'songForm.save': '保存',
+  'songForm.notFoundTitle': '曲が見つかりません',
+  'songForm.title': '曲名',
+  'songForm.artist': 'アーティスト',
+  'songForm.requiredHint': '必須',
+  'songForm.status': 'ステータス',
+  'songForm.myKey': 'My Key',
+  'songForm.keyOriginal': 'Original',
+  'songForm.keyLowerA11y': '半音下げる',
+  'songForm.keyRaiseA11y': '半音上げる',
+  'songForm.tags': 'タグ',
+  'songForm.tagsNote':
+    'タグはShow Modeに表示されます。人に見せたくない内容はPrivate Noteに入力してください。',
+  'songForm.newTagPlaceholder': '新しいタグ',
+  'songForm.addTag': 'タグを追加',
+  'songForm.privateNote': 'Private Note',
+  'songForm.privateNotePlaceholder': '自分だけが見られます',
+  'songForm.saveFailedTitle': '保存できませんでした',
+  'songForm.discardTitle': '変更を破棄しますか？',
+  'songForm.discardMessage': '変更はまだ保存されていません。',
+  'songForm.keepEditing': '編集を続ける',
+  'songForm.discard': '破棄',
 
   'error.titleRequired': '曲名を入力してください。',
   'error.artistRequired': 'アーティスト名を入力してください。',

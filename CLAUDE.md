@@ -107,6 +107,16 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     （`DatabaseTooNewError`）は、やり直しても開けないので「もう一度試す」を出さない。
     このErrorBoundaryは、起動後の画面の描画の失敗も拾う（再試行でレイアウトが作り直され、
     先頭の画面から始まる。詳細は screen-flow「起動時の例外」）。
+-   Add / Edit Song（`ui/SongForm.tsx`）の「変更があるまま戻るときの破棄の確認」は、
+    `usePreventRemove`（`expo-router/react-navigation`）で行う。`navigation.addListener(
+    'beforeRemove')` を自分で購読する形に「簡略化」しない。iOSのネイティブStackは、
+    `usePreventRemove` で止めると伝えない限り、戻るボタン・スワイプをネイティブ側で先に実行し、
+    JS側で止められない（"was removed natively" のエラーになる。iOSシミュレータで確認）。
+-   新しいタグは、Add / Edit Song で追加した時点ではなく、曲を保存するときに
+    `getOrCreateTag` で作る。追加した時点で作ると、保存せずに戻ったとき、使われないタグが残る。
+-   Androidはエッジ・ツー・エッジで、キーボードが出ても画面（ScrollView）が縮まず、下にある入力欄が
+    キーボードに隠れる（`adjustResize` は効かない。エミュレータで確認）。入力欄が下にある画面は、
+    `SongForm` のように、キーボードの高さの分の余白を足してスクロールする。
 -   RN・Expoに依存するUIの部品・hookは、`src/` に置けないため `ui/`（ルート直下）に置く。
 -   装飾のアイコンは `{...decorative}`（`ui/decorative.ts`）で読み上げから外す。外さないと、
     字形（`\uf55f` など）が読み上げの対象になる（iOSのアクセシビリティツリーで確認。
