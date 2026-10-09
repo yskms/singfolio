@@ -176,6 +176,78 @@ describe('createSong', () => {
     assert.equal(count('songs'), 0);
     assert.equal(count('song_tags'), 0);
   });
+
+  it('newTagNames の新しいタグを、曲の保存と一緒に作って付ける', async () => {
+    const { services, count } = await setup();
+    const rock = await services.tags.getOrCreateTag('Rock');
+    const song = await services.songs.createSong({
+      title: 'a',
+      artist: 'b',
+      status: 'ready',
+      tagIds: [rock.id],
+      newTagNames: [' J-Pop ', 'ボカロ'],
+    });
+    assert.deepEqual(
+      song.tags.map((tag) => tag.name),
+      ['J-Pop', 'Rock', 'ボカロ'],
+    );
+    assert.equal(count('tags'), 3);
+    assert.deepEqual(
+      (await services.tags.listTags()).map((tag) => tag.name),
+      ['J-Pop', 'Rock', 'ボカロ'],
+    );
+  });
+
+  it('newTagNames が既存のタグと同じ名前（大文字小文字・全角半角の違いを除く）なら、作らずにそのタグを付ける', async () => {
+    const { services, count } = await setup();
+    const rock = await services.tags.getOrCreateTag('Rock');
+    const song = await services.songs.createSong({
+      title: 'a',
+      artist: 'b',
+      status: 'ready',
+      // 同じ名前が重複していても、1つだけ作る。
+      newTagNames: ['rock', 'Ｒock', 'New', 'new'],
+    });
+    assert.deepEqual(
+      song.tags.map((tag) => tag.name),
+      ['New', 'Rock'],
+    );
+    assert.equal(song.tags.find((tag) => tag.name === 'Rock')?.id, rock.id);
+    assert.equal(count('tags'), 2);
+  });
+
+  it('保存が失敗したら、newTagNames で作ったタグも残らない（同じトランザクション）', async () => {
+    const { services, count } = await setup();
+    // 存在しないタグID
+    await rejectsWith(
+      services.songs.createSong({
+        title: 'a',
+        artist: 'b',
+        status: 'ready',
+        tagIds: ['no-such-tag'],
+        newTagNames: ['J-Pop'],
+      }),
+      'tag-not-found',
+    );
+    // 入力の検証（Title）
+    await rejectsWith(
+      services.songs.createSong({ title: ' ', artist: 'b', status: 'ready', newTagNames: ['J-Pop'] }),
+      'title-required',
+    );
+    // 空のタグ名。その前に作ったタグも残らない。
+    await rejectsWith(
+      services.songs.createSong({
+        title: 'a',
+        artist: 'b',
+        status: 'ready',
+        newTagNames: ['J-Pop', '  '],
+      }),
+      'tag-name-required',
+    );
+    assert.equal(count('tags'), 0);
+    assert.equal(count('songs'), 0);
+    assert.equal(count('song_tags'), 0);
+  });
 });
 
 describe('getSong', () => {
@@ -307,6 +379,61 @@ describe('updateSong', () => {
       }),
       'tag-not-found',
     );
+    assert.deepEqual(await services.songs.getSong(song.id), song);
+  });
+
+  it('newTagNames の新しいタグを、曲の保存と一緒に作って付ける（updatedAt も更新する）', async () => {
+    const { services, advance, count, song, rock, input } = await created();
+    advance();
+    const updated = await services.songs.updateSong(song.id, {
+      ...input,
+      newTagNames: ['J-Pop'],
+    });
+    assert.deepEqual(
+      updated.tags.map((tag) => tag.name),
+      ['J-Pop', 'Rock'],
+    );
+    assert.ok(updated.tags.some((tag) => tag.id === rock.id));
+    assert.equal(updated.updatedAt, 2_000);
+    assert.equal(count('tags'), 3, 'Rock・Pop・J-Pop');
+  });
+
+  it('newTagNames が、既に付いているタグと同じ名前なら、内容は変わらず、updatedAt も更新しない', async () => {
+    const { services, advance, count, song, input } = await created();
+    advance();
+    const same = await services.songs.updateSong(song.id, { ...input, newTagNames: ['rock'] });
+    assert.deepEqual(same, song);
+    assert.equal(count('tags'), 2);
+  });
+
+  it('保存が失敗したら、newTagNames で作ったタグも残らず、曲も変わらない', async () => {
+    const { services, advance, count, song, input } = await created();
+    advance();
+    // 存在しないタグID
+    await rejectsWith(
+      services.songs.updateSong(song.id, {
+        ...input,
+        tagIds: ['no-such-tag'],
+        newTagNames: ['J-Pop'],
+      }),
+      'tag-not-found',
+    );
+    // 存在しない曲（編集中に消えた）
+    await rejectsWith(
+      services.songs.updateSong('no-such-song', { ...input, newTagNames: ['J-Pop'] }),
+      'song-not-found',
+    );
+    // 入力の検証
+    await rejectsWith(
+      services.songs.updateSong(song.id, { ...input, title: ' ', newTagNames: ['J-Pop'] }),
+      'title-required',
+    );
+    // 空のタグ名
+    await rejectsWith(
+      services.songs.updateSong(song.id, { ...input, newTagNames: ['J-Pop', ''] }),
+      'tag-name-required',
+    );
+    assert.equal(count('tags'), 2, 'Rock・Pop のまま');
     assert.deepEqual(await services.songs.getSong(song.id), song);
   });
 });

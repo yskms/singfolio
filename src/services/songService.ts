@@ -1,4 +1,4 @@
-import type { Database, ReadExecutor } from '../db/appDatabase.ts';
+import type { Database, ReadExecutor, WriteExecutor } from '../db/appDatabase.ts';
 import {
   isSongStatus,
   type Song,
@@ -8,6 +8,7 @@ import {
 import type { SongRepository } from '../repositories/songRepository.ts';
 import type { TagRepository } from '../repositories/tagRepository.ts';
 import { ServiceError } from './errors.ts';
+import { findOrCreateTag } from './tagLookup.ts';
 import { normalizeText, searchKey } from './text.ts';
 
 /** 曲の編集画面で保存する内容。 */
@@ -19,6 +20,12 @@ export interface SongInput {
   keyOffset: number;
   privateNote: string;
   tagIds: string[];
+  /**
+   * 曲の保存と一緒に作る、新しいタグの名前（省略は無し）。同じ名前（正規化して、大文字小文字を
+   * 同一視）のタグが既にあれば、作らずにそのタグを付ける。タグの作成は曲の保存と同じ
+   * トランザクションで行うので、保存が失敗したら、作ったタグも残らない。
+   */
+  newTagNames?: string[];
 }
 
 /** 曲の追加。Title / Artist / Status 以外は省略できる（My Key 0、メモ・タグなし）。 */
@@ -31,8 +38,13 @@ export interface SongServiceDeps {
   tags: TagRepository;
 }
 
+/** 保存する形にした入力。タグは、新しいタグを作る前のもの。 */
+type NormalizedInput = Required<SongInput>;
+/** 新しいタグを作って、タグIDにまとめた後の入力。 */
+type ResolvedInput = Omit<SongInput, 'newTagNames'>;
+
 /** 入力を検証し、保存する形（曲名・アーティストの正規化、タグIDの重複の除去など）にする。 */
-function normalizeInput(input: SongInput): SongInput {
+function normalizeInput(input: SongInput): NormalizedInput {
   const title = normalizeText(input.title);
   if (title === '') throw new ServiceError('title-required');
   const artist = normalizeText(input.artist);
@@ -49,6 +61,7 @@ function normalizeInput(input: SongInput): SongInput {
     // 空白だけのメモは「メモなし」（空文字）にそろえる。
     privateNote: input.privateNote.trim(),
     tagIds: [...new Set(input.tagIds)],
+    newTagNames: input.newTagNames ?? [],
   };
 }
 
@@ -63,7 +76,7 @@ function toInput(song: Song): SongInput {
   };
 }
 
-function isUnchanged(current: Song, next: SongInput): boolean {
+function isUnchanged(current: Song, next: ResolvedInput): boolean {
   const currentTagIds = new Set(current.tags.map((tag) => tag.id));
   return (
     current.title === next.title &&
@@ -86,6 +99,18 @@ export function createSongService({ db, songs, tags }: SongServiceDeps) {
     if (found.length !== tagIds.length) throw new ServiceError('tag-not-found');
   }
 
+  /**
+   * 新しいタグを作り（同じ名前のタグがあれば、それを使う）、付けるタグのIDにまとめる。
+   * `tx` の中で呼ぶ（曲の保存が失敗したとき、作ったタグも取り消すため）。
+   */
+  async function resolveTagIds(tx: WriteExecutor, input: NormalizedInput): Promise<string[]> {
+    const ids = new Set(input.tagIds);
+    for (const name of input.newTagNames) {
+      ids.add((await findOrCreateTag(tx, tags, name)).id);
+    }
+    return [...ids];
+  }
+
   async function requireSong(executor: ReadExecutor, id: string): Promise<Song> {
     const song = await songs.get(executor, id);
     if (!song) throw new ServiceError('song-not-found');
@@ -99,7 +124,10 @@ export function createSongService({ db, songs, tags }: SongServiceDeps) {
   function edit(id: string, next: (current: Song) => SongInput): Promise<Song> {
     return db.transaction(async (tx) => {
       const current = await requireSong(tx, id);
-      const input = normalizeInput(next(current));
+      const normalized = normalizeInput(next(current));
+      // 新しいタグを作った場合は、そのIDが現在のタグに無いので、必ず「変更あり」になる
+      // （内容が変わらないのに、タグだけが作られることは無い）。
+      const input = { ...normalized, tagIds: await resolveTagIds(tx, normalized) };
       if (isUnchanged(current, input)) return current;
 
       await assertTagsExist(tx, input.tagIds);
@@ -136,7 +164,8 @@ export function createSongService({ db, songs, tags }: SongServiceDeps) {
 
     /**
      * 曲を追加する。入力が不正なら `ServiceError`（`title-required` など）で
-     * reject し、何も保存しない。存在しないタグIDを含む場合は `tag-not-found`。
+     * reject し、何も保存しない（`newTagNames` で作るタグも残らない）。存在しない
+     * タグIDを含む場合は `tag-not-found`。
      */
     async createSong(input: NewSongInput): Promise<Song> {
       const normalized = normalizeInput({
@@ -146,18 +175,21 @@ export function createSongService({ db, songs, tags }: SongServiceDeps) {
         keyOffset: input.keyOffset ?? 0,
         privateNote: input.privateNote ?? '',
         tagIds: input.tagIds ?? [],
+        newTagNames: input.newTagNames,
       });
       return db.transaction(async (tx) => {
-        await assertTagsExist(tx, normalized.tagIds);
+        const tagIds = await resolveTagIds(tx, normalized);
+        await assertTagsExist(tx, tagIds);
         const id = await songs.insert(tx, normalized);
-        await songs.replaceTags(tx, id, normalized.tagIds);
+        await songs.replaceTags(tx, id, tagIds);
         return requireSong(tx, id);
       });
     },
 
     /**
-     * 曲の編集画面の保存。全項目を渡した内容に置き換える（タグも渡した一覧になる）。
-     * `updatedAt` は、内容が実際に変わったときだけ更新する。
+     * 曲の編集画面の保存。全項目を渡した内容に置き換える（タグも、`tagIds` と、`newTagNames`
+     * から作ったタグの一覧になる）。`updatedAt` は、内容が実際に変わったときだけ更新する。
+     * 失敗したら、曲もタグも変更しない（`newTagNames` で作るタグも残らない）。
      */
     updateSong(id: string, input: SongInput): Promise<Song> {
       return edit(id, () => input);

@@ -2,6 +2,7 @@ import type { Database } from '../db/appDatabase.ts';
 import type { Tag } from '../domain/types.ts';
 import type { TagRepository } from '../repositories/tagRepository.ts';
 import { ServiceError } from './errors.ts';
+import { findOrCreateTag } from './tagLookup.ts';
 import { normalizeTagName, tagNameKey } from './text.ts';
 
 export interface TagServiceDeps {
@@ -25,19 +26,13 @@ export function createTagService({ db, tags }: TagServiceDeps) {
     },
 
     /**
-     * 同じ名前のタグがあればそれを返し、なければ作る。曲の編集画面の
-     * 「新規タグ作成」用で、既にあるタグ名を入力しても重複のエラーにならない。
-     * 名前は正規化し（text.ts）、正規化後に同じ名前（大文字小文字を除く）のものを同一とみなす。
+     * 同じ名前のタグがあればそれを返し、なければ作る。名前は正規化し（text.ts）、正規化後に
+     * 同じ名前（大文字小文字を除く）のものを同一とみなす。曲の編集画面は、これではなく
+     * 曲の保存（`createSong` / `updateSong` の `newTagNames`）でタグを作る
+     * （曲の保存が失敗したとき、作ったタグだけが残らないように）。
      */
-    async getOrCreateTag(name: string): Promise<Tag> {
-      const normalized = requireName(name);
-      return db.transaction(async (tx) => {
-        const key = tagNameKey(normalized);
-        const existing = (await tags.list(tx)).find(
-          (tag) => tagNameKey(tag.name) === key,
-        );
-        return existing ?? tags.insert(tx, normalized);
-      });
+    getOrCreateTag(name: string): Promise<Tag> {
+      return db.transaction((tx) => findOrCreateTag(tx, tags, name));
     },
 
     /**

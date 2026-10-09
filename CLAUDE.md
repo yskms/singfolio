@@ -73,7 +73,11 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
 詳細は `docs/singfolio-data-model.md`「Repository / Service層」。
 
 -   UI → Service → Repository → SQLite の一方向。画面はRepository・DBに触れず、
-    `getServices()` のServiceだけを使う。
+    `getServices()` のServiceだけを使う。例外は、`src/services/` の、DBに触れない純粋な関数
+    （`text.ts` の正規化・`tagInput.ts`）、`ServiceError`、入力の型で、保存前の入力の確認を、
+    Serviceと同じ判定にそろえるために画面から直接importしてよい（Add / Edit Songの、空の
+    曲名の判定・新規タグの重複の判定）。それ以外（`createServices`・Serviceの実装・
+    `repositories/`・`db/`）は、画面から使わない。
 -   DBへの書き込みは、必ず `Database.transaction` の中で行う（expo-sqliteの
     `withTransactionAsync` は排他ではないため）。`Database` を読み取り専用の型に
     しているのはこのためで、`runAsync` を直接呼べるように型を緩めない。
@@ -112,8 +116,10 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     'beforeRemove')` を自分で購読する形に「簡略化」しない。iOSのネイティブStackは、
     `usePreventRemove` で止めると伝えない限り、戻るボタン・スワイプをネイティブ側で先に実行し、
     JS側で止められない（"was removed natively" のエラーになる。iOSシミュレータで確認）。
--   新しいタグは、Add / Edit Song で追加した時点ではなく、曲を保存するときに
-    `getOrCreateTag` で作る。追加した時点で作ると、保存せずに戻ったとき、使われないタグが残る。
+-   新しいタグは、Add / Edit Song で追加した時点ではなく、曲を保存するときに、Serviceが曲と
+    同じトランザクションで作る（`createSong` / `updateSong` の `newTagNames`）。追加した時点で
+    作ると、保存せずに戻ったとき、使われないタグが残る。画面で `getOrCreateTag` を呼んでから
+    曲を保存する形にも「簡略化」しない（曲の保存が失敗したとき、タグだけが残る）。
 -   Androidはエッジ・ツー・エッジで、キーボードが出ても画面（ScrollView）が縮まず、下にある入力欄が
     キーボードに隠れる（`adjustResize` は効かない。エミュレータで確認）。入力欄が下にある画面は、
     `SongForm` のように、キーボードの高さの分の余白を足してスクロールする。

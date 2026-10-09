@@ -89,7 +89,9 @@ UIの表示名「My Key」は、モデル・DBでは `keyOffset` / `key_offset` 
 ## Repository / Service層
 
 UI → Service → Repository → SQLite の一方向。UIはRepositoryとDBに触れず、Service
-（`src/services/index.ts` の `getServices()`）だけを使う。公開機能などの将来の
+（`src/services/index.ts` の `getServices()`）だけを使う。例外は、DBに触れない純粋な関数
+（`text.ts` の正規化・`tagInput.ts`）と `ServiceError`・入力の型で、画面が、保存前の入力の
+確認を、Serviceと同じ判定にそろえるために直接importしてよい。公開機能などの将来の
 同期処理も、このService境界の内側に追加する（`singfolio-publishing-backend.md` §10）。
 
 | 層 | 場所 | 役割 |
@@ -117,11 +119,13 @@ expo-sqliteの `withTransactionAsync` は排他ではなく、トランザクシ
 
 -   `songs`: `getSong` / `listSongs` / `countSongsByStatus` / `createSong` /
     `updateSong`（編集画面の保存。全項目を置き換える）/ `setStatus`（Song Detail・
-    Practiceの「Mark as Ready」）/ `deleteSong`
+    Practiceの「Mark as Ready」）/ `deleteSong`。`createSong` / `updateSong` は、
+    新しいタグの名前（`newTagNames`）も受け、曲と同じトランザクションで作る
+    （「曲の入力」）
 -   `settings`: `getAppearance` / `setAppearance`（`system` / `light` / `dark`）、
     `getLanguageSetting` / `setLanguageSetting`（`system` / `en` / `ja`）
--   `tags`: `listTags` / `getOrCreateTag`（曲の編集画面の「新規タグ作成」。同じ名前の
-    タグがあればそれを返す。編集画面は、曲を保存するときに、追加した新しいタグごとに呼ぶ）/
+-   `tags`: `listTags` / `getOrCreateTag`（同じ名前のタグがあればそれを返し、なければ作る。
+    タグだけを作る操作で、曲の編集画面は使わない。「曲の入力」の `newTagNames`）/
     `renameTag` / `deleteTag`
 -   不正な入力・存在しない対象は、`ServiceError` で reject する。`code` は
     `title-required` / `artist-required` / `invalid-status` / `invalid-key-offset` /
@@ -144,9 +148,16 @@ expo-sqliteの `withTransactionAsync` は排他ではなく、トランザクシ
 -   My Key: 整数（範囲の制限はしない。編集画面の `−` / `+` が選べるのは上下12半音までで、
     これは画面の範囲）。省略は `0`。
 -   Private Note: 前後の空白を除く。空白だけは「メモなし」（空文字）。
--   Tags: タグIDの配列。重複は1つにし、存在しないIDは `tag-not-found`。
+-   Tags: タグIDの配列（`tagIds`）。重複は1つにし、存在しないIDは `tag-not-found`。
     `Song.tags` はタグ名の昇順（ASCIIの大文字小文字は区別しない）で返す。
--   追加・編集はすべて1つのトランザクション。検証やタグの確認で失敗したら、何も保存しない。
+-   新しいタグ（`newTagNames`。省略は無し）: 保存と一緒に作るタグの名前。名前は「タグ名」と
+    同じ規則で正規化し、同じ名前（大文字小文字を除く）のタグが既にあれば、作らずにそのタグを
+    付ける（`tagIds` と合わせて重複は1つ）。空の名前は `tag-name-required`。曲の編集画面は、
+    タグを先に作ってから曲を保存せず、これで渡す（曲の保存が失敗したとき、タグだけが残らない
+    ため）。`updateSong` で、内容が変わらない（名前が、既に付いているタグと同じ）場合は、
+    `updatedAt` を更新せず、タグも作らない。
+-   追加・編集はすべて1つのトランザクション（`newTagNames` のタグの作成を含む）。検証や
+    タグの確認で失敗したら、何も保存しない（作ったタグも残らない）。
 
 ### タグ名
 

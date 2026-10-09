@@ -26,8 +26,9 @@ const DEFAULT_STATUS: SongStatus = 'ready';
  * 追加・編集の画面（`app/song/`）のヘッダー。ルートが、読み込み中も含めて常に指定する
  * （`SongForm` が出るまで指定しないと、画面を開く動きの間、ヘッダーが無い）。題はルートが
  * 足す。保存のボタンだけは、入力の状態に依存するため `SongForm` が足す。
- * 戻るボタンの文字は出さない（前の画面の題が出るが、Songsはヘッダーが無いタブ内で、
- * 意味のある文字にならない）。
+ * 戻るボタンの文字は出さない（iOSは、前の画面の題を出す。前の画面は、ルートのStackの
+ * (tabs) で、このStackのヘッダーを出さず、題も付けていないため、意味のある文字にならない
+ * はず。出した場合の表示は未確認）。
  */
 export const SONG_FORM_SCREEN_OPTIONS = {
   headerShown: true,
@@ -47,8 +48,9 @@ function sameIds(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
  *
  * - 曲名・アーティストが空なら、保存せずに両方の欄にエラーを出す（Serviceの検証と同じ
  *   `normalizeText` で判定し、Serviceのエラーは念のため受ける）。
- * - 新しいタグは、保存するときに作る（保存せずに戻ると残らない）。「新規タグ」欄に書いたまま
- *   保存した名前も、追加したものとして扱う。
+ * - 新しいタグは、保存するときに、曲と同じトランザクションで作る（保存せずに戻ったときも、
+ *   保存に失敗したときも、使われないタグが残らない）。「新規タグ」欄に書いたまま保存した名前も、
+ *   追加したものとして扱う。
  * - 変更があるまま戻る（戻るボタン・iOSのスワイプ・Androidの戻る操作）と、破棄の確認を出す。
  */
 export function SongForm({ song, tags }: { song?: Song; tags: readonly Tag[] }) {
@@ -175,8 +177,9 @@ export function SongForm({ song, tags }: { song?: Song; tags: readonly Tag[] }) 
       const typed = resolveTagInput(tagInput, tags, pendingTagNames);
       const tagIds = new Set(selectedTagIds);
       if (typed.type === 'existing') tagIds.add(typed.tag.id);
-      const newNames = typed.type === 'new' ? [...pendingTagNames, typed.name] : pendingTagNames;
-      for (const name of newNames) tagIds.add((await services.tags.getOrCreateTag(name)).id);
+      // 新しいタグは、Serviceが、曲の保存と同じトランザクションで作る（保存が失敗したとき、
+      // タグだけが残らないように）。
+      const newTagNames = typed.type === 'new' ? [...pendingTagNames, typed.name] : pendingTagNames;
 
       const input: SongInput = {
         title,
@@ -185,6 +188,7 @@ export function SongForm({ song, tags }: { song?: Song; tags: readonly Tag[] }) 
         keyOffset,
         privateNote,
         tagIds: [...tagIds],
+        newTagNames: [...newTagNames],
       };
       if (song) await services.songs.updateSong(song.id, input);
       else await services.songs.createSong(input);
