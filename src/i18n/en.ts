@@ -79,6 +79,13 @@ export const en = {
   'songForm.discardMessage': 'Your changes haven’t been saved.',
   'songForm.keepEditing': 'Keep editing',
   'songForm.discard': 'Discard',
+  // 候補（サジェスト）。提供元の表記は、検索語を外部へ送る間、候補の欄に必ず出す。
+  'songForm.suggestionsProvider': 'Suggestions from Apple',
+  'songForm.suggestionRegistered': 'In your songs',
+  'songForm.suggestionA11y': '{title} by {artist}',
+  'songForm.suggestionA11yRegistered': '{title} by {artist}, already in your songs',
+  'songForm.suggestionSongHint': 'Fills in the title and artist',
+  'songForm.suggestionArtistHint': 'Fills in the artist',
 
   // ServiceErrorCode → 文言の対応は errors.ts。
   'error.titleRequired': 'Enter a title.',

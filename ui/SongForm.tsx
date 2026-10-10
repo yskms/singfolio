@@ -5,22 +5,34 @@ import { Alert, Keyboard, Platform, Pressable, ScrollView, StyleSheet } from 're
 import type { TextInput as NativeTextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { SONG_STATUSES, type Song, type SongStatus, type Tag } from '../src/domain/types';
+import {
+  SONG_STATUSES,
+  type Song,
+  type SongStatus,
+  type SongSuggestion,
+  type Tag,
+} from '../src/domain/types';
 import { errorMessageKey } from '../src/i18n';
 import { getServices, ServiceError, type SongInput } from '../src/services';
+import { MIN_CATALOG_TERM_LENGTH, mergeArtistSuggestions } from '../src/services/suggestionRules';
 import { resolveTagInput } from '../src/services/tagInput';
-import { normalizeText } from '../src/services/text';
+import { normalizeText, searchKey } from '../src/services/text';
 import { ChoiceRow } from './ChoiceRow';
 import { FormField } from './FormField';
 import { FormInput } from './FormInput';
 import { useI18n } from './i18n';
 import { KeyStepper } from './KeyStepper';
+import { SuggestionList } from './SuggestionList';
 import { TagPicker } from './TagPicker';
 import { Text } from './Text';
 import { useTheme } from './theme';
+import { useSuggestions } from './useSuggestions';
 
 /** 追加画面の Status の既定。「曲を登録 → Readyにする」が中心の体験のため。 */
 const DEFAULT_STATUS: SongStatus = 'ready';
+
+/** 外部の候補を探すまでの待ち時間。入力が止まってから送る（打つたびには送らない）。 */
+const SUGGEST_DELAY_MS = 500;
 
 /**
  * 追加・編集の画面（`app/song/`）のヘッダー。ルートが、読み込み中も含めて常に指定する
@@ -52,10 +64,14 @@ function sameIds(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
  *   保存に失敗したときも、使われないタグが残らない）。「新規タグ」欄に書いたまま保存した名前も、
  *   追加したものとして扱う。
  * - 変更があるまま戻る（戻るボタン・iOSのスワイプ・Androidの戻る操作）と、破棄の確認を出す。
+ * - 曲名・アーティストの欄の直下に、候補を出す（`singfolio-screen-flow.md`「候補（サジェスト）」）。
+ *   欄を**編集した**ときだけ探す（フォーカスしただけ・開いたときの既存の値では、外部へ送らない）。
+ *   曲の候補を選ぶと曲名とアーティストの両方、アーティストの候補を選ぶとアーティストだけを
+ *   置き換える。選んで欄が書き換わっても、探し直さない。
  */
 export function SongForm({ song, tags }: { song?: Song; tags: readonly Tag[] }) {
   const { colors } = useTheme();
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const router = useRouter();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
@@ -82,6 +98,91 @@ export function SongForm({ song, tags }: { song?: Song; tags: readonly Tag[] }) 
   const [titleError, setTitleError] = useState<string | undefined>(undefined);
   const [artistError, setArtistError] = useState<string | undefined>(undefined);
   const [saving, setSaving] = useState(false);
+
+  // 候補。欄を編集したときだけ探す（フォーカスしただけでは探さない・送らない）ため、フォーカス中か、
+  // 編集したか（フォーカスが外れたら戻す）を持つ。`picked*` は、候補を選んで入った値で、欄が
+  // その値のままのあいだは探し直さない（編集すると外れる）。
+  const [titleFocused, setTitleFocused] = useState(false);
+  const [artistFocused, setArtistFocused] = useState(false);
+  const [titleEdited, setTitleEdited] = useState(false);
+  const [artistEdited, setArtistEdited] = useState(false);
+  const [pickedTitle, setPickedTitle] = useState<string | null>(null);
+  const [pickedArtist, setPickedArtist] = useState<string | null>(null);
+  // 候補を選ぶたびに増やし、入力欄の `key` にする（欄を作り直す）。iOSは、日本語の変換中
+  // （未確定の文字がある）の欄の値を、JSから書き換えても無視する（確定の後も、欄は未確定の文字の
+  // まま。`onChangeText` も来ない。iOSシミュレータで確認）。ひらがなを打ってから、確定せずに
+  // 候補を押すのは普通の使い方なので、欄ごと作り直して、変換中の状態を捨てる。
+  const [titleEpoch, setTitleEpoch] = useState(0);
+  const [artistEpoch, setArtistEpoch] = useState(0);
+  // 外部の候補が使える（組み込まれていて、設定がオン）。提供元の表記を出すかどうか。
+  const [providerShown, setProviderShown] = useState(false);
+  useEffect(() => {
+    let current = true;
+    getServices()
+      .then(async ({ suggestions, settings }) =>
+        suggestions.available && (await settings.getSuggestionsEnabled()),
+      )
+      .then((enabled) => {
+        if (current) setProviderShown(enabled);
+      })
+      .catch(() => {}); // 候補が出ないだけ。入力・保存には影響しない。
+    return () => {
+      current = false;
+    };
+  }, []);
+
+  const titleActive = titleFocused && titleEdited && title !== pickedTitle;
+  const artistActive = artistFocused && artistEdited && artist !== pickedArtist;
+  const songSuggestions = useSuggestions<SongSuggestion>({
+    active: titleActive,
+    queryKey: `${language}\n${title}\n${artist}`,
+    delayMs: SUGGEST_DELAY_MS,
+    load: async () => (await getServices()).suggestions.catalogSongs({ title, artist, language }),
+  });
+  const localArtists = useSuggestions<string>({
+    active: artistActive,
+    queryKey: artist,
+    delayMs: 0,
+    load: async () => (await getServices()).suggestions.localArtists(artist),
+  });
+  const catalogArtists = useSuggestions<string>({
+    active: artistActive,
+    queryKey: `${language}\n${artist}`,
+    delayMs: SUGGEST_DELAY_MS,
+    load: async () => (await getServices()).suggestions.catalogArtists({ artist, language }),
+  });
+  const artistSuggestions = useMemo(
+    () => mergeArtistSuggestions(localArtists, catalogArtists, artist),
+    [localArtists, catalogArtists, artist],
+  );
+  // 提供元の表記は、検索語を外部へ送りうる間（送る長さがあるとき）だけ出す。
+  const sendable = (text: string) => searchKey(text).length >= MIN_CATALOG_TERM_LENGTH;
+  // 欄を作り直す（上の `titleEpoch` の説明）と、フォーカスの外れ（`onBlur`）が来ないことが
+  // あるので、フォーカスと編集の状態も、ここで戻す。
+  const pickSong = (suggestion: SongSuggestion) => {
+    setTitle(suggestion.title);
+    setArtist(suggestion.artist);
+    setPickedTitle(suggestion.title);
+    setPickedArtist(suggestion.artist);
+    setTitleError(undefined);
+    setArtistError(undefined);
+    setTitleFocused(false);
+    setArtistFocused(false);
+    setTitleEdited(false);
+    setArtistEdited(false);
+    setTitleEpoch((epoch) => epoch + 1);
+    setArtistEpoch((epoch) => epoch + 1);
+    Keyboard.dismiss();
+  };
+  const pickArtist = (name: string) => {
+    setArtist(name);
+    setPickedArtist(name);
+    setArtistError(undefined);
+    setArtistFocused(false);
+    setArtistEdited(false);
+    setArtistEpoch((epoch) => epoch + 1);
+    Keyboard.dismiss();
+  };
 
   const titleRef = useRef<NativeTextInput>(null);
   const artistRef = useRef<NativeTextInput>(null);
@@ -256,37 +357,93 @@ export function SongForm({ song, tags }: { song?: Song; tags: readonly Tag[] }) 
       >
         <FormField label={t('songForm.title')} required error={titleError}>
           <FormInput
+            key={`title-${titleEpoch}`}
             ref={titleRef}
             value={title}
             onChangeText={(text) => {
               setTitle(text);
+              setTitleEdited(true);
+              setPickedTitle(null);
               setTitleError(undefined);
             }}
             accessibilityLabel={t('songForm.title')}
             accessibilityHint={t('songForm.requiredHint')}
             invalid={titleError !== undefined}
-            onFocus={focusTopField}
-            // 追加は、開いてすぐ入力できるようにする（素早く登録できることを優先）。
-            autoFocus={!song}
+            onFocus={() => {
+              focusTopField();
+              setTitleFocused(true);
+            }}
+            onBlur={() => {
+              setTitleFocused(false);
+              setTitleEdited(false);
+            }}
+            // 追加は、開いてすぐ入力できるようにする（素早く登録できることを優先）。欄を作り直した
+            // とき（候補を選んだ後）は、フォーカスしない。
+            autoFocus={!song && titleEpoch === 0}
             returnKeyType="next"
             onSubmitEditing={() => artistRef.current?.focus()}
             submitBehavior="submit"
+          />
+          <SuggestionList
+            rows={songSuggestions.map((suggestion) => ({
+              key: `${suggestion.title}\u0000${suggestion.artist}`,
+              primary: suggestion.title,
+              secondary: suggestion.artist,
+              registered: suggestion.registered,
+              accessibilityLabel: t(
+                suggestion.registered ? 'songForm.suggestionA11yRegistered' : 'songForm.suggestionA11y',
+                { title: suggestion.title, artist: suggestion.artist },
+              ),
+            }))}
+            hint={t('songForm.suggestionSongHint')}
+            onPick={(index) => {
+              const suggestion = songSuggestions[index];
+              if (suggestion) pickSong(suggestion);
+            }}
+            provider={
+              providerShown && titleActive && sendable(title) ? t('songForm.suggestionsProvider') : undefined
+            }
           />
         </FormField>
 
         <FormField label={t('songForm.artist')} required error={artistError}>
           <FormInput
+            key={`artist-${artistEpoch}`}
             ref={artistRef}
             value={artist}
             onChangeText={(text) => {
               setArtist(text);
+              setArtistEdited(true);
+              setPickedArtist(null);
               setArtistError(undefined);
             }}
             accessibilityLabel={t('songForm.artist')}
             accessibilityHint={t('songForm.requiredHint')}
             invalid={artistError !== undefined}
-            onFocus={focusTopField}
+            onFocus={() => {
+              focusTopField();
+              setArtistFocused(true);
+            }}
+            onBlur={() => {
+              setArtistFocused(false);
+              setArtistEdited(false);
+            }}
             returnKeyType="done"
+          />
+          <SuggestionList
+            rows={artistSuggestions.map((name) => ({
+              key: name,
+              primary: name,
+              accessibilityLabel: name,
+            }))}
+            hint={t('songForm.suggestionArtistHint')}
+            onPick={(index) => {
+              const name = artistSuggestions[index];
+              if (name !== undefined) pickArtist(name);
+            }}
+            provider={
+              providerShown && artistActive && sendable(artist) ? t('songForm.suggestionsProvider') : undefined
+            }
           />
         </FormField>
 
