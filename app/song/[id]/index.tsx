@@ -1,4 +1,4 @@
-import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,6 +27,7 @@ export default function SongDetailScreen() {
   const { colors } = useTheme();
   const { t } = useI18n();
   const router = useRouter();
+  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
 
@@ -89,7 +90,9 @@ export default function SongDetailScreen() {
       if (error instanceof ServiceError && error.code === 'song-not-found') {
         // ここでは `changeCount` を進めない。曲を消すのはこの画面の削除（`removeSong`。成功したら
         // 進める）だけで、削除とステータスの変更は同時に走らない（`changingRef`）ので、ここへは
-        // 来ない想定の防御。
+        // 来ない想定の防御。別の画面から曲を消せるようにするとき（Settingsのデータ削除など）は、
+        // ここでも進めるか見直す。進めないと、曲が消える前に読み始めた読み直しが後から届いて、
+        // 消えた曲が再び出る。
         applyToSong(song.id, null);
       } else {
         Alert.alert(t('songDetail.statusFailedTitle'), t(errorMessageKey(error)), [
@@ -118,8 +121,11 @@ export default function SongDetailScreen() {
     }
     if (!removed) return;
     changeCount.current += 1;
-    // 画面を出したまま戻る（曲が無い画面は挟まない）。この画面が最初の画面のとき（リンクから直接
-    // 開いたとき）は戻る先が無いので、曲の一覧を開く。
+    // 削除している間に、戻る操作でこの画面を離れていたら、戻らない（もう1枚戻ってしまう）。
+    if (!navigation.isFocused()) return;
+    // 画面を出したまま戻る（曲が無い画面は挟まない）。`replace('/')` は、戻る先が無いときの
+    // 念のための分岐で、通常は通らない（リンクから直接開いても、`app/_layout.tsx` の
+    // `initialRouteName` で、下に (tabs) がある）。
     if (router.canGoBack()) router.back();
     else router.replace('/');
   };
@@ -197,7 +203,9 @@ export default function SongDetailScreen() {
             <View style={styles.actions}>
               <Pressable
                 accessibilityRole="button"
-                // 削除が済んでから戻るまでの間に、消えた曲の Edit Song を開かない。
+                // ステータスの変更・削除の処理中と、削除が済んでから戻るまでの間は開かない。
+                // 削除の処理中に開くと、削除のあとの `router.back()` が Edit Song を閉じて、消えた
+                // 曲の Song Detail が残る。
                 onPress={() => {
                   if (!changingRef.current) router.push(`/song/${song.id}/edit`);
                 }}
