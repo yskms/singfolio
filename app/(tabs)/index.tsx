@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import {
@@ -23,6 +23,7 @@ import { SongRow } from '../../ui/SongRow';
 import { StatusTile } from '../../ui/StatusTile';
 import { Text } from '../../ui/Text';
 import { useTheme } from '../../ui/theme';
+import { useFocusRefreshKey } from '../../ui/useFocusRefreshKey';
 
 // 並び替えの選択肢。向きは、それぞれの自然な向き（新しい順・A→Z）に決めている。
 // 曲名・アーティストは文字コード順で、日本語は読み順にならない（漢字の読みのデータが
@@ -71,18 +72,9 @@ export default function SongsScreen() {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   // 他の画面で曲・タグが変わったあと（Song Detail・Practice・Settingsなど）に戻ってきたら、
   // 読み直す。
-  const [refreshKey, setRefreshKey] = useState(0);
+  const refreshKey = useFocusRefreshKey();
   // reject の値が undefined などでも失敗を検知できるよう、包んで保持する。
   const [failure, setFailure] = useState<{ error: unknown } | null>(null);
-
-  const hasFocusedBefore = useRef(false);
-  useFocusEffect(
-    useCallback(() => {
-      // 最初のフォーカスは、マウント時の読み込みと重なるので、読み直さない。
-      if (hasFocusedBefore.current) setRefreshKey((key) => key + 1);
-      hasFocusedBefore.current = true;
-    }, []),
-  );
 
   const { sortBy, direction } = SORTS[sort];
   useEffect(() => {
