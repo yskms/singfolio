@@ -204,8 +204,8 @@ export default function SongDetailScreen() {
               <Pressable
                 accessibilityRole="button"
                 // ステータスの変更・削除の処理中と、削除が済んでから戻るまでの間は開かない。
-                // 削除の処理中に開くと、削除のあとの `router.back()` が Edit Song を閉じて、消えた
-                // 曲の Song Detail が残る。
+                // 削除の処理中に開くと、この画面がフォーカスを失い、削除のあとに戻る処理が走らず
+                // （`removeSong`）、消えた曲の Edit Song が開いたまま残る。
                 onPress={() => {
                   if (!changingRef.current) router.push(`/song/${song.id}/edit`);
                 }}
