@@ -128,7 +128,7 @@ expo-sqliteの `withTransactionAsync` は排他ではなく、トランザクシ
     `getLanguageSetting` / `setLanguageSetting`（`system` / `en` / `ja`）、
     `getSuggestionsEnabled` / `setSuggestionsEnabled`（候補の外部検索のオン / オフ。既定はオン）
 -   `suggestions`: `available`（外部の検索が組み込まれているか）/ `localArtists` /
-    `catalogArtists` / `catalogSongs`（「候補検索」）
+    `catalogArtists` / `catalogSongs`（「候補検索」。外部の検索は、探せなかったとき `null`）
 -   `tags`: `listTags` / `getOrCreateTag`（同じ名前のタグがあればそれを返し、なければ作る。
     タグだけを作る操作で、曲の編集画面は使わない。「曲の入力」の `newTagNames`）/
     `renameTag` / `deleteTag`
@@ -233,13 +233,15 @@ UI → `suggestions`（Service）→ `songCatalogRepository`（外部の楽曲�
     （`entity=musicArtist`）は、日本のアーティストを英字の表記（`Kenshi Yonezu`）で返す。
     曲の検索の結果は、タグ付けされた表記（`米津玄師`）で返る。
 -   **外部へ送る条件**: 提供元が組み込まれていて（`available`）、設定がオンで、検索語が
-    2文字以上（`searchKey` で比べた後の長さ）のとき。それ以外は、外部へは送らず、登録済みの
-    アーティストの候補だけを返す。
+    2文字以上（`searchKey` で比べた後の長さ）のとき。それ以外は、外部へは送らず（空配列）、
+    登録済みのアーティストの候補だけを返す。曲の検索に添えるアーティストは、画面が、その画面で
+    入力した・選んだものだけを渡す。
 -   **送信の制御**（Service）: 1分あたりの送信数の上限（予算）、同じ検索の同時リクエストの共有、
     結果のキャッシュ（キーはストア・種類・検索語。件数の上限と有効期限あり）、失敗の後の
     一時停止（回数の制限の後は長め）。値はコードの定数。**失敗はキャッシュしない**（0件の
-    成功だけをキャッシュする）。予算を使い切った・一時停止中は、外部の結果が空になるだけで、
-    登録済みのアーティストの候補は返す。
+    成功だけをキャッシュする）。予算を使い切った・一時停止中・失敗は、`null`（探せなかった）を
+    返す（reject しない）。空配列（0件、または送らない条件）とは区別し、画面は `null` のときだけ
+    直前の候補を残す。その間も、登録済みのアーティストの候補は返す。
 -   **並べ方**（`suggestionRules.ts`の純粋な関数）: 曲の候補は、（曲名, アーティスト）の
     `searchKey` の組で重複を除き、版の表記を含むもの（Live・Cover・Karaoke・オルゴール・
     `Ver.` など。ジャンルがインストゥルメンタルのものを含む）を、削らずに後ろへ回す。

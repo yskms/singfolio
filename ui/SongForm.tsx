@@ -108,6 +108,10 @@ export function SongForm({ song, tags }: { song?: Song; tags: readonly Tag[] }) 
   const [artistEdited, setArtistEdited] = useState(false);
   const [pickedTitle, setPickedTitle] = useState<string | null>(null);
   const [pickedArtist, setPickedArtist] = useState<string | null>(null);
+  // この画面でアーティストを入力した・候補から選んだ（開いている間は戻さない。`artistEdited` は
+  // フォーカスが外れると戻るので別）。曲名の検索にアーティストを添えるのは、これが true のとき
+  // だけ。編集画面を開いたときの既存のアーティストは、編集していないので、送らない。
+  const [artistTouched, setArtistTouched] = useState(false);
   // 候補を選ぶたびに増やし、入力欄の `key` にする（欄を作り直す）。iOSは、日本語の変換中
   // （未確定の文字がある）の欄の値を、JSから書き換えても無視する（確定の後も、欄は未確定の文字の
   // まま。`onChangeText` も来ない。iOSシミュレータで確認）。ひらがなを打ってから、確定せずに
@@ -133,11 +137,13 @@ export function SongForm({ song, tags }: { song?: Song; tags: readonly Tag[] }) 
 
   const titleActive = titleFocused && titleEdited && title !== pickedTitle;
   const artistActive = artistFocused && artistEdited && artist !== pickedArtist;
+  const searchArtist = artistTouched ? artist : '';
   const songSuggestions = useSuggestions<SongSuggestion>({
     active: titleActive,
-    queryKey: `${language}\n${title}\n${artist}`,
+    queryKey: `${language}\n${title}\n${searchArtist}`,
     delayMs: SUGGEST_DELAY_MS,
-    load: async () => (await getServices()).suggestions.catalogSongs({ title, artist, language }),
+    load: async () =>
+      (await getServices()).suggestions.catalogSongs({ title, artist: searchArtist, language }),
   });
   const localArtists = useSuggestions<string>({
     active: artistActive,
@@ -164,6 +170,7 @@ export function SongForm({ song, tags }: { song?: Song; tags: readonly Tag[] }) 
     setArtist(suggestion.artist);
     setPickedTitle(suggestion.title);
     setPickedArtist(suggestion.artist);
+    setArtistTouched(true);
     setTitleError(undefined);
     setArtistError(undefined);
     setTitleFocused(false);
@@ -177,6 +184,7 @@ export function SongForm({ song, tags }: { song?: Song; tags: readonly Tag[] }) 
   const pickArtist = (name: string) => {
     setArtist(name);
     setPickedArtist(name);
+    setArtistTouched(true);
     setArtistError(undefined);
     setArtistFocused(false);
     setArtistEdited(false);
@@ -413,6 +421,7 @@ export function SongForm({ song, tags }: { song?: Song; tags: readonly Tag[] }) 
             value={artist}
             onChangeText={(text) => {
               setArtist(text);
+              setArtistTouched(true);
               setArtistEdited(true);
               setPickedArtist(null);
               setArtistError(undefined);

@@ -11,7 +11,9 @@ const NONE: readonly never[] = [];
  *   通信そのものは止めない（止めても、相手には数えられるため）。
  * - `active` が false の間は何も返さず、読み込んだ候補も捨てる。
  * - 新しい結果が返るまでは、直前の候補を出し続ける（打つたびに候補が消えてちらつくのを
- *   避ける）。`load` が失敗したら、候補を空にする。
+ *   避ける）。`load` が `null`（今回は探せなかった。予算切れ・一時停止中・通信の失敗）を返したときも、
+ *   直前の候補を残す。空配列（0件・探さない条件）なら空にする（検索語が短くなったときも、これで
+ *   消える）。`load` が例外で失敗したら、候補を空にする。
  */
 export function useSuggestions<T>({
   active,
@@ -22,7 +24,7 @@ export function useSuggestions<T>({
   active: boolean;
   queryKey: string;
   delayMs: number;
-  load: () => Promise<readonly T[]>;
+  load: () => Promise<readonly T[] | null>;
 }): readonly T[] {
   const [items, setItems] = useState<readonly T[]>(NONE);
   // 最新の `load` を、effect を作り直さずに呼ぶ（`load` は毎回作り直される）。
@@ -40,7 +42,7 @@ export function useSuggestions<T>({
     const timer = setTimeout(() => {
       loadRef.current().then(
         (result) => {
-          if (!stale) setItems(result);
+          if (!stale && result !== null) setItems(result);
         },
         () => {
           if (!stale) setItems(NONE);

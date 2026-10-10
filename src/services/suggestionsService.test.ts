@@ -86,7 +86,7 @@ describe('catalogSongs', () => {
     await services.songs.createSong({ title: '紅蓮華', artist: 'lisa', status: 'ready' });
     const found = await services.suggestions.catalogSongs({ title: '紅蓮', artist: '', language: 'ja' });
     assert.deepEqual(
-      found.map((s) => [s.artist, s.registered]),
+      found?.map((s) => [s.artist, s.registered]),
       [
         ['LiSA', true],
         ['稲垣涼子', false],
@@ -114,7 +114,7 @@ describe('catalogSongs', () => {
     assert.equal(calls.length, 0);
 
     await services.settings.setSuggestionsEnabled(true);
-    assert.equal((await services.suggestions.catalogSongs({ title: '紅蓮', artist: '', language: 'ja' })).length, 1);
+    assert.equal((await services.suggestions.catalogSongs({ title: '紅蓮', artist: '', language: 'ja' }))?.length, 1);
     assert.equal(calls.length, 1);
   });
 });
@@ -196,7 +196,7 @@ describe('キャッシュと同時リクエスト', () => {
     const [a, b] = await Promise.all([first, second]);
     assert.equal(calls.length, 1);
     assert.deepEqual(a, b);
-    assert.equal(a.length, 1);
+    assert.equal(a?.length, 1);
   });
 
   it('キャッシュの件数に上限がある（古いものから捨て、また送る）', async () => {
@@ -218,47 +218,59 @@ describe('キャッシュと同時リクエスト', () => {
 });
 
 describe('失敗', () => {
-  it('失敗は reject せず空にする。キャッシュせず、一時停止が明けたら送り直す', async () => {
+  it('失敗は reject せず、探せなかった（null）にする。キャッシュせず、一時停止が明けたら送り直す', async () => {
     const { fetch, calls } = fakeFetch((_url, call) =>
       call === 1 ? { status: 500, body: {} } : { status: 200, body: songsBody(['紅蓮華', 'LiSA']) },
     );
     const { services, advance } = await createTestServices({ catalogFetch: fetch });
     const input = { title: '紅蓮', artist: '', language: 'ja' } as const;
 
-    assert.deepEqual(await services.suggestions.catalogSongs(input), []);
+    assert.equal(await services.suggestions.catalogSongs(input), null);
     assert.equal(calls.length, 1);
     // 一時停止中は送らない（別の検索語でも）
-    assert.deepEqual(await services.suggestions.catalogSongs(input), []);
-    await services.suggestions.catalogSongs({ ...input, title: '夜に駆' });
+    assert.equal(await services.suggestions.catalogSongs(input), null);
+    assert.equal(await services.suggestions.catalogSongs({ ...input, title: '夜に駆' }), null);
     assert.equal(calls.length, 1);
 
     advance(6_000);
-    assert.equal((await services.suggestions.catalogSongs(input)).length, 1);
+    assert.equal((await services.suggestions.catalogSongs(input))?.length, 1);
     assert.equal(calls.length, 2); // 失敗を「0件」として覚えていない
   });
 
-  it('通信できない（fetch が例外）ときも、空にして一時停止する', async () => {
+  it('通信できない（fetch が例外）ときも、null にして一時停止する', async () => {
     const { fetch, calls } = fakeFetch(() => Promise.reject(new TypeError('Network request failed')));
     const { services } = await createTestServices({ catalogFetch: fetch });
-    assert.deepEqual(await services.suggestions.catalogSongs({ title: '紅蓮', artist: '', language: 'ja' }), []);
-    assert.deepEqual(await services.suggestions.catalogSongs({ title: '夜に駆', artist: '', language: 'ja' }), []);
+    assert.equal(await services.suggestions.catalogSongs({ title: '紅蓮', artist: '', language: 'ja' }), null);
+    assert.equal(await services.suggestions.catalogSongs({ title: '夜に駆', artist: '', language: 'ja' }), null);
+    assert.equal(await services.suggestions.catalogArtists({ artist: 'ヨルシカ', language: 'ja' }), null);
     assert.equal(calls.length, 1);
   });
 
-  it('回数の制限（429）の後は、通常の失敗より長く止める', async () => {
+  it('探さない条件（提供元なし・設定オフ・短い検索語）は null ではなく空', async () => {
+    const { fetch } = fakeFetch(() => ({ status: 429 }));
+    const { services } = await createTestServices({ catalogFetch: fetch });
+    // 一時停止中でも、探さない条件は空（画面は、空なら直前の候補を捨てる）
+    await services.suggestions.catalogSongs({ title: '紅蓮', artist: '', language: 'ja' });
+    assert.deepEqual(await services.suggestions.catalogSongs({ title: '愛', artist: '', language: 'ja' }), []);
+    assert.deepEqual(await services.suggestions.catalogArtists({ artist: '', language: 'ja' }), []);
+    await services.settings.setSuggestionsEnabled(false);
+    assert.deepEqual(await services.suggestions.catalogSongs({ title: '紅蓮', artist: '', language: 'ja' }), []);
+  });
+
+  it('回数の制限（429）の後は、通常の失敗より長く（10秒）止める', async () => {
     const { fetch, calls } = fakeFetch((_url, call) =>
       call === 1 ? { status: 429 } : { status: 200, body: songsBody(['紅蓮華', 'LiSA']) },
     );
     const { services, advance } = await createTestServices({ catalogFetch: fetch });
     const input = { title: '紅蓮', artist: '', language: 'ja' } as const;
-    assert.deepEqual(await services.suggestions.catalogSongs(input), []);
+    assert.equal(await services.suggestions.catalogSongs(input), null);
 
-    advance(10_000);
-    assert.deepEqual(await services.suggestions.catalogSongs(input), []);
+    advance(6_000); // 通常の失敗の停止（5秒）は過ぎたが、429はまだ止めている
+    assert.equal(await services.suggestions.catalogSongs(input), null);
     assert.equal(calls.length, 1);
 
-    advance(25_000);
-    assert.equal((await services.suggestions.catalogSongs(input)).length, 1);
+    advance(5_000);
+    assert.equal((await services.suggestions.catalogSongs(input))?.length, 1);
     assert.equal(calls.length, 2);
   });
 
@@ -267,27 +279,27 @@ describe('失敗', () => {
     const { services } = await createTestServices({ catalogFetch: fetch });
     await services.songs.createSong({ title: '夜に駆ける', artist: 'YOASOBI', status: 'ready' });
     await services.suggestions.catalogSongs({ title: '紅蓮', artist: '', language: 'ja' });
-    assert.deepEqual(await services.suggestions.catalogArtists({ artist: 'yo', language: 'ja' }), []);
+    assert.equal(await services.suggestions.catalogArtists({ artist: 'yo', language: 'ja' }), null);
     assert.deepEqual(await services.suggestions.localArtists('yo'), ['YOASOBI']);
   });
 });
 
 describe('送信の予算', () => {
-  it('1分あたりの上限を超える検索は送らない。時間が経てば送れる', async () => {
+  it('1分あたりの上限（20回）を超える検索は送らず、null にする。時間が経てば送れる', async () => {
     const { fetch, calls } = fakeFetch(ok(['a', 'b']));
     const { services, advance } = await createTestServices({ catalogFetch: fetch });
     const search = (n: number) =>
       services.suggestions.catalogSongs({ title: `検索${n}`, artist: '', language: 'ja' });
 
-    for (let n = 0; n < 15; n++) await search(n);
-    assert.equal(calls.length, 15);
+    for (let n = 0; n < 20; n++) await search(n);
+    assert.equal(calls.length, 20);
 
-    assert.deepEqual(await search(15), []); // 予算切れ。送らない
-    assert.equal(calls.length, 15);
+    assert.equal(await search(20), null); // 予算切れ。送らない
+    assert.equal(calls.length, 20);
 
     advance(MINUTE + 1);
-    assert.equal((await search(15)).length, 1);
-    assert.equal(calls.length, 16);
+    assert.equal((await search(20))?.length, 1);
+    assert.equal(calls.length, 21);
   });
 
   it('キャッシュに当たる検索は、予算を使わない', async () => {

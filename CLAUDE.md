@@ -59,30 +59,21 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
 
 ### 曲名・アーティストの候補（サジェスト）
 
-詳細は `docs/singfolio-data-model.md`「候補検索」。
+詳細は `docs/singfolio-data-model.md`「候補検索」、`docs/singfolio-screen-flow.md`「候補（サジェスト）」。
 
--   外部へ送るのは、Title / Artist の入力欄に**打った検索語だけ**。My Key・Private Note・
-    タグ・端末内の曲の一覧は送らない。欄を編集していない（フォーカスしただけ・開いた
-    ときの既存の値）段階では送らない。
--   HTTPは `src/repositories/songCatalogRepository.ts` に閉じ込める。`fetch` は
-    `createServices` に注入し、注入しなければ外部検索は無効になる（設定の切替・提供元の
-    表記も出さない）。画面・Serviceから、特定の提供元のURLやレスポンスの形に触れない。
--   ストア（`country`）は、実際に使う言語（`resolveLanguage` の結果。設定値の `system`
-    ではない）で決め、`JP`（日本語）と `US`（それ以外）の2つに限る。他の国は結果が不安定
-    （KRは0件、存在しない国はHTTP 400）。`lang` は結果に影響しないので送らない。
-    端末の地域では決めない（決定済み）。
--   アーティストの候補は、曲の検索（`attribute=artistTerm`）から取る。アーティスト検索
-    （`entity=musicArtist`）は、日本のアーティストを英字表記で返すため使わない。
--   候補は補助。自由入力はいつでも保存できる。外部IDは保存しない。選んだ文字列は整形せず、
-    選んだ後に編集できる。
--   通信の失敗は「候補が出ない」だけにする。失敗を0件としてキャッシュしない。429などの
-    後は一定時間送らず、その間も登録済みのアーティストの候補は出す。
+-   外部へ送るのは、Title / Artist の入力欄に**その画面で打った検索語だけ**。My Key・Private Note・
+    タグ・端末内の曲の一覧は送らない。欄を編集していない段階（フォーカスしただけ・編集画面を開いた
+    ときの既存の値）では送らない。
+-   HTTPは `src/repositories/songCatalogRepository.ts` に閉じ込め、`fetch` は `createServices` に
+    注入する。注入しなければ外部検索は無効になる（設定の切替・提供元の表記も出さない）。画面・
+    Serviceから、提供元のURLやレスポンスの形に触れない。
+-   ストアは、実際に使う言語（`resolveLanguage` の結果）で決める（決定済み。端末の地域では決めない）。
+-   候補は補助。自由入力はいつでも保存でき、外部IDは保存しない。通信の失敗は「候補が出ない」だけに
+    し、失敗を0件としてキャッシュしない。
 -   候補の欄には提供元（「Suggestions from Apple」）を表記する。外さない。
--   候補を選んだとき、Title / Artist の入力欄を `key` で作り直す（`SongForm` の
-    `titleEpoch` / `artistEpoch`）。「簡略化」して、`setTitle` だけにしない。iOSは、日本語の
-    変換中（未確定の文字がある）の欄の値を、JSから書き換えても無視する（ひらがなを打って、確定せずに
-    候補を押すと、曲名が打った文字のままになる。iOSシミュレータで確認）。作り直した欄は
-    `autoFocus` しない。
+-   候補を選んだとき、Title / Artist の入力欄を `key` で作り直す（`SongForm` の `titleEpoch` /
+    `artistEpoch`）。「簡略化」して `setTitle` だけにしない（iOSの日本語の変換中の欄は、JSからの
+    書き換えを無視する。詳細は `SongForm` のコメント）。
 
 ### データモデル
 
