@@ -143,6 +143,14 @@ export function createSongRepository(env: RepositoryEnv) {
       return rowsToSongs(rows);
     },
 
+    /**
+     * 全曲の（曲名, アーティスト）。候補の「登録済み」の印と、登録済みのアーティストの
+     * 候補に使う。端末内の曲数（数百曲）なら、全部読んでも問題にならない。
+     */
+    async listTitleArtistPairs(db: ReadExecutor): Promise<{ title: string; artist: string }[]> {
+      return db.getAllAsync<{ title: string; artist: string }>('SELECT title, artist FROM songs');
+    },
+
     async countByStatus(db: ReadExecutor): Promise<Record<SongStatus, number>> {
       const rows = await db.getAllAsync<{ status: SongStatus; count: number }>(
         'SELECT status, count(*) AS count FROM songs GROUP BY status',

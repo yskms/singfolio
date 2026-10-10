@@ -15,6 +15,7 @@ export interface SettingsServiceDeps {
 
 const APPEARANCE_KEY = 'appearance';
 const LANGUAGE_KEY = 'language';
+const SUGGESTIONS_KEY = 'suggestions';
 
 // 書き込みは必ず `db.transaction` の中で行う（理由は db/appDatabase.ts）。
 export function createSettingsService({ db, settings }: SettingsServiceDeps) {
@@ -48,6 +49,19 @@ export function createSettingsService({ db, settings }: SettingsServiceDeps) {
     async setLanguageSetting(setting: LanguageSetting): Promise<void> {
       if (!isLanguageSetting(setting)) throw new ServiceError('invalid-language');
       await db.transaction((tx) => settings.set(tx, LANGUAGE_KEY, setting));
+    },
+
+    /**
+     * 曲名・アーティストの候補を、外部の楽曲検索から出すか（オフなら、入力中の検索語を外部へ
+     * 送らない）。未設定や、`off` 以外の値（アプリの将来のバージョンが保存した値など）は、
+     * 起動を止めないよう、既定のオンにする。
+     */
+    async getSuggestionsEnabled(): Promise<boolean> {
+      return (await settings.get(db, SUGGESTIONS_KEY)) !== 'off';
+    },
+
+    async setSuggestionsEnabled(enabled: boolean): Promise<void> {
+      await db.transaction((tx) => settings.set(tx, SUGGESTIONS_KEY, enabled ? 'on' : 'off'));
     },
   };
 }

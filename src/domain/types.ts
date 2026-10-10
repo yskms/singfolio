@@ -76,3 +76,14 @@ export interface SongListQuery {
   sortBy?: SongSortKey;
   direction?: SortDirection;
 }
+
+/**
+ * Add / Edit Song の曲の候補（曲名 / アーティスト）。保存する曲ではなく、選ぶと入力欄に
+ * 入る文字列。由来（外部の候補か）も外部IDも持たない。
+ */
+export interface SongSuggestion {
+  title: string;
+  artist: string;
+  /** 同じ（曲名, アーティスト）の曲が既にある（重複登録は止めない。印を付けるだけ） */
+  registered: boolean;
+}

@@ -11,7 +11,7 @@ import { createDatabase, type RawDatabase } from '../db/appDatabase.ts';
 import { runMigrations } from '../db/migrate.ts';
 import { migrations } from '../db/migrations.ts';
 import type { RepositoryEnv } from '../repositories/env.ts';
-import { createServices } from '../services/createServices.ts';
+import { createServices, type ServicesOptions } from '../services/createServices.ts';
 
 export function createRawDatabase(sqlite: DatabaseSync): RawDatabase {
   return {
@@ -56,7 +56,7 @@ export function createTestEnv() {
 }
 
 /** マイグレーション済みのメモリ上のDBに、Serviceを組み立てて返す。 */
-export async function createTestServices() {
+export async function createTestServices(options: ServicesOptions = {}) {
   const sqlite = new DatabaseSync(':memory:');
   // アプリ本体（database.ts）と同じく、外部キーを有効にしてからマイグレーションする。
   sqlite.exec('PRAGMA foreign_keys = ON');
@@ -71,5 +71,5 @@ export async function createTestServices() {
   );
   const db = createDatabase(raw);
   const clock = createTestEnv();
-  return { sqlite, raw, db, services: createServices(db, clock.env), ...clock };
+  return { sqlite, raw, db, services: createServices(db, clock.env, options), ...clock };
 }

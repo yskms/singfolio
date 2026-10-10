@@ -79,3 +79,26 @@ describe('language', () => {
     assert.equal(await services.settings.getAppearance(), 'dark');
   });
 });
+
+describe('suggestions', () => {
+  it('未設定ならオン（候補を外部の検索から出す）', async () => {
+    const { services } = await createTestServices();
+    assert.equal(await services.settings.getSuggestionsEnabled(), true);
+  });
+
+  it('設定した値を読み戻せる。オフにも、オンに戻すこともできる', async () => {
+    const { services } = await createTestServices();
+    for (const enabled of [false, true, false, true]) {
+      await services.settings.setSuggestionsEnabled(enabled);
+      assert.equal(await services.settings.getSuggestionsEnabled(), enabled);
+    }
+  });
+
+  it('off 以外の保存値（将来のバージョンが書いた値など）は、オンとして読む', async () => {
+    const { services, sqlite } = await createTestServices();
+    sqlite.exec("INSERT INTO settings (key, value) VALUES ('suggestions', 'maybe')");
+    assert.equal(await services.settings.getSuggestionsEnabled(), true);
+    sqlite.exec("UPDATE settings SET value = 'off' WHERE key = 'suggestions'");
+    assert.equal(await services.settings.getSuggestionsEnabled(), false);
+  });
+});

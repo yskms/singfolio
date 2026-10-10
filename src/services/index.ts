@@ -18,7 +18,12 @@ let servicesPromise: Promise<Services> | null = null;
 export function getServices(): Promise<Services> {
   servicesPromise ??= getDatabase()
     .then((raw) =>
-      createServices(createDatabase(raw), { newId: randomUUID, now: Date.now }),
+      createServices(
+        createDatabase(raw),
+        { newId: randomUUID, now: Date.now },
+        // 曲名・アーティストの候補の外部検索。ここで渡さなければ無効になる。
+        { catalogFetch: fetch },
+      ),
     )
     .catch((error) => {
       servicesPromise = null;
