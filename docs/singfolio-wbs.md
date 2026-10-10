@@ -62,7 +62,8 @@ v1.0より後（公開機能・Requests）の実装順序は、
 
 ## 6. リリース準備
 
--   [ ] 6.1 実機確認（iOS / Android）
+-   [ ] 6.1 実機確認（iOS / Android。Song Detail のヘッダーは、Androidの見た目と、画面名を
+    付けていない状態でのVoiceOver・TalkBackの読み上げも見る）
 -   [x] 6.2 アイコン・スプラッシュ（1024×1024への縮小、Androidの前景画像、
     Play Store用512×512、favicon）
 -   [ ] 6.3 プライバシーポリシー・ストア掲載情報（フィーチャーグラフィック、

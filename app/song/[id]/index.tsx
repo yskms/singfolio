@@ -84,6 +84,9 @@ export default function SongDetailScreen() {
       applyToSong(song.id, updated);
     } catch (error) {
       if (error instanceof ServiceError && error.code === 'song-not-found') {
+        // ここでは `changeCount` を進めない。曲が消える前にDBを読んだ読み直しが、この後に届くと、
+        // 消えた曲が再び出る。今は、曲がアプリの中から消えないので起きない。アプリ内から消せる
+        // ようにするとき（曲の削除）に、ここでも進めるか決める。
         applyToSong(song.id, null);
       } else {
         Alert.alert(t('songDetail.statusFailedTitle'), t(errorMessageKey(error)), [

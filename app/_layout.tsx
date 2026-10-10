@@ -67,7 +67,8 @@ export default function RootLayout() {
           {/* 同じ曲の画面を、素早い連打で重ねて開かないようにする（`push` は、既に同じ画面が
               あっても、毎回積む）。重なると、戻る操作が増えるだけでなく、下の Edit Song は
               開いた時点の内容のままで、上で保存した内容を、下で保存して上書きしてしまう
-              （iOSシミュレータで確認）。同じ画面を開こうとすると、既にある画面が最前面に出る。
+              （iOSシミュレータで確認）。同じ画面を開こうとすると、既にある画面が最前面に出る
+              （閉じずに積み直すので、その上に積んでいた画面は下に回る）。
               IDは、画面名の `[id]` を曲のIDに置き換えたもの（曲ごとに別の画面）。 */}
           <Stack.Screen name="song/new" dangerouslySingular />
           <Stack.Screen name="song/[id]/index" dangerouslySingular />
