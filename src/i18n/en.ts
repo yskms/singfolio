@@ -16,6 +16,7 @@ export const en = {
 
   'common.close': 'Close',
   'common.ok': 'OK',
+  'common.cancel': 'Cancel',
 
   // ステータスの表示名（件数タイル）。一覧の見出しは songs.section.*。
   'status.ready': 'Ready',
@@ -57,6 +58,11 @@ export const en = {
   // 同じ名前にそろえる）。曲が見つからないときの文言も songForm.notFoundTitle / error.songNotFound。
   'songDetail.edit': 'Edit',
   'songDetail.statusFailedTitle': 'Couldn’t change the status',
+  'songDetail.delete': 'Delete song',
+  'songDetail.deleteTitle': 'Delete this song?',
+  'songDetail.deleteMessage': '“{title}” will be deleted. This can’t be undone.',
+  'songDetail.deleteConfirm': 'Delete',
+  'songDetail.deleteFailedTitle': 'Couldn’t delete',
 
   // Add / Edit Song（ui/SongForm.tsx）。My Key・Private Note・Show Mode は機能の名前なので、
   // 日本語でも訳さない（docs/singfolio-screen-flow.md「Add / Edit Song」の文言に合わせる）。

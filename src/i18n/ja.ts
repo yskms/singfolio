@@ -13,6 +13,7 @@ export const ja: Record<MessageKey, Message> = {
 
   'common.close': '閉じる',
   'common.ok': 'OK',
+  'common.cancel': 'キャンセル',
 
   'status.ready': '歌える',
   'status.practice': '練習中',
@@ -47,6 +48,11 @@ export const ja: Record<MessageKey, Message> = {
 
   'songDetail.edit': '編集',
   'songDetail.statusFailedTitle': 'ステータスを変更できませんでした',
+  'songDetail.delete': '曲を削除',
+  'songDetail.deleteTitle': '曲を削除しますか？',
+  'songDetail.deleteMessage': '「{title}」を削除します。元に戻せません。',
+  'songDetail.deleteConfirm': '削除',
+  'songDetail.deleteFailedTitle': '削除できませんでした',
 
   'songForm.addTitle': '曲を追加',
   'songForm.editTitle': '曲を編集',

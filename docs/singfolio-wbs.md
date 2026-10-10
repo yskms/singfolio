@@ -6,7 +6,7 @@ v1.0の作業（保存・管理は端末内で完結し、外部通信は候補�
 v1.0より後（公開機能・Requests）の実装順序は、
 `singfolio-publishing-backend.md` §9 を参照。
 
-**現在地**：2. Songs（2.4 曲の削除から。2.5 の候補は先に実装した）
+**現在地**：3. Practice（3.1 から。2.5 の候補は先に実装した）
 
 ## 0. 企画・設計
 
@@ -40,7 +40,8 @@ v1.0より後（公開機能・Requests）の実装順序は、
 -   [x] 2.3 Song Detail（ステータス変更。Songs画面の行をタップして開く配線と、Edit から
     Edit Song（`app/song/[id]/edit.tsx`。実装済み）を開く配線もここで行う。編集から戻ったとき、
     Song Detail は曲を読み直す）
--   [ ] 2.4 曲の削除
+-   [x] 2.4 曲の削除（Song Detail の Delete song。確認のダイアログのあと削除して前の画面へ戻る。
+    Edit Song には置かない）
 -   [x] 2.5 曲名・アーティストの候補（Add / Edit Songの欄の直下。登録済みのアーティストと外部の
     楽曲検索。提供元の表記、送信の制御、設定の保存。設定画面の切替は 5.2）
 
@@ -63,7 +64,8 @@ v1.0より後（公開機能・Requests）の実装順序は、
 ## 6. リリース準備
 
 -   [ ] 6.1 実機確認（iOS / Android。Song Detail のヘッダーは、Androidの見た目と、画面名を
-    付けていない状態でのVoiceOver・TalkBackの読み上げも見る）
+    付けていない状態でのVoiceOver・TalkBackの読み上げも見る。Song Detail の Delete song と
+    確認のダイアログも、Androidで見る）
 -   [x] 6.2 アイコン・スプラッシュ（1024×1024への縮小、Androidの前景画像、
     Play Store用512×512、favicon）
 -   [ ] 6.3 プライバシーポリシー・ストア掲載情報（フィーチャーグラフィック、

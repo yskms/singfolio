@@ -22,6 +22,7 @@ const SCREEN_OPTIONS = {
 } as const;
 
 // Song Detail。Songsの行から開く。ステータスは、ここで直接変えられる（保存の操作は無い）。
+// 曲の削除も、この画面だけに置く（Edit Songには置かない。理由は docs の画面設計「Song Detail」）。
 export default function SongDetailScreen() {
   const { colors } = useTheme();
   const { t } = useI18n();
@@ -34,11 +35,13 @@ export default function SongDetailScreen() {
   const [loaded, setLoaded] = useState<{ id: string; song: Song | null } | undefined>(undefined);
   // reject の値が undefined などでも失敗を検知できるよう、包んで保持する。
   const [failure, setFailure] = useState<{ error: unknown } | null>(null);
-  // ステータスの変更が重ならないようにする（state は再描画まで古い）。
+  // ステータスの変更・削除が重ならないようにする（state は再描画まで古い）。削除できたときは、
+  // 戻る操作が済むまで下げない（その間に、もう一度の削除で戻る操作が重なるのを防ぐ）。
   const changingRef = useRef(false);
-  // ステータスを変えられるたびに増やす。変える前に読み始めた結果が、後から届いて、変えた後の曲を
-  // 古い内容で上書きしないようにする。変えられなかったとき（失敗）は増やさない。増やすと、
-  // 読み直しの結果まで捨てて、Edit Song で変えた内容が、次にフォーカスするまで出ない。
+  // ステータスを変えられるたび、曲を削除できたときに増やす。変える（消す）前に読み始めた結果が、
+  // 後から届いて、変えた後の曲を古い内容で上書きしない（消えた曲を出さない）ようにする。変えられ
+  // なかったとき（失敗）は増やさない。増やすと、読み直しの結果まで捨てて、Edit Song で変えた内容が、
+  // 次にフォーカスするまで出ない。
   const changeCount = useRef(0);
 
   // 画面を開いたときと、上に重ねた画面（Edit Song）から戻ったときに、曲を読み直す。
@@ -84,9 +87,9 @@ export default function SongDetailScreen() {
       applyToSong(song.id, updated);
     } catch (error) {
       if (error instanceof ServiceError && error.code === 'song-not-found') {
-        // ここでは `changeCount` を進めない。曲が消える前にDBを読んだ読み直しが、この後に届くと、
-        // 消えた曲が再び出る。今は、曲がアプリの中から消えないので起きない。アプリ内から消せる
-        // ようにするとき（曲の削除）に、ここでも進めるか決める。
+        // ここでは `changeCount` を進めない。曲を消すのはこの画面の削除（`removeSong`。成功したら
+        // 進める）だけで、削除とステータスの変更は同時に走らない（`changingRef`）ので、ここへは
+        // 来ない想定の防御。
         applyToSong(song.id, null);
       } else {
         Alert.alert(t('songDetail.statusFailedTitle'), t(errorMessageKey(error)), [
@@ -96,6 +99,41 @@ export default function SongDetailScreen() {
     } finally {
       changingRef.current = false;
     }
+  };
+
+  const removeSong = async (target: Song) => {
+    if (changingRef.current) return;
+    changingRef.current = true;
+    let removed = false;
+    try {
+      const { songs } = await getServices();
+      await songs.deleteSong(target.id);
+      removed = true;
+    } catch (error) {
+      Alert.alert(t('songDetail.deleteFailedTitle'), t(errorMessageKey(error)), [
+        { text: t('common.ok') },
+      ]);
+    } finally {
+      if (!removed) changingRef.current = false;
+    }
+    if (!removed) return;
+    changeCount.current += 1;
+    // 画面を出したまま戻る（曲が無い画面は挟まない）。この画面が最初の画面のとき（リンクから直接
+    // 開いたとき）は戻る先が無いので、曲の一覧を開く。
+    if (router.canGoBack()) router.back();
+    else router.replace('/');
+  };
+
+  const confirmDelete = (target: Song) => {
+    if (changingRef.current) return;
+    Alert.alert(t('songDetail.deleteTitle'), t('songDetail.deleteMessage', { title: target.title }), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('songDetail.deleteConfirm'),
+        style: 'destructive',
+        onPress: () => void removeSong(target),
+      },
+    ]);
   };
 
   return (
@@ -156,16 +194,32 @@ export default function SongDetailScreen() {
 
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => router.push(`/song/${song.id}/edit`)}
-              style={({ pressed }) => [
-                styles.editButton,
-                { backgroundColor: colors.surface, opacity: pressed ? 0.8 : 1 },
-              ]}
-            >
-              <Text style={[styles.editLabel, { color: colors.textPrimary }]}>{t('songDetail.edit')}</Text>
-            </Pressable>
+            <View style={styles.actions}>
+              <Pressable
+                accessibilityRole="button"
+                // 削除が済んでから戻るまでの間に、消えた曲の Edit Song を開かない。
+                onPress={() => {
+                  if (!changingRef.current) router.push(`/song/${song.id}/edit`);
+                }}
+                style={({ pressed }) => [
+                  styles.button,
+                  { backgroundColor: colors.surface, opacity: pressed ? 0.8 : 1 },
+                ]}
+              >
+                <Text style={[styles.buttonLabel, { color: colors.textPrimary }]}>{t('songDetail.edit')}</Text>
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => confirmDelete(song)}
+                style={({ pressed }) => [
+                  styles.button,
+                  { backgroundColor: colors.surface, opacity: pressed ? 0.8 : 1 },
+                ]}
+              >
+                <Text style={[styles.buttonLabel, { color: colors.error }]}>{t('songDetail.delete')}</Text>
+              </Pressable>
+            </View>
           </ScrollView>
         ))}
     </>
@@ -184,12 +238,13 @@ const styles = StyleSheet.create({
   // `numberOfLines` を付けず、全文を出す（改行は `Text` が入力どおりに出す）。
   note: { fontSize: 16, lineHeight: 24 },
   divider: { height: StyleSheet.hairlineWidth },
-  editButton: {
+  actions: { gap: 12 },
+  button: {
     minHeight: 48,
     paddingHorizontal: 24,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  editLabel: { fontSize: 16, lineHeight: 22, fontWeight: '700' },
+  buttonLabel: { fontSize: 16, lineHeight: 22, fontWeight: '700' },
 });
