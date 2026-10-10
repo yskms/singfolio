@@ -72,7 +72,7 @@ UIの表示名「My Key」は、モデル・DBでは `keyOffset` / `key_offset` 
 
 | カラム | 型 | 内容 |
 |---|---|---|
-| `key` | TEXT PK | 設定の名前。現在は `appearance` / `language` |
+| `key` | TEXT PK | 設定の名前。現在は `appearance` / `language` / `suggestions` |
 | `value` | TEXT NOT NULL | 値（文字列） |
 
 -   値の意味・検証はService層（`settingsService`）で行う。DBには制約を置かない
@@ -85,19 +85,21 @@ UIの表示名「My Key」は、モデル・DBでは `keyOffset` / `key_offset` 
     （`en` / `ja`）を書き込まない（書くと、System のまま端末の言語に追従できなくなる）。
     保存された値が上の3つ以外（将来のバージョンが追加した言語など）でも、エラーにせず
     `system` として読む（起動を止めない）。
+-   `suggestions`: `on` / `off`。曲名・アーティストの候補を外部の楽曲検索から出すか。
+    未保存、または `off` 以外の値は `on`（既定）として読む。
 
 ## Repository / Service層
 
 UI → Service → Repository → SQLite の一方向。UIはRepositoryとDBに触れず、Service
 （`src/services/index.ts` の `getServices()`）だけを使う。例外は、DBに触れない純粋な関数
-（`text.ts` の正規化・`tagInput.ts`）と `ServiceError`・入力の型で、画面が、保存前の入力の
-確認を、Serviceと同じ判定にそろえるために直接importしてよい。公開機能などの将来の
+（`text.ts` の正規化・`tagInput.ts`・`suggestionRules.ts`）と `ServiceError`・入力の型で、
+画面が、保存前の入力の確認や候補の結合を、Serviceと同じ判定にそろえるために直接importしてよい。公開機能などの将来の
 同期処理も、このService境界の内側に追加する（`singfolio-publishing-backend.md` §10）。
 
 | 層 | 場所 | 役割 |
 |---|---|---|
 | モデル | `src/domain/types.ts` | `Song` / `Tag` / ステータス。各層が共有する。`Song` は `tags` を持つ |
-| Repository | `src/repositories/` | SQLだけを持つ。IDと時刻の生成もここ（`RepositoryEnv`。テストで差し替える）。検証・正規化はしない |
+| Repository | `src/repositories/` | SQLだけを持つ。IDと時刻の生成もここ（`RepositoryEnv`。テストで差し替える）。検証・正規化はしない。例外は `songCatalogRepository`（外部の楽曲検索のHTTP。「候補検索」） |
 | Service | `src/services/` | 入力の検証・正規化、トランザクション、`updated_at` の規則。失敗は `ServiceError`（`code` で区別） |
 | DB | `src/db/appDatabase.ts` | Repositoryが使うDBのインターフェース（expo-sqliteを包む） |
 
@@ -123,7 +125,10 @@ expo-sqliteの `withTransactionAsync` は排他ではなく、トランザクシ
     新しいタグの名前（`newTagNames`）も受け、曲と同じトランザクションで作る
     （「曲の入力」）
 -   `settings`: `getAppearance` / `setAppearance`（`system` / `light` / `dark`）、
-    `getLanguageSetting` / `setLanguageSetting`（`system` / `en` / `ja`）
+    `getLanguageSetting` / `setLanguageSetting`（`system` / `en` / `ja`）、
+    `getSuggestionsEnabled` / `setSuggestionsEnabled`（候補の外部検索のオン / オフ。既定はオン）
+-   `suggestions`: `available`（外部の検索が組み込まれているか）/ `localArtists` /
+    `catalogArtists` / `catalogSongs`（「候補検索」）
 -   `tags`: `listTags` / `getOrCreateTag`（同じ名前のタグがあればそれを返し、なければ作る。
     タグだけを作る操作で、曲の編集画面は使わない。「曲の入力」の `newTagNames`）/
     `renameTag` / `deleteTag`
@@ -209,6 +214,41 @@ expo-sqliteの `withTransactionAsync` は排他ではなく、トランザクシ
     -   画面の選択肢は、更新が新しい順（既定）・追加が新しい順・曲名順・アーティスト順の4つで、
         向きはそれぞれ固定（`singfolio-screen-flow.md`「Songs」）。
 -   曲とタグは1回のクエリで取る（別々のクエリだと、間の書き込みで食い違いうるため）。
+
+## 候補検索
+
+Add / Edit Song の曲名・アーティストの候補（`singfolio-screen-flow.md`「候補（サジェスト）」）。
+UI → `suggestions`（Service）→ `songCatalogRepository`（外部の楽曲検索のHTTP）の一方向で、
+画面は提供元のURLやレスポンスの形を知らない。
+
+-   **gateway**（`src/repositories/songCatalogRepository.ts`）: 検索語とストアを受けて、曲
+    （曲名・アーティスト・ジャンル）またはアーティスト名の一覧を返す。`fetch` は
+    `createServices` に注入する（Nodeのテストは偽の `fetch` で動かす）。注入しなければ
+    `suggestions.available` が `false` になり、外部へは何も送らない。失敗は
+    `CatalogError`（`rate-limited` / `network` / `invalid-response`）。タイムアウトを持つ。
+-   **ストア**: 実際に使う言語（`resolveLanguage` の結果）が `ja` なら `JP`、それ以外は `US`
+    （`storeForLanguage`）。この2つに限る。他の国は結果が不安定で（KRは0件、存在しない国は
+    HTTP 400）、`lang` は結果に影響しない。画面が言語を渡す。
+-   **アーティスト名は曲の検索から取る**（`attribute=artistTerm`）。アーティスト検索
+    （`entity=musicArtist`）は、日本のアーティストを英字の表記（`Kenshi Yonezu`）で返す。
+    曲の検索の結果は、タグ付けされた表記（`米津玄師`）で返る。
+-   **外部へ送る条件**: 提供元が組み込まれていて（`available`）、設定がオンで、検索語が
+    2文字以上（`searchKey` で比べた後の長さ）のとき。それ以外は、外部へは送らず、登録済みの
+    アーティストの候補だけを返す。
+-   **送信の制御**（Service）: 1分あたりの送信数の上限（予算）、同じ検索の同時リクエストの共有、
+    結果のキャッシュ（キーはストア・種類・検索語。件数の上限と有効期限あり）、失敗の後の
+    一時停止（回数の制限の後は長め）。値はコードの定数。**失敗はキャッシュしない**（0件の
+    成功だけをキャッシュする）。予算を使い切った・一時停止中は、外部の結果が空になるだけで、
+    登録済みのアーティストの候補は返す。
+-   **並べ方**（`suggestionRules.ts`の純粋な関数）: 曲の候補は、（曲名, アーティスト）の
+    `searchKey` の組で重複を除き、版の表記を含むもの（Live・Cover・Karaoke・オルゴール・
+    `Ver.` など。ジャンルがインストゥルメンタルのものを含む）を、削らずに後ろへ回す。
+    元の並び（提供元の関連順）は保つ。アーティストの候補は、登録済み（曲数の多い順。前方一致を
+    先）→ 外部の順で、`searchKey` で重複を除き、共演の表記を後ろへ回す。入力欄と同じ文字列は
+    出さない。
+-   登録済みの印は、（曲名, アーティスト）の `searchKey` の組が既に曲にあるかで付ける。
+    重複登録は止めない。
+-   選んだ候補は、普通の文字列として保存する。由来（外部の候補か）も外部IDも保存しない。
 
 ## マイグレーション
 

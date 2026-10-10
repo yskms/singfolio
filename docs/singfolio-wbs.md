@@ -1,12 +1,12 @@
 # Singfolio v1.0 WBS
 
-v1.0（完全ローカル）の作業を、機能単位に分解した進捗表。
+v1.0の作業（保存・管理は端末内で完結し、外部通信は候補検索だけ）を、機能単位に分解した進捗表。
 番号は作業の順序の目安で、時期の約束ではない。
 
 v1.0より後（公開機能・Requests）の実装順序は、
 `singfolio-publishing-backend.md` §9 を参照。
 
-**現在地**：2. Songs（2.3 Song Detail から）
+**現在地**：2. Songs（2.3 Song Detail から。2.5 の候補は先に実装した）
 
 ## 0. 企画・設計
 
@@ -41,6 +41,8 @@ v1.0より後（公開機能・Requests）の実装順序は、
     Edit Song（`app/song/[id]/edit.tsx`。実装済み）を開く配線もここで行う。編集から戻ったとき、
     Song Detail は曲を読み直す）
 -   [ ] 2.4 曲の削除
+-   [ ] 2.5 曲名・アーティストの候補（Add / Edit Songの欄の直下。登録済みのアーティストと外部の
+    楽曲検索。提供元の表記、送信の制御、設定の保存。設定画面の切替は 5.2）
 
 ## 3. Practice
 
@@ -55,7 +57,7 @@ v1.0より後（公開機能・Requests）の実装順序は、
 ## 5. Profile / Settings
 
 -   [ ] 5.1 Profile（曲数の表示、Show My Songs）
--   [ ] 5.2 Settings（Appearance / Language / Tags管理 / About。Aboutには、同梱フォントの
+-   [ ] 5.2 Settings（Appearance / Language / Suggestions / Tags管理 / About。Aboutには、同梱フォントの
     ライセンス表記を含む（`assets/fonts/OFL-*.txt`））
 
 ## 6. リリース準備
@@ -64,5 +66,6 @@ v1.0より後（公開機能・Requests）の実装順序は、
 -   [x] 6.2 アイコン・スプラッシュ（1024×1024への縮小、Androidの前景画像、
     Play Store用512×512、favicon）
 -   [ ] 6.3 プライバシーポリシー・ストア掲載情報（フィーチャーグラフィック、
-    スクリーンショットを含む）
+    スクリーンショットを含む。候補検索で外部へ送る検索語の説明とプライバシー申告を含む）
 -   [ ] 6.4 ビルド・ストア提出
+-   [ ] 6.5 候補検索の提供元の利用条件の確認（ストア提出の前に済ませる）
