@@ -53,6 +53,11 @@ export const en = {
     'Nothing in “{section}” matches. Try changing the search, tag, or status.',
   'songs.noMatch.clear': 'Clear search and tag',
 
+  // Song Detail（app/song/[id]/index.tsx）。項目の見出しは songForm.* を使う（Add / Edit Song と
+  // 同じ名前にそろえる）。曲が見つからないときの文言も songForm.notFoundTitle / error.songNotFound。
+  'songDetail.edit': 'Edit',
+  'songDetail.statusFailedTitle': 'Couldn’t change the status',
+
   // Add / Edit Song（ui/SongForm.tsx）。My Key・Private Note・Show Mode は機能の名前なので、
   // 日本語でも訳さない（docs/singfolio-screen-flow.md「Add / Edit Song」の文言に合わせる）。
   'songForm.addTitle': 'Add Song',

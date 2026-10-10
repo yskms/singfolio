@@ -1,18 +1,33 @@
 import { memo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
 
 import type { Song } from '../src/domain/types';
 import { Text } from './Text';
 import { useTheme } from './theme';
 
 /**
- * 曲の一覧の1行（曲名・アーティスト・タグ）。管理用の情報（My Key・Private Note）は
- * 一覧に出さない。数百曲でも軽いよう、`song` が変わらない限り再描画しない。
+ * 曲の一覧の1行（曲名・アーティスト・タグ）。押すと `onPress`（Song Detailを開く）。管理用の
+ * 情報（My Key・Private Note）は一覧に出さない。数百曲でも軽いよう、`song` と `onPress` が
+ * 変わらない限り再描画しない（`onPress` は、呼び出し側で安定した関数にする）。
  */
-export const SongRow = memo(function SongRow({ song }: { song: Song }) {
+export const SongRow = memo(function SongRow({
+  song,
+  onPress,
+}: {
+  song: Song;
+  onPress: (song: Song) => void;
+}) {
   const { colors } = useTheme();
   return (
-    <View accessible style={[styles.row, { borderBottomColor: colors.border }]}>
+    <Pressable
+      accessible
+      accessibilityRole="button"
+      onPress={() => onPress(song)}
+      style={({ pressed }) => [
+        styles.row,
+        { borderBottomColor: colors.border, backgroundColor: pressed ? colors.surface : 'transparent' },
+      ]}
+    >
       <Text numberOfLines={2} style={[styles.title, { color: colors.textPrimary }]}>
         {song.title}
       </Text>
@@ -24,7 +39,7 @@ export const SongRow = memo(function SongRow({ song }: { song: Song }) {
           {song.tags.map((tag) => tag.name).join(' · ')}
         </Text>
       )}
-    </View>
+    </Pressable>
   );
 });
 

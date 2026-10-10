@@ -12,8 +12,8 @@ import { applyAppearance, ThemeProvider } from '../ui/theme';
 // スプラッシュも閉じる）。Providerの外で描画されるため、端末の言語で出す（ui/ErrorScreen）。
 export { ErrorScreen as ErrorBoundary } from '../ui/ErrorScreen';
 
-// 画面は、全タブをこのStackの1画面（(tabs)）として載せる。Add / Edit Song（app/song/）は、
-// このStackに載せ、タブバーを隠して全画面で出す（ヘッダーは各画面が指定する）。Song Detail・
+// 画面は、全タブをこのStackの1画面（(tabs)）として載せる。Song Detail・Add / Edit Song
+// （app/song/）は、このStackに載せ、タブバーを隠して全画面で出す（ヘッダーは各画面が指定する）。
 // Show Mode・Settingsも、ここに足していく。
 // 下の `initialRouteName` は、ディープリンクで詳細画面だけが開かれたとき、下にタブが無く、
 // 戻る操作でアプリが終了するのを防ぐ。

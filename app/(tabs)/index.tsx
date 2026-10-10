@@ -36,10 +36,6 @@ const SORTS = {
 type SortName = keyof typeof SORTS;
 const SORT_NAMES = Object.keys(SORTS) as SortName[];
 
-function renderSong({ item }: { item: Song }) {
-  return <SongRow song={item} />;
-}
-
 interface Loaded {
   /**
    * この一覧を読み込んだときの条件。見出し・件数・空の状態は、表示中の一覧に合わせるため、
@@ -64,6 +60,13 @@ export default function SongsScreen() {
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<SortName>('updated');
   const [sortSheetOpen, setSortSheetOpen] = useState(false);
+
+  // 行の `memo` が効くよう、行へ渡す関数は毎回作り直さない。
+  const openSong = useCallback((song: Song) => router.push(`/song/${song.id}`), [router]);
+  const renderSong = useCallback(
+    ({ item }: { item: Song }) => <SongRow song={item} onPress={openSong} />,
+    [openSong],
+  );
 
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   // 他の画面で曲・タグが変わったあと（Song Detail・Practice・Settingsなど）に戻ってきたら、

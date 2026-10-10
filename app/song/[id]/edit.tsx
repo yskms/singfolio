@@ -6,7 +6,7 @@ import { MessageScreen } from '../../../ui/MessageScreen';
 import { SONG_FORM_SCREEN_OPTIONS, SongForm } from '../../../ui/SongForm';
 import { useLoad } from '../../../ui/useLoad';
 
-// Edit Song。Song Detail（WBS 2.3）の Edit から開く。
+// Edit Song。Song Detail の Edit から開く。
 export default function EditSongScreen() {
   const { t } = useI18n();
   const router = useRouter();

@@ -45,6 +45,9 @@ export const ja: Record<MessageKey, Message> = {
     '「{section}」に一致する曲はありません。検索語・タグ・ステータスを変えてみてください。',
   'songs.noMatch.clear': '検索とタグをクリア',
 
+  'songDetail.edit': '編集',
+  'songDetail.statusFailedTitle': 'ステータスを変更できませんでした',
+
   'songForm.addTitle': '曲を追加',
   'songForm.editTitle': '曲を編集',
   'songForm.save': '保存',
