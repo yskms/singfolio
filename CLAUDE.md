@@ -120,6 +120,11 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
 -   ログインを要求しない（v1.0）。
 -   画面（ルート）は `app/`（Expo Router）に置く。`src/` はNodeのテストから直接
     実行するため、画面（RN・Expoのimport）を置かない。
+-   曲の画面（`song/new`・`song/[id]/index`・`song/[id]/edit`）は、`app/_layout.tsx` で
+    `dangerouslySingular` にしている。外さない。`router.push` は同じ画面でも毎回積むので、行や
+    ボタンの素早い連打で同じ画面が重なる。Edit Songが重なると、下の画面は開いた時点の内容のまま
+    で、上で保存した内容を、下で保存して上書きする（iOSシミュレータで確認）。曲の画面を
+    足すときも同じ指定を足す。
 -   `app/_layout.tsx` は、DB初期化（`getServices()`）と、保存済みのAppearanceの
     端末への反映が終わるまで画面を出さない。Serviceが使えない状態で画面を描画させない。
     反映前に描くと、既定の配色が一瞬見える。

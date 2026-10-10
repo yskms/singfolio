@@ -36,8 +36,9 @@ export default function SongDetailScreen() {
   const [failure, setFailure] = useState<{ error: unknown } | null>(null);
   // ステータスの変更が重ならないようにする（state は再描画まで古い）。
   const changingRef = useRef(false);
-  // ステータスを変えるたびに増やす。変える前に読み始めた結果が、後から届いて、変えた後の曲を
-  // 古い内容で上書きしないようにする。
+  // ステータスを変えられるたびに増やす。変える前に読み始めた結果が、後から届いて、変えた後の曲を
+  // 古い内容で上書きしないようにする。変えられなかったとき（失敗）は増やさない。増やすと、
+  // 読み直しの結果まで捨てて、Edit Song で変えた内容が、次にフォーカスするまで出ない。
   const changeCount = useRef(0);
 
   // 画面を開いたときと、上に重ねた画面（Edit Song）から戻ったときに、曲を読み直す。
@@ -69,18 +70,21 @@ export default function SongDetailScreen() {
   const current = loaded?.id === id ? loaded : undefined;
   const song = current?.song ?? undefined;
 
+  // 変えている間に、別の曲へ移動していたら（開いたままIDが変わったとき）、その曲の読み込みを残す。
+  const applyToSong = (songId: string, next: Song | null) =>
+    setLoaded((prev) => (prev !== undefined && prev.id !== songId ? prev : { id: songId, song: next }));
+
   const changeStatus = async (status: SongStatus) => {
     if (!song || status === song.status || changingRef.current) return;
     changingRef.current = true;
-    changeCount.current += 1;
     try {
       const { songs } = await getServices();
       const updated = await songs.setStatus(song.id, status);
-      // 変えている間に、別の曲へ移動していたら（開いたままIDが変わったとき）、その曲の読み込みを残す。
-      setLoaded((prev) => (prev !== undefined && prev.id !== song.id ? prev : { id: song.id, song: updated }));
+      changeCount.current += 1;
+      applyToSong(song.id, updated);
     } catch (error) {
       if (error instanceof ServiceError && error.code === 'song-not-found') {
-        setLoaded({ id: song.id, song: null });
+        applyToSong(song.id, null);
       } else {
         Alert.alert(t('songDetail.statusFailedTitle'), t(errorMessageKey(error)), [
           { text: t('common.ok') },
@@ -174,7 +178,7 @@ const styles = StyleSheet.create({
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   tag: { height: 36, paddingHorizontal: 14, justifyContent: 'center', borderRadius: 18 },
   tagLabel: { fontSize: 14, lineHeight: 20 },
-  // 改行を、入力したとおりに出す。
+  // `numberOfLines` を付けず、全文を出す（改行は `Text` が入力どおりに出す）。
   note: { fontSize: 16, lineHeight: 24 },
   divider: { height: StyleSheet.hairlineWidth },
   editButton: {
