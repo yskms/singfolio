@@ -6,6 +6,7 @@ import { describe, it } from 'node:test';
 import type { CatalogSong } from '../repositories/songCatalogRepository.ts';
 import {
   isCollaboration,
+  isContinuation,
   isVariant,
   mergeArtistSuggestions,
   pairKey,
@@ -46,6 +47,18 @@ describe('isVariant', () => {
     assert.equal(isVariant('ひとり', 'インストゥルメンタル'), true);
     assert.equal(isVariant('Hitori', 'Karaoke'), true);
     assert.equal(isVariant('ひとり', 'J-Pop'), false);
+  });
+});
+
+describe('isContinuation', () => {
+  it('打ち足した・消して戻したときは続き。別の語に打ち直したら続きではない', () => {
+    assert.equal(isContinuation('ぐれんげ', 'ぐれ'), true);
+    assert.equal(isContinuation('ぐれ', 'ぐれんげ'), true);
+    assert.equal(isContinuation('ぐれんげ', 'ぐれんげ'), true);
+    assert.equal(isContinuation('', 'ぐれんげ'), true);
+    assert.equal(isContinuation('yoruni', 'gurenge'), false);
+    assert.equal(isContinuation('よ', 'ぐれんげ'), false);
+    assert.equal(isContinuation('紅蓮華', 'ぐれんげ'), false); // 変換で別の字になった
   });
 });
 

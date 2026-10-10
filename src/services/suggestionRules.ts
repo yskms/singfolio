@@ -4,6 +4,15 @@ import { normalizeText, searchKey } from './text.ts';
 // 候補の並べ方・結合の、DBにも通信にも触れない規則。画面からも直接importしてよい
 // （アーティストの候補の結合を、Serviceと同じ判定にそろえるため。CLAUDE.md）。
 
+/**
+ * 検索語 `next` が、候補を読んだときの検索語 `previous` に続けて打ったもの（さらに打ち足した・
+ * 打ったものを消して戻した）か。別の語に打ち直したら `false`。探せなかったとき（通信の失敗など）に
+ * 直前の候補を残してよいかの判定で、別の曲の候補が残って押し間違えるのを防ぐ。
+ */
+export function isContinuation(next: string, previous: string): boolean {
+  return next.startsWith(previous) || previous.startsWith(next);
+}
+
 /** 外部の検索に出す曲の候補・アーティストの候補の最大数（キーボードの上に収めるため）。 */
 export const MAX_SONG_SUGGESTIONS = 5;
 export const MAX_ARTIST_SUGGESTIONS = 4;

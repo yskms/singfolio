@@ -140,6 +140,7 @@ export function SongForm({ song, tags }: { song?: Song; tags: readonly Tag[] }) 
   const searchArtist = artistTouched ? artist : '';
   const songSuggestions = useSuggestions<SongSuggestion>({
     active: titleActive,
+    term: title,
     queryKey: `${language}\n${title}\n${searchArtist}`,
     delayMs: SUGGEST_DELAY_MS,
     load: async () =>
@@ -147,12 +148,14 @@ export function SongForm({ song, tags }: { song?: Song; tags: readonly Tag[] }) 
   });
   const localArtists = useSuggestions<string>({
     active: artistActive,
+    term: artist,
     queryKey: artist,
     delayMs: 0,
     load: async () => (await getServices()).suggestions.localArtists(artist),
   });
   const catalogArtists = useSuggestions<string>({
     active: artistActive,
+    term: artist,
     queryKey: `${language}\n${artist}`,
     delayMs: SUGGEST_DELAY_MS,
     load: async () => (await getServices()).suggestions.catalogArtists({ artist, language }),
