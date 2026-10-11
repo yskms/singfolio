@@ -8,6 +8,7 @@ import {
 import { createSongRepository } from '../repositories/songRepository.ts';
 import { createTagRepository } from '../repositories/tagRepository.ts';
 import { createSettingsService, type SettingsService } from './settingsService.ts';
+import { createShowService, type ShowService } from './showService.ts';
 import { createSongService, type SongService } from './songService.ts';
 import { createSuggestionsService, type SuggestionsService } from './suggestionsService.ts';
 import { createTagService, type TagService } from './tagService.ts';
@@ -15,6 +16,8 @@ import { createTagService, type TagService } from './tagService.ts';
 export interface Services {
   songs: SongService;
   tags: TagService;
+  /** Show Mode（人に見せる画面）用。Readyの曲だけを、管理情報を持たない形で返す */
+  show: ShowService;
   settings: SettingsService;
   suggestions: SuggestionsService;
 }
@@ -44,9 +47,12 @@ export function createServices(
   const tagRepository = createTagRepository(env);
   const settingsRepository = createSettingsRepository();
   const settings = createSettingsService({ db, settings: settingsRepository });
+  const songs = createSongService({ db, songs: songRepository, tags: tagRepository });
+  const tags = createTagService({ db, tags: tagRepository });
   return {
-    songs: createSongService({ db, songs: songRepository, tags: tagRepository }),
-    tags: createTagService({ db, tags: tagRepository }),
+    songs,
+    tags,
+    show: createShowService({ songs, tags }),
     settings,
     suggestions: createSuggestionsService({
       db,

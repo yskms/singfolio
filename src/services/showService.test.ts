@@ -1,0 +1,176 @@
+// ShowService（Show Mode用）のテスト。`npm test` で実行する。
+// 実際のSQL（node:sqlite）に対して動かす。実機のexpo-sqliteでの確認の代わりにはならない。
+/// <reference types="node" />
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+
+import type { SongStatus } from '../domain/types.ts';
+import { createTestServices } from '../testing/testDatabase.ts';
+
+async function setup() {
+  const t = await createTestServices();
+  const add = async (
+    title: string,
+    artist: string,
+    status: SongStatus = 'ready',
+    extra: { tagIds?: string[]; keyOffset?: number; privateNote?: string } = {},
+  ) => t.services.songs.createSong({ title, artist, status, ...extra });
+  return { ...t, add };
+}
+
+const shape = (groups: { artist: string; songs: { title: string }[] }[]) =>
+  groups.map((group) => [group.artist, group.songs.map((song) => song.title)]);
+
+describe('getShowView: 対象と並び', () => {
+  it('Readyの曲だけを出す（PracticeとWantは、件数にも一覧にも入らない）', async () => {
+    const { services, add } = await setup();
+    await add('チェリー', 'スピッツ', 'ready');
+    await add('練習中の曲', 'スピッツ', 'practice');
+    await add('歌いたい曲', 'Mr.Children', 'want');
+
+    const view = await services.show.getShowView();
+    assert.equal(view.readyCount, 1);
+    assert.deepEqual(shape(view.groups), [['スピッツ', ['チェリー']]]);
+  });
+
+  it('アーティスト別にまとめ、アーティスト順・曲名順に並べる', async () => {
+    const { services, add } = await setup();
+    await add('Sign', 'Mr.Children');
+    await add('楓', 'スピッツ');
+    await add('HANABI', 'Mr.Children');
+    await add('チェリー', 'スピッツ');
+    await add('Alive', 'AAA');
+
+    const view = await services.show.getShowView();
+    // 英字は大文字小文字を区別せず、日本語は文字コード順（Songs の「アーティスト順」と同じ）。
+    assert.deepEqual(shape(view.groups), [
+      ['AAA', ['Alive']],
+      ['Mr.Children', ['HANABI', 'Sign']],
+      ['スピッツ', ['チェリー', '楓']],
+    ]);
+  });
+
+  it('アーティストは登録の表記のまま。曲名が間に挟まっても、同じ表記は1つの見出しにまとまる', async () => {
+    const { services, add } = await setup();
+    // 大文字小文字を区別しない並びでは、(MR.CHILDREN, A) (Mr.Children, B) (MR.CHILDREN, C) の順になる。
+    await add('A', 'MR.CHILDREN');
+    await add('B', 'Mr.Children');
+    await add('C', 'MR.CHILDREN');
+
+    const view = await services.show.getShowView();
+    assert.deepEqual(shape(view.groups), [
+      ['MR.CHILDREN', ['A', 'C']],
+      ['Mr.Children', ['B']],
+    ]);
+  });
+
+  it('曲が無ければ、空を返す', async () => {
+    const { services } = await setup();
+    assert.deepEqual(await services.show.getShowView(), { readyCount: 0, tags: [], groups: [] });
+  });
+});
+
+describe('getShowView: 絞り込み', () => {
+  it('検索は曲名とアーティストに効き、ひらがな/カタカナを区別しない。件数とタグは変わらない', async () => {
+    const { services, add } = await setup();
+    const rock = await services.tags.getOrCreateTag('Rock');
+    await add('チェリー', 'スピッツ', 'ready', { tagIds: [rock.id] });
+    await add('HANABI', 'Mr.Children');
+
+    const byTitle = await services.show.getShowView({ search: 'ちぇりー' });
+    assert.deepEqual(shape(byTitle.groups), [['スピッツ', ['チェリー']]]);
+    const byArtist = await services.show.getShowView({ search: 'mr.' });
+    assert.deepEqual(shape(byArtist.groups), [['Mr.Children', ['HANABI']]]);
+
+    const none = await services.show.getShowView({ search: 'zzz' });
+    assert.deepEqual(none.groups, []);
+    assert.equal(none.readyCount, 2, '検索で絞っても、Readyの総数は変わらない');
+    assert.deepEqual(none.tags, [rock], '検索で絞っても、タグの一覧は変わらない');
+  });
+
+  it('検索はReady以外の曲に当たらない', async () => {
+    const { services, add } = await setup();
+    await add('チェリー', 'スピッツ', 'ready');
+    await add('チェリー（練習中）', 'スピッツ', 'practice');
+    await add('チェリーパイ', 'どこか', 'want');
+
+    const view = await services.show.getShowView({ search: 'チェリー' });
+    assert.deepEqual(shape(view.groups), [['スピッツ', ['チェリー']]]);
+  });
+
+  it('タグで絞り込める（Readyの曲の中で）', async () => {
+    const { services, add } = await setup();
+    const rock = await services.tags.getOrCreateTag('Rock');
+    const ballad = await services.tags.getOrCreateTag('Ballad');
+    await add('ロビンソン', 'スピッツ', 'ready', { tagIds: [rock.id] });
+    await add('チェリー', 'スピッツ', 'ready', { tagIds: [ballad.id] });
+    await add('練習中のロック', 'スピッツ', 'practice', { tagIds: [rock.id] });
+
+    const view = await services.show.getShowView({ tagId: rock.id });
+    assert.deepEqual(shape(view.groups), [['スピッツ', ['ロビンソン']]]);
+  });
+
+  it('検索とタグは両方満たす曲だけ（AND）', async () => {
+    const { services, add } = await setup();
+    const rock = await services.tags.getOrCreateTag('Rock');
+    await add('ロビンソン', 'スピッツ', 'ready', { tagIds: [rock.id] });
+    await add('チェリー', 'スピッツ');
+    await add('HANABI', 'Mr.Children', 'ready', { tagIds: [rock.id] });
+
+    const view = await services.show.getShowView({ search: 'スピッツ', tagId: rock.id });
+    assert.deepEqual(shape(view.groups), [['スピッツ', ['ロビンソン']]]);
+  });
+
+  it('型の外から status を渡されても、Ready以外は返さない', async () => {
+    const { services, add } = await setup();
+    await add('チェリー', 'スピッツ', 'ready');
+    await add('練習中', 'スピッツ', 'practice');
+
+    const query = { status: 'practice' } as unknown as Parameters<typeof services.show.getShowView>[0];
+    const view = await services.show.getShowView(query);
+    assert.deepEqual(shape(view.groups), [['スピッツ', ['チェリー']]]);
+  });
+});
+
+describe('getShowView: タグの一覧', () => {
+  it('Readyの曲に付いているタグだけを、名前順に出す', async () => {
+    const { services, add } = await setup();
+    const rock = await services.tags.getOrCreateTag('Rock');
+    const ballad = await services.tags.getOrCreateTag('Ballad');
+    const practiceOnly = await services.tags.getOrCreateTag('練習用');
+    await services.tags.getOrCreateTag('未使用');
+    await add('ロビンソン', 'スピッツ', 'ready', { tagIds: [rock.id, ballad.id] });
+    await add('練習中の曲', 'スピッツ', 'practice', { tagIds: [practiceOnly.id] });
+
+    const view = await services.show.getShowView();
+    assert.deepEqual(view.tags, [ballad, rock]);
+  });
+
+  it('曲の行のタグは、その曲に付いたタグ（名前順）', async () => {
+    const { services, add } = await setup();
+    const rock = await services.tags.getOrCreateTag('Rock');
+    const ballad = await services.tags.getOrCreateTag('Ballad');
+    await add('ロビンソン', 'スピッツ', 'ready', { tagIds: [rock.id, ballad.id] });
+    await add('チェリー', 'スピッツ');
+
+    const [group] = (await services.show.getShowView()).groups;
+    assert.deepEqual(
+      group?.songs.map((song) => song.tags),
+      [[], [ballad, rock]],
+    );
+  });
+});
+
+describe('getShowView: 人に見せない情報', () => {
+  it('曲は id / title / tags だけを持つ（My Key・Private Note・ステータスを含まない）', async () => {
+    const { services, add } = await setup();
+    await add('チェリー', 'スピッツ', 'ready', { keyOffset: -3, privateNote: '2番が不安' });
+
+    const view = await services.show.getShowView();
+    const song = view.groups[0]?.songs[0];
+    assert.deepEqual(Object.keys(song ?? {}).sort(), ['id', 'tags', 'title']);
+    assert.deepEqual(Object.keys(view).sort(), ['groups', 'readyCount', 'tags']);
+    assert.deepEqual(Object.keys(view.groups[0] ?? {}).sort(), ['artist', 'songs']);
+    assert.equal(JSON.stringify(view).includes('2番が不安'), false);
+  });
+});

@@ -62,6 +62,23 @@ export interface Song {
   updatedAt: number;
 }
 
+/**
+ * Show Mode に出す曲。人に見せる画面なので、管理用の情報（My Key・Private Note・ステータス）を
+ * 型の上でも持たない（画面に出せないようにする。`Song` をそのまま渡さない）。アーティストは、
+ * 曲の上の見出し（`ArtistGroup`）に出す。
+ */
+export interface ShowSong {
+  id: string;
+  title: string;
+  tags: Tag[];
+}
+
+/** Show Mode の、同じアーティストの曲のまとまり（見出しは `artist`）。 */
+export interface ArtistGroup {
+  artist: string;
+  songs: ShowSong[];
+}
+
 export type SongSortKey = 'title' | 'artist' | 'createdAt' | 'updatedAt';
 export type SortDirection = 'asc' | 'desc';
 
