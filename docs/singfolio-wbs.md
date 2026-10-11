@@ -66,7 +66,9 @@ v1.0より後（公開機能・Requests）の実装順序は、
 
 -   [ ] 6.1 実機確認（iOS / Android。Song Detail のヘッダーは、Androidの見た目と、画面名を
     付けていない状態でのVoiceOver・TalkBackの読み上げも見る。Song Detail の Delete song と
-    確認のダイアログも、Androidで見る）
+    確認のダイアログも、Androidで見る。Practice の行は、Androidの日本語（Noto Sans JP）で、
+    ボタンの文字の縦位置のずれ・切れが無いかを見る。Practice のボタンの読み上げ
+    （曲名が添わっていること）と、失敗のダイアログも、実機で見る）
 -   [x] 6.2 アイコン・スプラッシュ（1024×1024への縮小、Androidの前景画像、
     Play Store用512×512、favicon）
 -   [ ] 6.3 プライバシーポリシー・ストア掲載情報（フィーチャーグラフィック、

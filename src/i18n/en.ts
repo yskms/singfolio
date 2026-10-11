@@ -18,7 +18,9 @@ export const en = {
   'common.ok': 'OK',
   'common.cancel': 'Cancel',
 
-  // ステータスの表示名（件数タイル）。一覧の見出しは songs.section.*。
+  // ステータスの表示名（件数タイル）。一覧の見出しは songs.section.*。ステータスの名前は、
+  // songs.* ・practice.* の文言にも書いている（差し込みにしていない）。名前を変えるときは、
+  // それらも直す（ja.ts も同じ）。
   'status.ready': 'Ready',
   'status.practice': 'Practice',
   'status.want': 'Want',
@@ -66,8 +68,9 @@ export const en = {
   'practice.empty.message': 'Songs you set to Practice will appear here.',
   'practice.noMatch.message': 'No songs in practice match your search.',
   'practice.markReady': 'Mark as Ready',
-  // 読み上げ用。行ごとにボタンが並ぶので、どの曲かを添える（先頭は見えている文字と同じにする。
-  // 音声コントロールが、見えている文字で呼べるように）。
+  // 読み上げ用。行ごとに同じ名前のボタンが並ぶので、どの曲かを添える。先頭は見えている文字と
+  // 同じにする（WCAG 2.5.3 Label in Name）。音声コントロールで呼べるかは、確認していない
+  // （RN には `accessibilityUserInputLabels` が無く、ラベルを別に渡せない）。
   'practice.markReadyLabel': 'Mark as Ready, {title}',
   'practice.markReadyFailedTitle': 'Couldn’t mark as Ready',
 

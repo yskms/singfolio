@@ -15,6 +15,8 @@ export const ja: Record<MessageKey, Message> = {
   'common.ok': 'OK',
   'common.cancel': 'キャンセル',
 
+  // ステータスの名前は、songs.* ・practice.* の文言にも書いている（差し込みにしていない）。
+  // 名前を変えるときは、それらも直す。
   'status.ready': '歌える',
   'status.practice': '練習中',
   'status.want': '歌いたい',

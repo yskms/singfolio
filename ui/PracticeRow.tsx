@@ -18,6 +18,9 @@ import { useTheme } from './theme';
  *   `Pressable` の中にボタンを入れない。行を `accessible` にすると、iOS では子が1つにまとめられ、
  *   中のボタンにVoiceOverでフォーカスできなくなる。`Pressable` の入れ子は、押す範囲も競合する。
  * - 行の下の線は、2つを包む `View` に付ける（情報の `Pressable` に付けると、ボタンが線の外に出る）。
+ * - 押せるのは、曲の情報の部分とボタンだけ。ボタンの右側と行の下の余白は、押しても何も起きない
+ *   （押したときの色の変化も、情報の部分だけ）。見えない `Pressable` で余白を埋めることもできるが、
+ *   色の変化の範囲もそろえる作業が要り、見返りに比べて複雑になるので、していない。
  */
 export const PracticeRow = memo(function PracticeRow({
   song,
