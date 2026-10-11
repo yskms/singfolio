@@ -1,20 +1,135 @@
-import { StyleSheet, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import { FlatList, StyleSheet, View } from 'react-native';
 
+import type { Song } from '../../src/domain/types';
+import { formatDay } from '../../src/i18n';
+import { getServices } from '../../src/services';
+import { EmptyState } from '../../ui/EmptyState';
 import { useI18n } from '../../ui/i18n';
+import { PracticeRow } from '../../ui/PracticeRow';
+import { SearchField } from '../../ui/SearchField';
 import { Text } from '../../ui/Text';
 import { useTheme } from '../../ui/theme';
+import { useFocusRefreshKey } from '../../ui/useFocusRefreshKey';
 
-// 練習中の曲の一覧（WBS 3.1）までのプレースホルダー。
+interface Loaded {
+  /**
+   * この一覧を読み込んだときの検索語。件数・空の状態は、表示中の一覧に合わせるため、現在の
+   * state（入力は、読み込みより先に変わる）ではなく、これで決める。
+   */
+  search: string;
+  /** 練習中の曲（更新が新しい順）。`search` で絞り込み済み */
+  songs: Song[];
+  /** 練習中の曲の総数（検索に関係なく）。0なら、検索のせいではなく、練習中の曲が無い */
+  total: number;
+  /** 読み込んだ時刻。最終更新の「今日」の判定に使う */
+  now: number;
+}
+
 export default function PracticeScreen() {
   const { colors } = useTheme();
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+  const router = useRouter();
+
+  // 検索語。タブは開いたままなので、アプリを終了するまで残る（Songsの絞り込みと同じ）。
+  const [search, setSearch] = useState('');
+
+  // 行の `memo` が効くよう、行へ渡す関数は毎回作り直さない。
+  const openSong = useCallback((song: Song) => router.push(`/song/${song.id}`), [router]);
+
+  const [loaded, setLoaded] = useState<Loaded | null>(null);
+  // 他の画面で曲が変わったあと（Song Detail など）に戻ってきたら、読み直す。
+  const refreshKey = useFocusRefreshKey();
+  // reject の値が undefined などでも失敗を検知できるよう、包んで保持する。
+  const [failure, setFailure] = useState<{ error: unknown } | null>(null);
+
+  useEffect(() => {
+    // 検索語がすぐに変わると、先の読み込みが後から終わることがある。古い結果で上書きしない
+    // よう、条件が変わったら捨てる。
+    let cancelled = false;
+    (async () => {
+      const { songs } = await getServices();
+      const [list, counts] = await Promise.all([
+        songs.listSongs({ status: 'practice', search, sortBy: 'updatedAt', direction: 'desc' }),
+        songs.countSongsByStatus(),
+      ]);
+      if (cancelled) return;
+      setLoaded({ search, songs: list, total: counts.practice, now: Date.now() });
+    })().catch((error) => {
+      if (!cancelled) setFailure({ error });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [search, refreshKey]);
+
+  const now = loaded?.now;
+  const renderSong = useCallback(
+    ({ item }: { item: Song }) => {
+      const day = now === undefined ? null : formatDay(item.updatedAt, now, language);
+      const updated = day === null ? t('practice.updatedToday') : t('practice.updated', { date: day });
+      return <PracticeRow song={item} updated={updated} onPress={openSong} />;
+    },
+    [openSong, now, language, t],
+  );
+
+  // 読み込みの失敗は、画面の描画の失敗と同じく、ルートのErrorBoundary（エラー画面）に任せる。
+  // Errorでない値は包む（`app/_layout.tsx` と同じ理由）。
+  if (failure) throw failure.error instanceof Error ? failure.error : new Error(String(failure.error));
+
+  const header = (
+    <View style={styles.header}>
+      <Text style={[styles.count, { color: colors.textSecondary }]}>
+        {loaded === null ? '' : t('practice.count', { count: loaded.songs.length })}
+      </Text>
+      <SearchField
+        value={search}
+        onChangeText={setSearch}
+        placeholder={t('songs.searchPlaceholder')}
+        clearLabel={t('songs.searchClear')}
+      />
+    </View>
+  );
+
+  // 空の状態。読み込み前は出さない（曲があるのに「練習中の曲はありません」が一瞬見える）。
+  let empty: { title: string; message: string; action?: { label: string; onPress: () => void } } | null =
+    null;
+  if (loaded !== null && loaded.songs.length === 0) {
+    if (loaded.total === 0 || loaded.search.trim() === '') {
+      empty = { title: t('practice.empty.title'), message: t('practice.empty.message') };
+    } else {
+      empty = {
+        title: t('songs.noMatch.title'),
+        message: t('practice.noMatch.message'),
+        action: { label: t('songs.searchClear'), onPress: () => setSearch('') },
+      };
+    }
+  }
+
   return (
-    <View style={styles.container}>
-      <Text style={{ color: colors.textPrimary }}>{t('tabs.practice')}</Text>
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
+      <FlatList
+        data={loaded?.songs ?? []}
+        renderItem={renderSong}
+        keyExtractor={(song) => song.id}
+        ListHeaderComponent={header}
+        ListEmptyComponent={empty && <EmptyState {...empty} />}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        contentContainerStyle={styles.listContent}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  root: { flex: 1 },
+  listContent: { paddingBottom: 24 },
+  // 件数と検索欄は、一覧と一緒にスクロールする（Songsと同じ。検索欄は固定しない）。
+  // 検索欄を含むので、FlatListのヘッダーには、コンポーネントではなく要素を渡す
+  // （毎回別の関数になると、入力欄が作り直されてフォーカスを失う）。
+  header: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8, gap: 12 },
+  // 読み込み前は空欄。件数が出ても、検索欄の位置が動かないよう、行の高さを確保する。
+  count: { minHeight: 20, fontSize: 14, lineHeight: 20 },
 });

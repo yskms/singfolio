@@ -46,6 +46,13 @@ export const ja: Record<MessageKey, Message> = {
     '「{section}」に一致する曲はありません。検索語・タグ・ステータスを変えてみてください。',
   'songs.noMatch.clear': '検索とタグをクリア',
 
+  'practice.count': { other: '{count}曲' },
+  'practice.updatedToday': '最終更新：今日',
+  'practice.updated': '最終更新：{date}',
+  'practice.empty.title': '練習中の曲はありません',
+  'practice.empty.message': 'ステータスを「練習中」にした曲がここに並びます。',
+  'practice.noMatch.message': '検索語に一致する練習中の曲はありません。',
+
   'songDetail.edit': '編集',
   'songDetail.statusFailedTitle': 'ステータスを変更できませんでした',
   'songDetail.delete': '曲を削除',

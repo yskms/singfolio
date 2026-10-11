@@ -10,6 +10,7 @@ export {
   type ErrorMessageKey,
   type ErrorScreenContent,
 } from './errors.ts';
+export { formatDay } from './formatDay.ts';
 export { resolveLanguage } from './resolveLanguage.ts';
 export type { MessageKey } from './en.ts';
 

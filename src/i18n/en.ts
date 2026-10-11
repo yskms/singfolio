@@ -54,6 +54,18 @@ export const en = {
     'Nothing in “{section}” matches. Try changing the search, tag, or status.',
   'songs.noMatch.clear': 'Clear search and tag',
 
+  // Practice（app/(tabs)/practice.tsx）。検索欄・「一致する曲がありません」の題・検索のクリアは、
+  // Songs の文言（songs.*）を使う。
+  'practice.count': {
+    one: '{count} song',
+    other: '{count} songs',
+  },
+  'practice.updatedToday': 'Last updated: Today',
+  'practice.updated': 'Last updated: {date}',
+  'practice.empty.title': 'No songs in practice',
+  'practice.empty.message': 'Songs you set to Practice will appear here.',
+  'practice.noMatch.message': 'No songs in practice match your search.',
+
   // Song Detail（app/song/[id]/index.tsx）。項目の見出しは songForm.* を使う（Add / Edit Song と
   // 同じ名前にそろえる）。曲が見つからないときの文言も songForm.notFoundTitle / error.songNotFound。
   'songDetail.edit': 'Edit',

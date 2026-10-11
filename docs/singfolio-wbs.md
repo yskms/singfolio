@@ -6,7 +6,7 @@ v1.0の作業（保存・管理は端末内で完結し、外部通信は候補�
 v1.0より後（公開機能・Requests）の実装順序は、
 `singfolio-publishing-backend.md` §9 を参照。
 
-**現在地**：3. Practice（3.1 から。2.5 の候補は先に実装した）
+**現在地**：3. Practice（3.2 から。2.5 の候補は先に実装した）
 
 ## 0. 企画・設計
 
@@ -47,8 +47,8 @@ v1.0より後（公開機能・Requests）の実装順序は、
 
 ## 3. Practice
 
--   [ ] 3.1 練習中の曲の一覧・検索（他の画面から戻ったときの読み直しは、Songs と同じ
-    `ui/useFocusRefreshKey.ts` を使う）
+-   [x] 3.1 練習中の曲の一覧・検索（他の画面から戻ったときの読み直しは、Songs と同じ
+    `ui/useFocusRefreshKey.ts` を使う。行には最終更新を出す）
 -   [ ] 3.2 Mark as Ready
 
 ## 4. Show Mode
