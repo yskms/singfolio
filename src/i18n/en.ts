@@ -65,6 +65,11 @@ export const en = {
   'practice.empty.title': 'No songs in practice',
   'practice.empty.message': 'Songs you set to Practice will appear here.',
   'practice.noMatch.message': 'No songs in practice match your search.',
+  'practice.markReady': 'Mark as Ready',
+  // 読み上げ用。行ごとにボタンが並ぶので、どの曲かを添える（先頭は見えている文字と同じにする。
+  // 音声コントロールが、見えている文字で呼べるように）。
+  'practice.markReadyLabel': 'Mark as Ready, {title}',
+  'practice.markReadyFailedTitle': 'Couldn’t mark as Ready',
 
   // Song Detail（app/song/[id]/index.tsx）。項目の見出しは songForm.* を使う（Add / Edit Song と
   // 同じ名前にそろえる）。曲が見つからないときの文言も songForm.notFoundTitle / error.songNotFound。

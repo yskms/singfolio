@@ -1,10 +1,10 @@
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { AppState, FlatList, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, AppState, FlatList, StyleSheet, View } from 'react-native';
 
 import type { Song } from '../../src/domain/types';
-import { formatDay } from '../../src/i18n';
-import { getServices } from '../../src/services';
+import { errorMessageKey, formatDay } from '../../src/i18n';
+import { getServices, ServiceError } from '../../src/services';
 import { EmptyState } from '../../ui/EmptyState';
 import { useI18n } from '../../ui/i18n';
 import { PracticeRow } from '../../ui/PracticeRow';
@@ -37,6 +37,12 @@ export default function PracticeScreen() {
   const openSong = useCallback((song: Song) => router.push(`/song/${song.id}`), [router]);
 
   const [loaded, setLoaded] = useState<Loaded | null>(null);
+  // Mark as Ready のあとに、一覧を読み直す合図。他の画面で変わったときの `refreshKey` とは別
+  // （こちらは、この画面の中で変えたときに増やす）。増えると、読み込み中の古い結果は捨てられる。
+  const [reloadKey, setReloadKey] = useState(0);
+  // Mark as Ready の処理中の曲。同じ曲のボタンを続けて押しても、2回は変えない。曲ごとに分けるのは、
+  // 別の曲のボタンは、続けて押せるようにするため（書き込みは直列になる）。
+  const markingIds = useRef(new Set<string>());
   // 最終更新の「今日」の判定に使う現在時刻。一覧を読み込むたびに更新するほか、アプリが
   // バックグラウンドから戻ったときも更新する。戻っても、タブのフォーカスは変わらず、一覧は
   // 読み直さない（曲が変わるのはアプリの中だけ）ので、これが無いと、昨夜開いたまま閉じて
@@ -73,15 +79,42 @@ export default function PracticeScreen() {
     return () => {
       cancelled = true;
     };
-  }, [search, refreshKey]);
+  }, [search, refreshKey, reloadKey]);
+
+  const markReady = useCallback(
+    async (song: Song) => {
+      if (markingIds.current.has(song.id)) return;
+      markingIds.current.add(song.id);
+      let changed = false;
+      try {
+        const { songs } = await getServices();
+        await songs.setStatus(song.id, 'ready');
+        changed = true;
+      } catch (error) {
+        // 曲が既に無いときは、一覧から消えれば済む（伝えることは無い）。読み直す。
+        if (error instanceof ServiceError && error.code === 'song-not-found') {
+          changed = true;
+        } else {
+          Alert.alert(t('practice.markReadyFailedTitle'), t(errorMessageKey(error)), [
+            { text: t('common.ok') },
+          ]);
+        }
+      } finally {
+        markingIds.current.delete(song.id);
+      }
+      // Ready になった曲は Practice ではなくなるので、一覧から外れる。
+      if (changed) setReloadKey((key) => key + 1);
+    },
+    [t],
+  );
 
   const renderSong = useCallback(
     ({ item }: { item: Song }) => {
       const day = formatDay(item.updatedAt, now, language);
       const updated = day === null ? t('practice.updatedToday') : t('practice.updated', { date: day });
-      return <PracticeRow song={item} updated={updated} onPress={openSong} />;
+      return <PracticeRow song={item} updated={updated} onPress={openSong} onMarkReady={markReady} />;
     },
-    [openSong, now, language, t],
+    [openSong, markReady, now, language, t],
   );
 
   // 読み込みの失敗は、画面の描画の失敗と同じく、ルートのErrorBoundary（エラー画面）に任せる。

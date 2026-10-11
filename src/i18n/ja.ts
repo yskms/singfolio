@@ -52,6 +52,9 @@ export const ja: Record<MessageKey, Message> = {
   'practice.empty.title': '練習中の曲はありません',
   'practice.empty.message': 'ステータスを「練習中」にした曲がここに並びます。',
   'practice.noMatch.message': '検索語に一致する練習中の曲はありません。',
+  'practice.markReady': '「歌える」にする',
+  'practice.markReadyLabel': '「歌える」にする、{title}',
+  'practice.markReadyFailedTitle': '「歌える」にできませんでした',
 
   'songDetail.edit': '編集',
   'songDetail.statusFailedTitle': 'ステータスを変更できませんでした',
