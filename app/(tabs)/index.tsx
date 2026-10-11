@@ -15,6 +15,7 @@ import {
 import type { MessageKey } from '../../src/i18n';
 import { getServices } from '../../src/services';
 import { decorative } from '../../ui/decorative';
+import { EmptyState } from '../../ui/EmptyState';
 import { FilterChip } from '../../ui/FilterChip';
 import { useI18n } from '../../ui/i18n';
 import { OptionSheet } from '../../ui/OptionSheet';
@@ -251,40 +252,6 @@ export default function SongsScreen() {
   );
 }
 
-function EmptyState({
-  title,
-  message,
-  action,
-}: {
-  title?: string;
-  message: string;
-  action?: { label: string; onPress: () => void };
-}) {
-  const { colors } = useTheme();
-  return (
-    <View style={styles.empty}>
-      {title !== undefined && (
-        <Text role="heading" style={[styles.emptyTitle, { color: colors.textPrimary }]}>
-          {title}
-        </Text>
-      )}
-      <Text style={[styles.emptyMessage, { color: colors.textSecondary }]}>{message}</Text>
-      {action && (
-        <Pressable
-          accessibilityRole="button"
-          onPress={action.onPress}
-          style={({ pressed }) => [
-            styles.emptyButton,
-            { backgroundColor: colors.primary, opacity: pressed ? 0.8 : 1 },
-          ]}
-        >
-          <Text style={[styles.emptyButtonLabel, { color: colors.onPrimary }]}>{action.label}</Text>
-        </Pressable>
-      )}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   root: { flex: 1 },
   listContent: { paddingBottom: 24 },
@@ -308,16 +275,4 @@ const styles = StyleSheet.create({
   sectionCount: { fontSize: 14, lineHeight: 20 },
   sortButton: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 4 },
   sortLabel: { fontSize: 13, lineHeight: 18 },
-  empty: { alignItems: 'center', paddingHorizontal: 32, paddingTop: 48 },
-  emptyTitle: { fontSize: 18, lineHeight: 24, fontWeight: '700', textAlign: 'center' },
-  emptyMessage: { marginTop: 8, fontSize: 15, lineHeight: 22, textAlign: 'center' },
-  emptyButton: {
-    marginTop: 24,
-    minHeight: 44,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyButtonLabel: { fontSize: 15, lineHeight: 20, fontWeight: '700' },
 });
