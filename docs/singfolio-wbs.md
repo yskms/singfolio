@@ -47,7 +47,8 @@ v1.0より後（公開機能・Requests）の実装順序は、
 
 ## 3. Practice
 
--   [ ] 3.1 練習中の曲の一覧・検索
+-   [ ] 3.1 練習中の曲の一覧・検索（他の画面から戻ったときの読み直しは、Songs と同じ
+    `ui/useFocusRefreshKey.ts` を使う）
 -   [ ] 3.2 Mark as Ready
 
 ## 4. Show Mode
