@@ -75,6 +75,23 @@ export const en = {
   'practice.markReadyLabel': 'Mark as Ready, {title}',
   'practice.markReadyFailedTitle': 'Couldn’t mark as Ready',
 
+  // Show Mode（app/show.tsx）。人に見せる画面。Show Mode は機能の名前なので、日本語でも訳さない。
+  // 検索欄・「一致する曲がありません」の題・検索とタグのクリアは、Songs の文言（songs.*）を使う。
+  'show.title': 'What should I sing?',
+  'show.count': {
+    one: '{count} song ready to sing',
+    other: '{count} songs ready to sing',
+  },
+  // アーティストの見出し（読み上げ用。見た目は、名前と右端の曲数）。
+  'show.artistA11y': {
+    one: '{artist}, {count} song',
+    other: '{artist}, {count} songs',
+  },
+  'show.closeA11y': 'Close Show Mode',
+  'show.empty.title': 'No songs to show yet',
+  'show.empty.message': 'Songs you mark as Ready will appear here.',
+  'show.noMatch.message': 'No songs match your search or tag.',
+
   // Song Detail（app/song/[id]/index.tsx）。項目の見出しは songForm.* を使う（Add / Edit Song と
   // 同じ名前にそろえる）。曲が見つからないときの文言も songForm.notFoundTitle / error.songNotFound。
   'songDetail.edit': 'Edit',
