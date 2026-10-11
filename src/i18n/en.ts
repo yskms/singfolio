@@ -20,7 +20,8 @@ export const en = {
 
   // ステータスの表示名（件数タイル）。一覧の見出しは songs.section.*。ステータスの名前は、
   // songs.* ・practice.* の文言にも書いている（差し込みにしていない）。名前を変えるときは、
-  // それらも直す（ja.ts も同じ）。
+  // それらも直す（ja.ts も同じ）。タブの名前（tabs.practice）は別の文言で、English では今、
+  // ステータスの名前と同じ字になっているだけ（ja では揃えていない）。
   'status.ready': 'Ready',
   'status.practice': 'Practice',
   'status.want': 'Want',
