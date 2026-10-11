@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { FlatList, StyleSheet, View } from 'react-native';
+import { AppState, FlatList, StyleSheet, View } from 'react-native';
 
 import type { Song } from '../../src/domain/types';
 import { formatDay } from '../../src/i18n';
@@ -23,8 +23,6 @@ interface Loaded {
   songs: Song[];
   /** 練習中の曲の総数（検索に関係なく）。0なら、検索のせいではなく、練習中の曲が無い */
   total: number;
-  /** 読み込んだ時刻。最終更新の「今日」の判定に使う */
-  now: number;
 }
 
 export default function PracticeScreen() {
@@ -39,6 +37,18 @@ export default function PracticeScreen() {
   const openSong = useCallback((song: Song) => router.push(`/song/${song.id}`), [router]);
 
   const [loaded, setLoaded] = useState<Loaded | null>(null);
+  // 最終更新の「今日」の判定に使う現在時刻。一覧を読み込むたびに更新するほか、アプリが
+  // バックグラウンドから戻ったときも更新する。戻っても、タブのフォーカスは変わらず、一覧は
+  // 読み直さない（曲が変わるのはアプリの中だけ）ので、これが無いと、昨夜開いたまま閉じて
+  // 翌朝開いたとき、昨日更新した曲が「今日」のまま残る。読み直しは要らず、日付の文字列だけが変わる。
+  // 画面を見ている最中に日付をまたいだ場合は、読み直す（タブの切り替え・検索の変更）まで変わらない。
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') setNow(Date.now());
+    });
+    return () => subscription.remove();
+  }, []);
   // 他の画面で曲が変わったあと（Song Detail など）に戻ってきたら、読み直す。
   const refreshKey = useFocusRefreshKey();
   // reject の値が undefined などでも失敗を検知できるよう、包んで保持する。
@@ -55,7 +65,8 @@ export default function PracticeScreen() {
         songs.countSongsByStatus(),
       ]);
       if (cancelled) return;
-      setLoaded({ search, songs: list, total: counts.practice, now: Date.now() });
+      setLoaded({ search, songs: list, total: counts.practice });
+      setNow(Date.now());
     })().catch((error) => {
       if (!cancelled) setFailure({ error });
     });
@@ -64,10 +75,9 @@ export default function PracticeScreen() {
     };
   }, [search, refreshKey]);
 
-  const now = loaded?.now;
   const renderSong = useCallback(
     ({ item }: { item: Song }) => {
-      const day = now === undefined ? null : formatDay(item.updatedAt, now, language);
+      const day = formatDay(item.updatedAt, now, language);
       const updated = day === null ? t('practice.updatedToday') : t('practice.updated', { date: day });
       return <PracticeRow song={item} updated={updated} onPress={openSong} />;
     },

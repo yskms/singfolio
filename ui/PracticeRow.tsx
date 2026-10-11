@@ -11,6 +11,13 @@ import { useTheme } from './theme';
  * 出さない。`updated` は、出す形に整えた文字列（日付の整形は呼び出し側。`memo` が効くよう、
  * `Date` ではなく文字列で受ける）。`song` と `updated` と `onPress` が変わらない限り再描画しない
  * （`onPress` は、呼び出し側で安定した関数にする）。
+ *
+ * `SongRow` とほぼ同じ作りだが、あえて分けている。WBS 3.2 で、各行に `Mark as Ready` のボタンが
+ * 入るため。3.2 では、次の形にする（`SongRow` と「共通化」しない）。
+ * - 行全体を押せる `Pressable` の中にボタンを入れない。行を `accessible` にすると、iOS では子が
+ *   1つにまとめられ、中のボタンにVoiceOverでフォーカスできなくなる。`Pressable` の入れ子は、
+ *   押す範囲も競合する。
+ * - 曲の情報（曲名・アーティスト・最終更新）を押す部分と、ボタンを、兄弟の要素にする。
  */
 export const PracticeRow = memo(function PracticeRow({
   song,
