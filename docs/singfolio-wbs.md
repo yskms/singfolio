@@ -6,7 +6,7 @@ v1.0の作業（保存・管理は端末内で完結し、外部通信は候補�
 v1.0より後（公開機能・Requests）の実装順序は、
 `singfolio-publishing-backend.md` §9 を参照。
 
-**現在地**：4. Show Mode（4.1 から）
+**現在地**：5. Profile / Settings（5.1 から）
 
 ## 0. 企画・設計
 
@@ -53,8 +53,10 @@ v1.0より後（公開機能・Requests）の実装順序は、
 
 ## 4. Show Mode
 
--   [ ] 4.1 閲覧専用画面（アーティスト別、検索、タグ絞り込み、× で戻る）
--   [ ] 4.2 非表示項目の確認（My Key / Private Note / Want を出さない）
+-   [x] 4.1 閲覧専用画面（アーティスト別、検索、タグ絞り込み、× で戻る。`app/show.tsx`。
+    開く入口（Profile の Show My Songs）は 5.1。それまではリンク `singfolio://show` で開く）
+-   [x] 4.2 非表示項目の確認（My Key / Private Note / Want を出さない。`show` Service が管理情報を
+    持たない形で返すので、画面は出せない。Serviceのテストと、iOS・Androidの画面で確認した）
 
 ## 5. Profile / Settings
 
@@ -68,7 +70,10 @@ v1.0より後（公開機能・Requests）の実装順序は、
     付けていない状態でのVoiceOver・TalkBackの読み上げも見る。Song Detail の Delete song と
     確認のダイアログも、Androidで見る。Practice の行は、Androidの日本語（Noto Sans JP）で、
     ボタンの文字の縦位置のずれ・切れが無いかを見る。Practice のボタンの読み上げ
-    （曲名が添わっていること）と、失敗のダイアログも、実機で見る）
+    （曲名が添わっていること）と、失敗のダイアログも、実機で見る。Show Mode は、実機で
+    ヘッダーの `×`・戻るキーで閉じられることと、アーティストの見出しと曲の行の読み上げ
+    （見出しが「名前、N曲」になっていること）、Show My Songs から連打しても重ならないこと
+    （5.1 の後）も見る）
 -   [x] 6.2 アイコン・スプラッシュ（1024×1024への縮小、Androidの前景画像、
     Play Store用512×512、favicon）
 -   [ ] 6.3 プライバシーポリシー・ストア掲載情報（フィーチャーグラフィック、

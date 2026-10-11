@@ -125,6 +125,9 @@ expo-sqliteの `withTransactionAsync` は排他ではなく、トランザクシ
     Practiceの「Mark as Ready」）/ `deleteSong`。`createSong` / `updateSong` は、
     新しいタグの名前（`newTagNames`）も受け、曲と同じトランザクションで作る
     （「曲の入力」）
+-   `show`: `getShowView`（Show Mode の画面用。Readyの曲だけを、アーティスト別に、My Key・
+    Private Note・ステータスを持たない形（`ShowSong`）で返す。`songs.listSongs` を使うので、
+    検索の判定は Songs と同じ。タグの一覧は、Readyの曲に付いているものだけ。読み取りだけ）
 -   `settings`: `getAppearance` / `setAppearance`（`system` / `light` / `dark`）、
     `getLanguageSetting` / `setLanguageSetting`（`system` / `en` / `ja`）、
     `getSuggestionsEnabled` / `setSuggestionsEnabled`（候補の外部検索のオン / オフ。既定はオン）

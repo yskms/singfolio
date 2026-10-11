@@ -115,6 +115,11 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
 
 -   「管理する画面」と「人に見せる画面」を分離する。Show Modeは閲覧専用で、
     My Key・Private Note・Wantなどの管理情報を出さず、編集操作も置かない。
+-   Show Mode（`app/show.tsx`）は、`songs` ではなく `show` Service を使う。Show Modeの曲
+    （`ShowSong`）は My Key・Private Note・ステータスを型の上でも持たず、画面が管理情報に
+    触れない。`ShowSong` に項目を足したり、`Song` をそのまま渡す形に「簡略化」しない。行は
+    押せるようにしない（Song Detail は管理情報を出す）。タグのチップは、Songs と違い、Readyの
+    曲に付いたものだけ（理由は screen-flow「Show Mode」）。
 -   ボトムタブはSongs / Practice / Profileの3つ。Wantは独立タブにせず
     Songs内のステータスとして扱う（Practiceのみ独立タブ）。
 -   ログインを要求しない（v1.0）。
