@@ -75,8 +75,8 @@ export const en = {
   'practice.markReadyLabel': 'Mark as Ready, {title}',
   'practice.markReadyFailedTitle': 'Couldn’t mark as Ready',
 
-  // Show Mode（app/show.tsx）。人に見せる画面。Show Mode は機能の名前なので、日本語でも訳さない。
-  // 検索欄・「一致する曲がありません」の題・検索とタグのクリアは、Songs の文言（songs.*）を使う。
+  // Show Mode（app/show.tsx）。人に見せる画面。検索欄・「一致する曲がありません」の題・検索とタグの
+  // クリアは、Songs の文言（songs.*）を使う。文言の中の機能名「Show Mode」は、日本語でも訳さない。
   'show.title': 'What should I sing?',
   'show.count': {
     one: '{count} song ready to sing',

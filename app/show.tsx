@@ -16,11 +16,15 @@ import { Text } from '../ui/Text';
 import { useTheme } from '../ui/theme';
 
 // ヘッダーの題はブランド名（中央）。戻るボタンは出さず、右の `×` で閉じる（下から出入りする）。
+// iOSの、画面の端からのスワイプでは閉じない（今の指定のままでも閉じないことを、iOSシミュレータで
+// 確認した。人に渡して触られても管理の画面へ戻らないよう、明示的に無効にしている）。Androidは
+// 戻るキー（戻るジェスチャーを含む）でも閉じる。
 const SCREEN_OPTIONS = {
   headerShown: true,
   headerBackVisible: false,
   headerTitleAlign: 'center',
   animation: 'slide_from_bottom',
+  gestureEnabled: false,
   headerRight: () => <ShowCloseButton />,
 } as const;
 
@@ -69,7 +73,9 @@ export default function ShowModeScreen() {
   // Errorでない値は包む（`app/_layout.tsx` と同じ理由）。
   if (failure) throw failure.error instanceof Error ? failure.error : new Error(String(failure.error));
 
-  // Readyの曲が1つも無いときは、検索欄もタグも要らない。読み込み前は出しておく（出たり消えたりしない）。
+  // Readyの曲が1つも無いときは、検索欄もタグも要らない。読み込み前は出しておく（曲があるときに、
+  // 検索欄が後から現れて位置が動かないように）。そのため、Readyが0件のときだけ、読み込みが終わった
+  // ところで検索欄が消える（0件で開くのは、まだ何もReadyにしていないときだけなので、割り切っている）。
   const hasSongs = view === null || view.readyCount > 0;
 
   // 検索欄を含むので、SectionListのヘッダーには、コンポーネントではなく要素を渡す

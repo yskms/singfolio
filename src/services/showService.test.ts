@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import type { SongStatus } from '../domain/types.ts';
+import type { ShowTag, SongStatus, Tag } from '../domain/types.ts';
 import { createTestServices } from '../testing/testDatabase.ts';
 
 async function setup() {
@@ -17,6 +17,9 @@ async function setup() {
   ) => t.services.songs.createSong({ title, artist, status, ...extra });
   return { ...t, add };
 }
+
+// Show Mode が返すタグは、`id` と `name` だけ。
+const showTag = (tag: Tag): ShowTag => ({ id: tag.id, name: tag.name });
 
 const shape = (groups: { artist: string; songs: { title: string }[] }[]) =>
   groups.map((group) => [group.artist, group.songs.map((song) => song.title)]);
@@ -85,7 +88,7 @@ describe('getShowView: 絞り込み', () => {
     const none = await services.show.getShowView({ search: 'zzz' });
     assert.deepEqual(none.groups, []);
     assert.equal(none.readyCount, 2, '検索で絞っても、Readyの総数は変わらない');
-    assert.deepEqual(none.tags, [rock], '検索で絞っても、タグの一覧は変わらない');
+    assert.deepEqual(none.tags, [showTag(rock)], '検索で絞っても、タグの一覧は変わらない');
   });
 
   it('検索はReady以外の曲に当たらない', async () => {
@@ -143,7 +146,7 @@ describe('getShowView: タグの一覧', () => {
     await add('練習中の曲', 'スピッツ', 'practice', { tagIds: [practiceOnly.id] });
 
     const view = await services.show.getShowView();
-    assert.deepEqual(view.tags, [ballad, rock]);
+    assert.deepEqual(view.tags, [showTag(ballad), showTag(rock)]);
   });
 
   it('曲の行のタグは、その曲に付いたタグ（名前順）', async () => {
@@ -156,7 +159,7 @@ describe('getShowView: タグの一覧', () => {
     const [group] = (await services.show.getShowView()).groups;
     assert.deepEqual(
       group?.songs.map((song) => song.tags),
-      [[], [ballad, rock]],
+      [[], [showTag(ballad), showTag(rock)]],
     );
   });
 });
@@ -164,13 +167,17 @@ describe('getShowView: タグの一覧', () => {
 describe('getShowView: 人に見せない情報', () => {
   it('曲は id / title / tags だけを持つ（My Key・Private Note・ステータスを含まない）', async () => {
     const { services, add } = await setup();
-    await add('チェリー', 'スピッツ', 'ready', { keyOffset: -3, privateNote: '2番が不安' });
+    const rock = await services.tags.getOrCreateTag('Rock');
+    await add('チェリー', 'スピッツ', 'ready', { keyOffset: -3, privateNote: '2番が不安', tagIds: [rock.id] });
 
     const view = await services.show.getShowView();
     const song = view.groups[0]?.songs[0];
     assert.deepEqual(Object.keys(song ?? {}).sort(), ['id', 'tags', 'title']);
     assert.deepEqual(Object.keys(view).sort(), ['groups', 'readyCount', 'tags']);
     assert.deepEqual(Object.keys(view.groups[0] ?? {}).sort(), ['artist', 'songs']);
+    // タグも、id と name だけ（`Tag` に項目が増えても、Show Mode には届かない）。
+    assert.deepEqual(Object.keys(song?.tags[0] ?? {}).sort(), ['id', 'name']);
+    assert.deepEqual(Object.keys(view.tags[0] ?? {}).sort(), ['id', 'name']);
     assert.equal(JSON.stringify(view).includes('2番が不安'), false);
   });
 });

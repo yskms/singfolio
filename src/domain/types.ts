@@ -63,6 +63,12 @@ export interface Song {
 }
 
 /**
+ * Show Mode に出すタグ。`Tag` に項目が増えても、人に見せる画面へ自動で届かないよう、必要な
+ * 項目（`id` と `name`）だけを持つ（Serviceが、この2つだけを取り出して渡す）。
+ */
+export type ShowTag = Pick<Tag, 'id' | 'name'>;
+
+/**
  * Show Mode に出す曲。人に見せる画面なので、管理用の情報（My Key・Private Note・ステータス）を
  * 型の上でも持たない（画面に出せないようにする。`Song` をそのまま渡さない）。アーティストは、
  * 曲の上の見出し（`ArtistGroup`）に出す。
@@ -70,7 +76,7 @@ export interface Song {
 export interface ShowSong {
   id: string;
   title: string;
-  tags: Tag[];
+  tags: ShowTag[];
 }
 
 /** Show Mode の、同じアーティストの曲のまとまり（見出しは `artist`）。 */

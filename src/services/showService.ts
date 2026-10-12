@@ -1,4 +1,4 @@
-import type { ArtistGroup, ShowSong, Tag } from '../domain/types.ts';
+import type { ArtistGroup, ShowSong, ShowTag, Tag } from '../domain/types.ts';
 import type { SongService } from './songService.ts';
 import type { TagService } from './tagService.ts';
 
@@ -23,7 +23,7 @@ export interface ShowView {
    * Ready以外の曲にだけ付いたタグは出さない（選んでも何も出ず、人に見せる画面に、見せない曲の
    * 手がかりも出る）。
    */
-  tags: Tag[];
+  tags: ShowTag[];
   /** 絞り込んだ曲を、アーティスト別にまとめたもの。アーティストの昇順、曲は曲名の昇順 */
   groups: ArtistGroup[];
 }
@@ -34,6 +34,12 @@ export interface ShowView {
  * `songs` ではなく、こちらを使う（画面が管理情報に触れないようにする。docs/singfolio-screen-flow.md
  * 「Show Mode」）。読み取りだけで、書き込まない。
  */
+// `Tag` から、人に見せる項目だけを取り出す（`{ ...tag }` や `Pick` の型だけでは、余分な項目が実行時に
+// 残る）。
+function toShowTag(tag: Tag): ShowTag {
+  return { id: tag.id, name: tag.name };
+}
+
 export function createShowService({ songs, tags }: ShowServiceDeps) {
   return {
     async getShowView(query: ShowQuery = {}): Promise<ShowView> {
@@ -55,7 +61,7 @@ export function createShowService({ songs, tags }: ShowServiceDeps) {
       // （見出しの位置は、最初の曲の位置）。
       const groups = new Map<string, ShowSong[]>();
       for (const song of shown) {
-        const entry: ShowSong = { id: song.id, title: song.title, tags: song.tags };
+        const entry: ShowSong = { id: song.id, title: song.title, tags: song.tags.map(toShowTag) };
         const group = groups.get(song.artist);
         if (group) group.push(entry);
         else groups.set(song.artist, [entry]);
@@ -63,7 +69,7 @@ export function createShowService({ songs, tags }: ShowServiceDeps) {
 
       return {
         readyCount: ready.length,
-        tags: allTags.filter((tag) => used.has(tag.id)),
+        tags: allTags.filter((tag) => used.has(tag.id)).map(toShowTag),
         groups: [...groups].map(([artist, groupSongs]) => ({ artist, songs: groupSongs })),
       };
     },
