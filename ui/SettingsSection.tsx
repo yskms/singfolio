@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
-import { Alert, StyleSheet, Switch, View } from 'react-native';
+import { Alert, Platform, StyleSheet, Switch, View } from 'react-native';
 
 import {
   APPEARANCES,
@@ -110,6 +110,17 @@ export function SettingsSection() {
               value={suggestionsEnabled}
               onValueChange={(next) => toggleSuggestions(next, suggestionsEnabled)}
               trackColor={{ false: colors.border, true: colors.primary }}
+              // Androidのつまみは、既定ではOSのアクセントの色（ティール）になり、ブランドと合わない。
+              // つまみはトラックからはみ出し、背景の上にも載るので、背景と紛れない色にする（オンは、
+              // ライトでは濃い色、ダークでは明るい色。`onPrimary` だと、ダークで背景に溶ける）。
+              // iOSは、既定の白のまま。
+              thumbColor={
+                Platform.OS === 'android'
+                  ? suggestionsEnabled
+                    ? colors.textPrimary
+                    : colors.textSecondary
+                  : undefined
+              }
               ios_backgroundColor={colors.border}
               // 親の `alignItems: 'center'` では、iOSでスイッチが行の上端に寄る（レイアウトの y が 0。
               // iOSシミュレータで確認）ので、`alignSelf` で中央にそろえる。

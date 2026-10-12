@@ -62,7 +62,7 @@ export function TagEditDialog({
           // VoiceOverは、ダイアログの外の幕（上の「閉じる」ボタン）に触れられないため、2本指の
           // Zジェスチャ（escape）で閉じられるようにする。Androidは戻る操作（`onRequestClose`）。
           onAccessibilityEscape={onClose}
-          style={[styles.dialog, { backgroundColor: colors.background }]}
+          style={[styles.dialog, { backgroundColor: colors.background, borderColor: colors.border }]}
         >
           <Text role="heading" style={[styles.title, { color: colors.textPrimary }]}>
             {t('tags.renameTitle')}
@@ -124,7 +124,8 @@ export function TagEditDialog({
 
 const styles = StyleSheet.create({
   root: { flex: 1, alignItems: 'center', paddingHorizontal: 24 },
-  dialog: { width: '100%', maxWidth: 420, padding: 20, gap: 16, borderRadius: 16 },
+  // 縁の線は、ダークで、幕に暗くした背景とダイアログの区別がつくようにするため。
+  dialog: { width: '100%', maxWidth: 420, padding: 20, gap: 16, borderRadius: 16, borderWidth: 1 },
   title: { fontSize: 18, lineHeight: 24, fontWeight: '700' },
   buttons: { flexDirection: 'row', gap: 12 },
   button: {
