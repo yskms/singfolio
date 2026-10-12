@@ -6,7 +6,7 @@ v1.0の作業（保存・管理は端末内で完結し、外部通信は候補�
 v1.0より後（公開機能・Requests）の実装順序は、
 `singfolio-publishing-backend.md` §9 を参照。
 
-**現在地**：5. Profile / Settings（5.1 から）
+**現在地**：5. Profile / Settings（5.2 から）
 
 ## 0. 企画・設計
 
@@ -54,13 +54,13 @@ v1.0より後（公開機能・Requests）の実装順序は、
 ## 4. Show Mode
 
 -   [x] 4.1 閲覧専用画面（アーティスト別、検索、タグ絞り込み、× で戻る。`app/show.tsx`。
-    開く入口（Profile の Show My Songs）は 5.1。それまではリンク `singfolio://show` で開く）
+    開く入口は Profile の Show My Songs（5.1）。リンク `singfolio://show` でも開く）
 -   [x] 4.2 非表示項目の確認（My Key / Private Note / Want を出さない。`show` Service が管理情報を
     持たない形で返すので、画面は出せない。Serviceのテストと、iOS・Androidの画面で確認した）
 
 ## 5. Profile / Settings
 
--   [ ] 5.1 Profile（曲数の表示、Show My Songs）
+-   [x] 5.1 Profile（曲数の表示、Show My Songs。件数は、他の画面から戻ったときに読み直す）
 -   [ ] 5.2 Settings（Appearance / Language / Suggestions / Tags管理 / About。Aboutには、同梱フォントの
     ライセンス表記を含む（`assets/fonts/OFL-*.txt`））
 
@@ -73,7 +73,7 @@ v1.0より後（公開機能・Requests）の実装順序は、
     （曲名が添わっていること）と、失敗のダイアログも、実機で見る。Show Mode は、実機で
     ヘッダーの `×`・戻るキーで閉じられることと、アーティストの見出しと曲の行の読み上げ
     （見出しが「名前、N曲」になっていること）、Show My Songs から連打しても重ならないこと
-    （5.1 の後）も見る）
+    も見る）
 -   [x] 6.2 アイコン・スプラッシュ（1024×1024への縮小、Androidの前景画像、
     Play Store用512×512、favicon）
 -   [ ] 6.3 プライバシーポリシー・ストア掲載情報（フィーチャーグラフィック、

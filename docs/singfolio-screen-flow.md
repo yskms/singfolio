@@ -400,13 +400,9 @@ Last updated: Sep 28
 ``` text
 Profile
 
-YSKMS
-
 84 songs ready to sing
 
-────────────────
-
-Show My Songs
+[ Show My Songs ]
 
 ────────────────
 
@@ -414,11 +410,20 @@ Appearance
 Language
 Suggestions
 Tags
-Data
 About
 ```
 
 v1.0では公開プロフィールではなく、端末内のプロフィール・設定画面として扱う。
+
+-   **件数**（「84 songs ready to sing」）は、Readyの曲の総数（Show Mode の件数と同じ）。
+    タブはマウントしたままなので、他の画面で曲が変わったあと（Practice の Mark as Ready、
+    Song Detail など）、このタブへ戻ったときに読み直す（§3の読み直しと同じ
+    `ui/useFocusRefreshKey.ts`）。読み直すあいだは前の件数を出し続ける。
+-   **`Show My Songs`** は、Show Mode（§8）を開くボタン。Readyの曲が0件でも押せる（Show Mode が
+    案内を出す）。連打で重ねて開かない。
+-   **表示名は持たない**。ブランド資料のモックアップの `YSKMS` のような名前は、v1.0には保存先も
+    入力する画面も無い（公開用のハンドル名は、公開機能の設定。`singfolio-publishing-backend.md` §6）。
+-   `Appearance` 以下の設定項目は WBS 5.2 で足す。v1.0で実装しない `Data` は出さない。
 
 ## 8. Show Mode
 
