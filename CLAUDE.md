@@ -131,10 +131,8 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     で、上で保存した内容を、下で保存して上書きする（iOSシミュレータで確認）。曲の画面を
     足すときも同じ指定を足す。Show Mode・Tags・About も同じ指定（Profile の行の連打で重なる。
     6連打して、戻る1回でProfileへ戻ることをiOSシミュレータで確認）。
--   設定の項目（Appearance・Language・Suggestions・Tags・About）は、別の「Settings」画面を
-    作らず、Profile の下半分に並べる（`ui/SettingsSection.tsx`。仕様は screen-flow §9）。
-    言語の選択肢の名前（English / 日本語）は、文言のカタログではなく `languageNames`
-    （`src/i18n`）から出す（表示言語に依らず、その言語自身の名前）。
+-   言語の選択肢の名前（English / 日本語）は、文言のカタログ（`en.ts`・`ja.ts`）に入れず、
+    `languageNames`（`src/i18n`）から出す（表示言語に依らず、その言語自身の名前）。
 -   `app/_layout.tsx` は、DB初期化（`getServices()`）と、保存済みのAppearanceの
     端末への反映が終わるまで画面を出さない。Serviceが使えない状態で画面を描画させない。
     反映前に描くと、既定の配色が一瞬見える。
@@ -166,6 +164,9 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     呼び出しを飛ばす形にしない（Expo Routerの `useFocusEffect` は、マウントより遅れて最初に呼ぶので、
     マウントと同時のフォーカスを見分けるには実行の順序に頼ることになり、壊れやすい）。
 -   RN・Expoに依存するUIの部品・hookは、`src/` に置けないため `ui/`（ルート直下）に置く。
+-   アイコンは `import Ionicons from '@expo/vector-icons/Ionicons'` と、セットを指定して
+    importする。`import { Ionicons } from '@expo/vector-icons'`（ルート）に「簡略化」しない。全20セット
+    のフォントが、アプリに入る（約5MB増える。`expo export` で確認）。`npm test` が検出する。
 -   装飾のアイコンは `{...decorative}`（`ui/decorative.ts`）で読み上げから外す。外さないと、
     字形（`\uf55f` など）が読み上げの対象になる（iOSのアクセシビリティツリーで確認。
     読み上げ自体と、TalkBackは未確認）。
