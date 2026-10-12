@@ -28,18 +28,18 @@ export interface ShowView {
   groups: ArtistGroup[];
 }
 
-/**
- * Show Mode（人に見せる、閲覧専用の画面）のためのService。Readyの曲だけを、管理用の情報
- * （My Key・Private Note・ステータス）を持たない形（`ShowSong`）で返す。Show Modeの画面は
- * `songs` ではなく、こちらを使う（画面が管理情報に触れないようにする。docs/singfolio-screen-flow.md
- * 「Show Mode」）。読み取りだけで、書き込まない。
- */
 // `Tag` から、人に見せる項目だけを取り出す（`{ ...tag }` や `Pick` の型だけでは、余分な項目が実行時に
 // 残る）。
 function toShowTag(tag: Tag): ShowTag {
   return { id: tag.id, name: tag.name };
 }
 
+/**
+ * Show Mode（人に見せる、閲覧専用の画面）のためのService。Readyの曲だけを、管理用の情報
+ * （My Key・Private Note・ステータス）を持たない形（`ShowSong`）で返す。Show Modeの画面は
+ * `songs` ではなく、こちらを使う（画面が管理情報に触れないようにする。docs/singfolio-screen-flow.md
+ * 「Show Mode」）。読み取りだけで、書き込まない。
+ */
 export function createShowService({ songs, tags }: ShowServiceDeps) {
   return {
     async getShowView(query: ShowQuery = {}): Promise<ShowView> {
