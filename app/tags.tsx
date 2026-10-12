@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet } from 'react-native';
@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { Tag } from '../src/domain/types';
 import { errorMessageKey } from '../src/i18n';
-import { getServices } from '../src/services';
+import { getServices, ServiceError } from '../src/services';
 import { decorative } from '../ui/decorative';
 import { EmptyState } from '../ui/EmptyState';
 import { useI18n } from '../ui/i18n';
@@ -65,7 +65,11 @@ export default function TagsScreen() {
       const { tags: service } = await getServices();
       await service.renameTag(tag.id, name);
     } catch (error) {
-      return t(errorMessageKey(error));
+      // タグが既に無いときは、入力を直しても解消しない。ダイアログを閉じて、一覧を読み直す
+      // （削除はこの画面だけなので、来ない想定の防御）。
+      if (!(error instanceof ServiceError && error.code === 'tag-not-found')) {
+        return t(errorMessageKey(error));
+      }
     }
     setEditing(null);
     setReloadKey((key) => key + 1);

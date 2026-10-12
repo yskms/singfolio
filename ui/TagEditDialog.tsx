@@ -34,6 +34,14 @@ export function TagEditDialog({
   const { t } = useI18n();
   const insets = useSafeAreaInsets();
   const [name, setName] = useState(tag.name);
+  // 開いた直後は、名前を全選択にして、そのまま打ち直せるようにする。`selectTextOnFocus` は、
+  // iOSでは `autoFocus` と組み合わせると効かない（カーソルが末尾に置かれる。iOSシミュレータで確認。
+  // Androidは効く）ので、`selection` で指定する。`selection` を渡し続けると、利用者が動かした
+  // カーソルが、次の再描画で戻されるため、選択が変わったら（入力・カーソルの移動）手放す。
+  const [selection, setSelection] = useState<{ start: number; end: number } | undefined>({
+    start: 0,
+    end: tag.name.length,
+  });
   const [error, setError] = useState<string | undefined>(undefined);
   // 保存が重ならないようにする（state は再描画まで古い）。
   const savingRef = useRef(false);
@@ -78,7 +86,13 @@ export function TagEditDialog({
               invalid={error !== undefined}
               accessibilityLabel={t('tags.nameLabel')}
               autoFocus
-              selectTextOnFocus
+              selection={selection}
+              onSelectionChange={(event) => {
+                const { start, end } = event.nativeEvent.selection;
+                if (selection && (start !== selection.start || end !== selection.end)) {
+                  setSelection(undefined);
+                }
+              }}
               returnKeyType="done"
               onSubmitEditing={() => void save()}
               autoCapitalize="none"
