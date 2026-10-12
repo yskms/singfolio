@@ -6,7 +6,7 @@ v1.0の作業（保存・管理は端末内で完結し、外部通信は候補�
 v1.0より後（公開機能・Requests）の実装順序は、
 `singfolio-publishing-backend.md` §9 を参照。
 
-**現在地**：5. Profile / Settings（5.2 から）
+**現在地**：6. リリース準備（6.1 から）
 
 ## 0. 企画・設計
 
@@ -61,8 +61,8 @@ v1.0より後（公開機能・Requests）の実装順序は、
 ## 5. Profile / Settings
 
 -   [x] 5.1 Profile（曲数の表示、Show My Songs。件数は、他の画面から戻ったときに読み直す）
--   [ ] 5.2 Settings（Appearance / Language / Suggestions / Tags管理 / About。Aboutには、同梱フォントの
-    ライセンス表記を含む（`assets/fonts/OFL-*.txt`））
+-   [x] 5.2 Settings（Appearance / Language / Suggestions / Tags管理 / About。Profileの下半分に並べる。
+    Aboutには、同梱フォントのライセンス表記を含む（`assets/fonts/OFL-*.txt`））
 
 ## 6. リリース準備
 
@@ -73,7 +73,9 @@ v1.0より後（公開機能・Requests）の実装順序は、
     （曲名が添わっていること）と、失敗のダイアログも、実機で見る。Show Mode は、実機で
     ヘッダーの `×`・戻るキーで閉じられることと、アーティストの見出しと曲の行の読み上げ
     （見出しが「名前、N曲」になっていること）、Show My Songs から連打しても重ならないこと
-    も見る）
+    も見る。Settings は、Tags のダイアログとキーボードの重なり（エミュレータ・シミュレータは
+    ソフトキーボードが出ず、未確認）、スイッチ・Tags・Aboutの読み上げ（VoiceOver・TalkBack。
+    未確認）も見る）
 -   [x] 6.2 アイコン・スプラッシュ（1024×1024への縮小、Androidの前景画像、
     Play Store用512×512、favicon）
 -   [ ] 6.3 プライバシーポリシー・ストア掲載情報（フィーチャーグラフィック、
