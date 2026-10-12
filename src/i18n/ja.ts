@@ -58,6 +58,10 @@ export const ja: Record<MessageKey, Message> = {
   'practice.markReadyLabel': '「歌える」にする、{title}',
   'practice.markReadyFailedTitle': '「歌える」にできませんでした',
 
+  'profile.count': { other: '歌える曲は{count}曲' },
+  'profile.showMySongs': '歌える曲を見せる',
+  'profile.showMySongsHint': 'Show Modeを開きます',
+
   'show.title': '何を歌おう？',
   'show.count': { other: '歌える曲は{count}曲' },
   'show.artistA11y': { other: '{artist}、{count}曲' },

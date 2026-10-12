@@ -75,6 +75,15 @@ export const en = {
   'practice.markReadyLabel': 'Mark as Ready, {title}',
   'practice.markReadyFailedTitle': 'Couldn’t mark as Ready',
 
+  // Profile（app/(tabs)/profile.tsx）。ボタンの名前は、機能の名前「Show Mode」を開く入口。
+  'profile.count': {
+    one: '{count} song ready to sing',
+    other: '{count} songs ready to sing',
+  },
+  'profile.showMySongs': 'Show My Songs',
+  // 読み上げ用。ボタンの名前と、開く画面（Show Mode）の名前が違うので、行き先を添える。
+  'profile.showMySongsHint': 'Opens Show Mode',
+
   // Show Mode（app/show.tsx）。人に見せる画面。検索欄・「一致する曲がありません」の題・検索とタグの
   // クリアは、Songs の文言（songs.*）を使う。文言の中の機能名「Show Mode」は、日本語でも訳さない。
   'show.title': 'What should I sing?',
