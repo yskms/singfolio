@@ -14,7 +14,8 @@ export { ErrorScreen as ErrorBoundary } from '../ui/ErrorScreen';
 
 // 画面は、全タブをこのStackの1画面（(tabs)）として載せる。Song Detail・Add / Edit Song
 // （app/song/）は、このStackに載せ、タブバーを隠して全画面で出す（ヘッダーは各画面が指定する）。
-// Show Mode（app/show.tsx）も、このStackに載せ、タブバーを隠して全画面で出す。Settingsも、ここに足していく。
+// Show Mode（app/show.tsx）も、このStackに載せ、タブバーを隠して全画面で出す。Settingsの、Tags・About
+// （app/tags.tsx・app/about.tsx）も同じ。
 // 下の `initialRouteName` は、ディープリンクで詳細画面だけが開かれたとき、下にタブが無く、
 // 戻る操作でアプリが終了するのを防ぐ。
 export const unstable_settings = { initialRouteName: '(tabs)' };
@@ -75,6 +76,9 @@ export default function RootLayout() {
           <Stack.Screen name="song/[id]/edit" dangerouslySingular />
           {/* Show Mode も、素早い連打で重ねて開かないようにする（重なると、`×` で1枚しか閉じない）。 */}
           <Stack.Screen name="show" dangerouslySingular />
+          {/* Tags・About も同じ（Profile の行の連打で、同じ画面が重なる）。 */}
+          <Stack.Screen name="tags" dangerouslySingular />
+          <Stack.Screen name="about" dangerouslySingular />
         </Stack>
       </ThemeProvider>
     </I18nProvider>

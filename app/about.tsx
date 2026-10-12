@@ -1,0 +1,113 @@
+import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
+import { Stack } from 'expo-router';
+import { useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { FONT_LICENSES, type FontLicense } from '../src/legal/fontLicenses';
+import { reflowLicense } from '../src/legal/reflowLicense';
+import { decorative } from '../ui/decorative';
+import { useI18n } from '../ui/i18n';
+import { Text } from '../ui/Text';
+import { useTheme } from '../ui/theme';
+
+// ヘッダーの題は、画面の中で足す（言語に従う）。戻るボタンの文字は出さない（Song Detail と同じ）。
+const SCREEN_OPTIONS = {
+  headerShown: true,
+  headerBackButtonDisplayMode: 'minimal',
+  headerTitleAlign: 'left',
+} as const;
+
+// About。Profile の Settings から開く。アプリの名前とバージョン、同梱しているフォントのライセンス
+// （SIL Open Font License は、再配布するときに、著作権表示とライセンス全文を付けることを求める）。
+export default function AboutScreen() {
+  const { colors } = useTheme();
+  const { t } = useI18n();
+  const insets = useSafeAreaInsets();
+  // app.json の `version`。取れなければ、バージョンの行は出さない。
+  const version = Constants.expoConfig?.version;
+
+  return (
+    <>
+      <Stack.Screen options={{ ...SCREEN_OPTIONS, title: t('settings.about') }} />
+      <ScrollView
+        style={{ backgroundColor: colors.background }}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
+      >
+        <View style={styles.app}>
+          <Text style={[styles.appName, { color: colors.textPrimary }]}>{t('app.name')}</Text>
+          {version !== undefined && (
+            <Text style={[styles.version, { color: colors.textSecondary }]}>
+              {t('about.version', { version })}
+            </Text>
+          )}
+        </View>
+
+        <Text role="heading" style={[styles.section, { color: colors.textSecondary }]}>
+          {t('about.fonts')}
+        </Text>
+        {FONT_LICENSES.map((license) => (
+          <FontLicenseItem key={license.name} license={license} />
+        ))}
+      </ScrollView>
+    </>
+  );
+}
+
+// 書体の名前と著作権表示。ライセンスの全文は長いので、押して開く。
+function FontLicenseItem({ license }: { license: FontLicense }) {
+  const { colors } = useTheme();
+  const { t } = useI18n();
+  const [expanded, setExpanded] = useState(false);
+  // 先頭の行が著作権表示（`fontLicenses.test.ts` が確認する）。
+  const copyright = license.text.split('\n')[0];
+  return (
+    <View style={[styles.font, { borderBottomColor: colors.border }]}>
+      <Text style={[styles.fontName, { color: colors.textPrimary }]}>{license.name}</Text>
+      <Text style={[styles.fontNote, { color: colors.textSecondary }]}>{copyright}</Text>
+      <Text style={[styles.fontNote, { color: colors.textSecondary }]}>{t('about.fontLicense')}</Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
+        onPress={() => setExpanded((current) => !current)}
+        style={({ pressed }) => [styles.toggle, { opacity: pressed ? 0.6 : 1 }]}
+      >
+        <Text style={[styles.toggleLabel, { color: colors.textPrimary }]}>
+          {expanded ? t('about.hideLicense') : t('about.showLicense')}
+        </Text>
+        <Ionicons
+          name={expanded ? 'chevron-up' : 'chevron-down'}
+          size={18}
+          color={colors.textSecondary}
+          {...decorative}
+        />
+      </Pressable>
+      {expanded && (
+        <Text selectable style={[styles.licenseText, { color: colors.textSecondary }]}>
+          {reflowLicense(license.text)}
+        </Text>
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  content: { paddingHorizontal: 16, paddingTop: 24 },
+  app: { gap: 4, marginBottom: 32 },
+  appName: { fontSize: 24, lineHeight: 32, fontWeight: '700' },
+  version: { fontSize: 15, lineHeight: 22 },
+  section: { marginBottom: 8, fontSize: 13, lineHeight: 18, fontWeight: '700' },
+  font: { paddingVertical: 12, gap: 2, borderBottomWidth: StyleSheet.hairlineWidth },
+  fontName: { fontSize: 16, lineHeight: 22, fontWeight: '700' },
+  fontNote: { fontSize: 13, lineHeight: 18 },
+  toggle: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    alignSelf: 'flex-start',
+  },
+  toggleLabel: { fontSize: 15, lineHeight: 20 },
+  licenseText: { fontSize: 12, lineHeight: 17 },
+});

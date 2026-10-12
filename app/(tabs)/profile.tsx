@@ -4,12 +4,13 @@ import { Pressable, ScrollView, StyleSheet } from 'react-native';
 
 import { getServices } from '../../src/services';
 import { useI18n } from '../../ui/i18n';
+import { SettingsSection } from '../../ui/SettingsSection';
 import { Text } from '../../ui/Text';
 import { useTheme } from '../../ui/theme';
 import { useFocusRefreshKey } from '../../ui/useFocusRefreshKey';
 
 // Profile。端末内の、自分のSingfolioの画面（公開プロフィールではない）。
-// 歌える（Ready）曲の数と、Show Mode を開く入口を置く。Settings の項目（5.2）は、ここに足していく。
+// 歌える（Ready）曲の数と、Show Mode を開く入口、その下に設定（`SettingsSection`）を置く。
 export default function ProfileScreen() {
   const { colors } = useTheme();
   const { t } = useI18n();
@@ -65,6 +66,8 @@ export default function ProfileScreen() {
       >
         <Text style={[styles.buttonLabel, { color: colors.onPrimary }]}>{t('profile.showMySongs')}</Text>
       </Pressable>
+
+      <SettingsSection />
     </ScrollView>
   );
 }

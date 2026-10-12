@@ -84,6 +84,42 @@ export const en = {
   // 読み上げ用。ボタンの名前と、開く画面（Show Mode）の名前が違うので、行き先を添える。
   'profile.showMySongsHint': 'Opens Show Mode',
 
+  // Profile の設定の項目（ui/SettingsSection.tsx）。Language の English / 日本語 は、その言語自身の
+  // 名前で出すので、文言ではなく `languageNames`（src/i18n）。System だけは、表示中の言語の文言。
+  'settings.appearance': 'Appearance',
+  'settings.appearance.system': 'System',
+  'settings.appearance.light': 'Light',
+  'settings.appearance.dark': 'Dark',
+  'settings.language': 'Language',
+  'settings.language.system': 'System',
+  'settings.suggestions': 'Suggestions',
+  'settings.suggestionsNote':
+    'What you type in Title and Artist is sent to Apple to find suggestions. Nothing else is sent.',
+  'settings.tags': 'Tags',
+  'settings.about': 'About',
+  'settings.saveFailedTitle': 'Couldn’t save the setting',
+
+  // Tags（app/tags.tsx）。タグ名の入力の誤りは、error.tagName* を使う。
+  'tags.title': 'Tags',
+  'tags.empty.title': 'No tags yet',
+  'tags.empty.message': 'Tags you add to songs will appear here.',
+  'tags.rowHint': 'Rename or delete this tag',
+  'tags.renameTitle': 'Edit tag',
+  'tags.nameLabel': 'Tag name',
+  'tags.save': 'Save',
+  'tags.delete': 'Delete tag',
+  'tags.deleteTitle': 'Delete this tag?',
+  'tags.deleteMessage': '“{name}” will be removed from all songs. The songs themselves won’t be deleted.',
+  'tags.deleteConfirm': 'Delete',
+  'tags.deleteFailedTitle': 'Couldn’t delete',
+
+  // About（app/about.tsx）。
+  'about.version': 'Version {version}',
+  'about.fonts': 'Fonts',
+  'about.fontLicense': 'SIL Open Font License 1.1',
+  'about.showLicense': 'Show license',
+  'about.hideLicense': 'Hide license',
+
   // Show Mode（app/show.tsx）。人に見せる画面。検索欄・「一致する曲がありません」の題・検索とタグの
   // クリアは、Songs の文言（songs.*）を使う。文言の中の機能名「Show Mode」は、日本語でも訳さない。
   'show.title': 'What should I sing?',
