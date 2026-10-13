@@ -93,6 +93,8 @@ export const ja: Record<MessageKey, Message> = {
   'about.fontLicense': 'SIL Open Font License 1.1',
   'about.showLicense': 'ライセンスを表示',
   'about.hideLicense': 'ライセンスを隠す',
+  'about.privacyPolicy': 'プライバシーポリシー',
+  'about.privacyPolicyHint': 'ブラウザで開きます',
   'about.licenses': 'オープンソースライセンス',
   'licenses.intro':
     'このアプリは、次のオープンソースソフトウェアとアイコンフォントを使っています。項目を押すと、ライセンスの全文を表示します。',

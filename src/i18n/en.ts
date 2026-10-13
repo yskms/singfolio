@@ -119,6 +119,8 @@ export const en = {
   'about.fontLicense': 'SIL Open Font License 1.1',
   'about.showLicense': 'Show license',
   'about.hideLicense': 'Hide license',
+  'about.privacyPolicy': 'Privacy Policy',
+  'about.privacyPolicyHint': 'Opens in your browser',
   'about.licenses': 'Open source licenses',
   'licenses.intro':
     'This app uses the open source software and icon fonts below. Tap an item to see its license.',

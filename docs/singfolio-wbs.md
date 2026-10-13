@@ -78,12 +78,14 @@ v1.0より後（公開機能・Requests）の実装順序は、
     （エミュレータ・シミュレータでは、9回とも全選択だった。実機は未確認。外れていたら、Androidに
     `selectTextOnFocus` を足す）、スイッチ・Tags・Aboutの読み上げ（VoiceOver・TalkBack。未確認）
     も見る。Open source licenses は、Android の日本語・ダーク表示と、VoiceOver・TalkBack の
-    読み上げ（名前と「版 · ライセンスの種類」、展開の状態）も見る）
+    読み上げ（名前と「版 · ライセンスの種類」、展開の状態）も見る。About の Privacy Policy の行が、
+    公開したページをブラウザで開くことも見る）
 -   [x] 6.2 アイコン・スプラッシュ（1024×1024への縮小、Androidの前景画像、
     Play Store用512×512、favicon）
--   [ ] 6.3 プライバシーポリシー・ストア掲載情報（フィーチャーグラフィック、
-    スクリーンショットを含む。候補検索で外部へ送る検索語の説明とプライバシー申告を含む。
-    説明は、5.2 の Suggestions の切替が済んでから確定する）
+-   [ ] 6.3 プライバシーポリシー・ストア掲載情報（`docs/privacy-policy.md`・`docs/singfolio-store-listing.md`・
+    `docs/index.md`は作成済み。候補検索で外部へ送る検索語の説明とプライバシー申告を含む。
+    GitHub Pages の公開（`docs/` を公開元にする）と、2つのURLが開けることの確認、フィーチャーグラフィック、
+    スクリーンショットが残っている）
 -   [ ] 6.4 ビルド・ストア提出（提出の前に、`node scripts/generate-licenses.mjs --check --apk <release の
     APK・AAB>` で、第三者ライセンスの一覧が今の依存と同じことと、把握していない `.so` が入っていない
     ことを確かめる）

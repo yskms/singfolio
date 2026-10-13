@@ -607,10 +607,13 @@ Profile（§7）の下半分に、`Appearance` / `Language` / `Suggestions` / `T
 
 ### About
 
-アプリの名前、バージョン（app.json の `version`）、Open source licenses への行、自前で同梱した
-フォントのライセンス（Profile の `About` から開く画面）。
+アプリの名前、バージョン（app.json の `version`）、プライバシーポリシーと Open source licenses への
+行、自前で同梱したフォントのライセンス（Profile の `About` から開く画面）。
 
--   「Open source licenses」の行は、バージョンの下に置き、押すと下の画面を開く（連打で重ねない）。
+-   「Privacy Policy」の行は、バージョンの下に置き、押すとブラウザで公開ページ（`src/legal/legalUrls.ts`。
+    `docs/privacy-policy.md` をGitHub Pagesで公開したもの）を開く。App Store の審査は、ストア掲載情報と
+    アプリの中の両方に、プライバシーポリシーへのリンクを求める。読み上げには「ブラウザで開きます」を添える。
+-   「Open source licenses」の行は、その下に置き、押すと下の画面を開く（連打で重ねない）。
 -   フォントは、書体名・著作権表示・「SIL Open Font License 1.1」を出し、「ライセンスを表示」で全文を
     開閉する。SIL OFL は、フォントを再配布するとき、著作権表示とライセンス全文を付けることを求める。
 -   全文は、元の約75桁の改行を、段落の中で詰めて出す（スマホの幅で、折り返しの後に、短い行が

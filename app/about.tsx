@@ -2,10 +2,11 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import Constants from 'expo-constants';
 import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FONT_LICENSES, type FontLicense } from '../src/legal/fontLicenses';
+import { PRIVACY_POLICY_URL } from '../src/legal/legalUrls';
 import { reflowLicense } from '../src/legal/reflowLicense';
 import { decorative } from '../ui/decorative';
 import { useI18n } from '../ui/i18n';
@@ -20,7 +21,7 @@ const SCREEN_OPTIONS = {
   headerTitleAlign: 'left',
 } as const;
 
-// About。Profile の Settings から開く。アプリの名前とバージョン、自前で同梱したフォント（`assets/fonts/`）
+// About。Profile の Settings から開く。アプリの名前とバージョン、プライバシーポリシーへのリンク、自前で同梱したフォント（`assets/fonts/`）
 // のライセンス（SIL Open Font License は、再配布するときに、著作権表示とライセンス全文を付けることを
 // 求める）。アイコンフォント（Ionicons など）と npm の依存のライセンスは、ここには載せず、
 // 「Open source licenses」（app/licenses.tsx）に出す。
@@ -48,6 +49,12 @@ export default function AboutScreen() {
           )}
         </View>
 
+        <SettingsRow
+          label={t('about.privacyPolicy')}
+          accessibilityHint={t('about.privacyPolicyHint')}
+          // ブラウザで開く。開けなくても（ブラウザが無い端末は、まず無い）、アプリの動作には影響しない。
+          onPress={() => void Linking.openURL(PRIVACY_POLICY_URL).catch(() => undefined)}
+        />
         <SettingsRow label={t('about.licenses')} onPress={() => router.push('/licenses')} />
 
         <Text role="heading" style={[styles.section, styles.fonts, { color: colors.textSecondary }]}>
