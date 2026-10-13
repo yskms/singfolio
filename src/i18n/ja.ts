@@ -96,7 +96,7 @@ export const ja: Record<MessageKey, Message> = {
   'about.licenses': 'オープンソースライセンス',
   'licenses.intro':
     'このアプリは、次のオープンソースソフトウェアとアイコンフォントを使っています。項目を押すと、ライセンスの全文を表示します。',
-  'licenses.includes': '含まれるもの: {list}',
+  'licenses.includes': '含まれるもの:\n{list}',
 
   'show.title': '何を歌おう？',
   'show.count': { other: '歌える曲は{count}曲' },

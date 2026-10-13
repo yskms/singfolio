@@ -83,7 +83,7 @@ function PackageItem({ item }: { item: ThirdPartyPackage }) {
         <>
           {item.includes !== undefined && (
             <Text selectable style={[styles.includes, { color: colors.textSecondary }]}>
-              {t('licenses.includes', { list: item.includes.join(', ') })}
+              {t('licenses.includes', { list: item.includes.join('\n') })}
             </Text>
           )}
           <Text selectable style={[styles.licenseText, { color: colors.textSecondary }]}>
