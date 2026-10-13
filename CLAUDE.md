@@ -252,14 +252,19 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
 
 詳細は `docs/singfolio-screen-flow.md`「Open source licenses」。
 
--   `src/legal/thirdPartyLicenses.ts` は生成物。手で直さず、依存（`package.json`・ロックファイル）を
-    変えたら `node scripts/generate-licenses.mjs` で作り直す（`npm test` が食い違いを検出する）。
-    載せるものは、`dependencies` をたどらず、実際にアプリに入るもの（JSバンドルのsourcemapと
-    autolinking）から決める。「`dependencies` から機械的に作る形に簡略化」しない（ビルドにしか
+-   `src/legal/thirdPartyLicenses.ts` は生成物。手で直さず、依存（`package.json`・ロックファイル・
+    ネイティブの依存）を変えたら `node scripts/generate-licenses.mjs` で作り直す。ストア提出の前に
+    `--check` で、今の依存と同じことを確かめる。`npm test` が検出するのは、版の食い違いと
+    `dependencies` の載せ漏れまで（バンドルに入るものが増えても気づけない）。
+-   載せるものは、`dependencies` をたどらず、実際にアプリに入るもの（JSバンドルのsourcemap・
+    autolinking・Gradle）から決める。「`dependencies` から機械的に作る形に簡略化」しない（ビルドにしか
     使わないパッケージが大量に入る）。
--   MIT・ISC・Apache-2.0 以外のライセンスが入ると生成が失敗する。黙って許可を足さず、条件を確認する。
+-   npm のパッケージの中に取り込まれた別のプロジェクトのコード（今は expo-router の React Navigation）は、
+    パッケージの LICENSE では足りない。`BUNDLED` に足して、別の行にする（`vendor/`・`fork/` などが
+    バンドルに入ると、生成が失敗する）。
+-   許可していないライセンスが入ると生成が失敗する。黙って許可を足さず、条件を確認する。
 -   アイコンフォント（Ionicons・Material Symbols）は、npmパッケージのLICENSEとは別のライセンスなので、
-    別の行にしている。Ionicons の全文は依存の中に無く、`scripts/license-texts/` に上流の写しがある。
+    別の行にしている。上流から写した全文は `scripts/license-texts/` にある（取得元はスクリプトの設定）。
 -   About の「Fonts」（`fontLicenses.ts`）は、自前で同梱した書体だけで、この一覧とは別。
 
 ### ネイティブビルド

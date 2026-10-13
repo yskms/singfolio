@@ -122,6 +122,7 @@ export const en = {
   'about.licenses': 'Open source licenses',
   'licenses.intro':
     'This app uses the open source software and icon fonts below. Tap an item to see its license.',
+  'licenses.includes': 'Includes: {list}',
 
   // Show Mode（app/show.tsx）。人に見せる画面。検索欄・「一致する曲がありません」の題・検索とタグの
   // クリアは、Songs の文言（songs.*）を使う。文言の中の機能名「Show Mode」は、日本語でも訳さない。

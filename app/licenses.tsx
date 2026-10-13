@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { reflowLicense } from '../src/legal/reflowLicense';
@@ -22,10 +22,15 @@ const SCREEN_OPTIONS = {
   headerTitleAlign: 'left',
 } as const;
 
-// Open source licenses。About から開く。アプリに入る、npm の依存とアイコンフォントの名前・版・
-// ライセンスの種類を並べ、押すと全文（著作権表示を含む）を開く。MIT などは、著作権表示と許諾表示を
-// 含めることを求める。一覧は、依存関係から生成したもの（`scripts/generate-licenses.mjs`。
-// `src/legal/thirdPartyLicenses.ts`）で、手で直さない。About の「Fonts」（自前で同梱した書体）とは別。
+// Open source licenses。About から開く。アプリに入る、npm の依存・取り込まれたコード・アイコンフォント・
+// ネイティブのライブラリの名前・版・ライセンスの種類を並べ、押すと全文（著作権表示を含む）を開く。
+// MIT などは、著作権表示と許諾表示を含めることを求める。一覧は、依存関係から生成したもの
+// （`scripts/generate-licenses.mjs`。`src/legal/thirdPartyLicenses.ts`）で、手で直さない。片方の OS
+// にだけ入るもの（AndroidX など）は、その OS でだけ出す。About の「Fonts」（自前で同梱した書体）とは別。
+const ITEMS = THIRD_PARTY_PACKAGES.filter(
+  (item) => item.platform === undefined || item.platform === Platform.OS,
+);
+
 export default function LicensesScreen() {
   const { colors } = useTheme();
   const { t } = useI18n();
@@ -39,7 +44,7 @@ export default function LicensesScreen() {
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
       >
         <Text style={[styles.intro, { color: colors.textSecondary }]}>{t('licenses.intro')}</Text>
-        {THIRD_PARTY_PACKAGES.map((item) => (
+        {ITEMS.map((item) => (
           <PackageItem key={`${item.name}@${item.version ?? ''}`} item={item} />
         ))}
       </ScrollView>
@@ -75,9 +80,16 @@ function PackageItem({ item }: { item: ThirdPartyPackage }) {
         />
       </Pressable>
       {expanded && (
-        <Text selectable style={[styles.licenseText, { color: colors.textSecondary }]}>
-          {reflowLicense(THIRD_PARTY_LICENSE_TEXTS[item.text] ?? '')}
-        </Text>
+        <>
+          {item.includes !== undefined && (
+            <Text selectable style={[styles.includes, { color: colors.textSecondary }]}>
+              {t('licenses.includes', { list: item.includes.join(', ') })}
+            </Text>
+          )}
+          <Text selectable style={[styles.licenseText, { color: colors.textSecondary }]}>
+            {reflowLicense(THIRD_PARTY_LICENSE_TEXTS[item.text] ?? '')}
+          </Text>
+        </>
       )}
     </View>
   );
@@ -98,5 +110,6 @@ const styles = StyleSheet.create({
   titles: { flexShrink: 1, gap: 2 },
   name: { fontSize: 16, lineHeight: 22, fontWeight: '700' },
   detail: { fontSize: 13, lineHeight: 18 },
+  includes: { paddingBottom: 8, fontSize: 12, lineHeight: 17 },
   licenseText: { paddingBottom: 12, fontSize: 12, lineHeight: 17 },
 });

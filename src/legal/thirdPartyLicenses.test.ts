@@ -12,8 +12,8 @@ const readJson = (file: string) => JSON.parse(readFileSync(new URL(file, import.
 const lock: { packages: Record<string, { version?: string }> } = readJson('../../package-lock.json');
 const manifest: { dependencies: Record<string, string> } = readJson('../../package.json');
 
-const ICON_FONT = / \(icon font\)$/;
-const npmPackages = THIRD_PARTY_PACKAGES.filter((entry) => !ICON_FONT.test(entry.name));
+const npmPackages = THIRD_PARTY_PACKAGES.filter((entry) => entry.kind === 'npm');
+const names = new Set(THIRD_PARTY_PACKAGES.map((entry) => entry.name));
 
 // 許可しているライセンスの全文に、必ず含まれる文（生成のとき、種類は package.json の license で
 // 確認しているので、ここでは、別の種類の全文が入っていないことだけを見る）。
@@ -21,6 +21,8 @@ const LICENSE_MARKERS: Record<string, RegExp> = {
   MIT: /Permission is hereby granted, free of charge/,
   ISC: /Permission to use, copy, modify, and\/or distribute this software/,
   'Apache-2.0': /Apache License\s+Version 2\.0/,
+  'BSD-3-Clause': /Redistribution and use in source and binary forms/,
+  'BSL-1.0': /Boost Software License - Version 1\.0/,
 };
 
 describe('THIRD_PARTY_PACKAGES', () => {
@@ -65,7 +67,40 @@ describe('THIRD_PARTY_PACKAGES', () => {
   });
 
   it('アイコンフォント（Ionicons・Material Symbols）が載っている', () => {
-    const fonts = THIRD_PARTY_PACKAGES.filter((entry) => ICON_FONT.test(entry.name)).map((entry) => entry.name);
+    const fonts = THIRD_PARTY_PACKAGES.filter((entry) => entry.kind === 'font').map((entry) => entry.name);
     assert.deepEqual(fonts.sort(), ['Ionicons (icon font)', 'Material Symbols (icon font)']);
+  });
+
+  it('expo-router が取り込んだ React Navigation の著作権表示が載っている（Expo の LICENSE とは別の行）', () => {
+    const entry = THIRD_PARTY_PACKAGES.find((item) => item.kind === 'bundled');
+    assert.equal(entry?.name, 'React Navigation (bundled in expo-router)');
+    const text = THIRD_PARTY_LICENSE_TEXTS[entry?.text ?? -1] ?? '';
+    assert.match(text, /Copyright \(c\) 2017 React Navigation Contributors/);
+  });
+
+  it('ネイティブのライブラリ（React Native の C++ の依存と、Android の Maven の依存）が載っている', () => {
+    for (const name of ['Hermes', 'Folly', 'glog', 'double-conversion', 'Boost', '{fmt}', 'fast_float']) {
+      assert.ok(names.has(name), name);
+    }
+    for (const name of ['AndroidX', 'OkHttp', 'Okio', 'Fresco', 'SoLoader', 'fbjni', 'Kotlin']) {
+      assert.ok(names.has(name), name);
+    }
+    // SocketRocket は iOS だけ、Maven の依存は Android だけ。
+    assert.equal(THIRD_PARTY_PACKAGES.find((item) => item.name === 'SocketRocket')?.platform, 'ios');
+    assert.equal(THIRD_PARTY_PACKAGES.find((item) => item.name === 'AndroidX')?.platform, 'android');
+  });
+
+  it('platform・includes は、ネイティブのものにだけある。includes は group:artifact:version', () => {
+    for (const entry of THIRD_PARTY_PACKAGES) {
+      if (entry.platform !== undefined) {
+        assert.ok(entry.platform === 'ios' || entry.platform === 'android', entry.name);
+        assert.equal(entry.kind, 'native', entry.name);
+      }
+      if (entry.includes !== undefined) {
+        assert.equal(entry.kind, 'native', entry.name);
+        assert.ok(entry.includes.length > 0, entry.name);
+        for (const coordinate of entry.includes) assert.match(coordinate, /^[\w.-]+:[\w.-]+:[\w.-]+$/, entry.name);
+      }
+    }
   });
 });

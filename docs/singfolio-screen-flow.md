@@ -622,24 +622,44 @@ Profile（§7）の下半分に、`Appearance` / `Language` / `Suggestions` / `T
 
 ### Open source licenses
 
-About から開く画面。アプリに入る、npm の依存とアイコンフォントの一覧。MIT・ISC・Apache-2.0 は、
-著作権表示とライセンスの全文を含めることを求める。
+About から開く画面。アプリに入る、npm の依存・取り込まれたコード・アイコンフォント・ネイティブの
+ライブラリの一覧。MIT・ISC・Apache-2.0・BSD・BSL は、著作権表示とライセンスの全文を含めることを
+求める。
 
 -   上に、短い説明（「項目を押すと、ライセンスの全文を表示します」）。その下に、名前の順に、1行ずつ
-    パッケージ名と、「版 · ライセンスの種類」（アイコンフォントは版が無く、種類だけ）を出す。行を押すと、
-    全文（著作権表示を含む）を開閉する。全文の詰め方は About と同じ。共著の著作権表示は1行ずつ残す。
--   アイコンフォントは `Ionicons (icon font)`（MIT）・`Material Symbols (icon font)`（Apache-2.0。
-    Expo の依存で Android に入る）。npm のパッケージ（`@expo/vector-icons`・
-    `@expo-google-fonts/material-symbols`）の LICENSE は、そのコードのもので、フォント自体の
-    ライセンスではないため、別の行にしている。
--   **一覧は生成物**（`src/legal/thirdPartyLicenses.ts`）。`node scripts/generate-licenses.mjs` が、
-    実際にアプリに入るもの（`expo export` の JS バンドルの sourcemap と、autolinking が取り込む
-    ネイティブのパッケージ。`dependencies` を機械的にたどるのではない）から作る。依存を更新・追加
-    したら作り直す（`npm test` が、版の食い違いと `dependencies` の載せ漏れを検出する）。許可して
-    いない種類のライセンス（MIT・ISC・Apache-2.0 以外）や、LICENSE の見つからないパッケージが
-    入ると、生成が失敗する（条件を確認してから、スクリプトの設定に足す）。
--   **載せる範囲は、npm のパッケージとアイコンフォントまで**。React Native・Hermes がネイティブに
-    含む C++ などのライブラリ（CocoaPods・Gradle 経由）は、載せていない。
+    名前と、「版 · ライセンスの種類」（版が無いもの・1つに決まらないものは、種類だけ）を出す。行を
+    押すと、全文（著作権表示を含む）を開閉する。全文の詰め方は About と同じ。共著の著作権表示は1行
+    ずつ残す。
+-   片方の OS にだけ入るもの（AndroidX など Android の Maven の依存、iOS の SocketRocket）は、その OS
+    でだけ出す。まとめた行（AndroidX など）は、開くと、全文の上に、含まれる成果物
+    （`group:artifact:version`）を並べる。
+-   **載せているもの**（`src/legal/thirdPartyLicenses.ts`。生成物）:
+    -   `npm`: JS バンドルに入るパッケージと、autolinking が取り込むネイティブのパッケージ
+        （`dependencies` を機械的にたどるのではない。ビルドにしか使わないものが大量に入るため）。
+    -   `bundled`: npm のパッケージの中に取り込まれた、別のプロジェクトのコード。expo-router は
+        React Navigation を取り込んでいて（`build/react-navigation/`・`build/fork/`・
+        `assets/react-navigation/`）、Expo の LICENSE には React Navigation の著作権表示が無いため、
+        別の行にしている。
+    -   `font`: アイコンフォント `Ionicons (icon font)`（MIT）・`Material Symbols (icon font)`
+        （Apache-2.0。Expo の依存で入る）。npm のパッケージ（`@expo/vector-icons`・
+        `@expo-google-fonts/material-symbols`）の LICENSE は、そのコードのもので、フォント自体の
+        ライセンスではないため、別の行にしている。
+    -   `native`: React Native が同梱する C++ のライブラリと、Android の Maven の依存。
+        React Native のもの: Hermes・Folly・glog・double-conversion・Boost・{fmt}・fast_float・
+        SocketRocket（iOS）。版は React Native のマニフェストから読む。Maven の依存は、Gradle の
+        `releaseRuntimeClasspath` を、POM のライセンスで、プロジェクトごとにまとめる。
+-   **載せていないもの**: Maven の成果物（AAR）の中に、さらに取り込まれた C/C++ のコードやデータ
+    （Fresco の画像コーデック、zstd-kmp の zstd、OkHttp の public suffix のリストなど）。OS・NDK が
+    提供する実行時のライブラリ（libc++ など）と、SQLite（パブリックドメイン）も載せていない。
+-   **生成と確認**: `node scripts/generate-licenses.mjs` で作り直す（`node_modules`・`ios/`・`android/`
+    が要る。依存を更新・追加したら、必ず作り直す）。`--check` を付けると、作り直した結果が今のファイルと
+    同じかを確かめる（ストア提出の前に実行する）。`npm test` が検出するのは、一覧の版がロックファイルに
+    あるか、`dependencies` が全部載っているかまで。バンドルに入るものが増えても（インストール済みの
+    依存を、新しく import したなど）、テストは気づけないので、`--check` を使う。
+    許可していない種類のライセンス（MIT・ISC・Apache-2.0・BSD-3-Clause・BSL-1.0 以外）、LICENSE の
+    見つからないパッケージ、`vendor/`・`fork/`・`react-navigation/` の下のファイルがバンドルに入る
+    （設定にない取り込み）、Maven の groupId や、React Native の C++ の依存の版が変わったときは、
+    生成が失敗する（条件を確認してから、スクリプトの設定に足す）。
 
 ### Data
 
