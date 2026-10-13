@@ -155,6 +155,11 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     'beforeRemove')` を自分で購読する形に「簡略化」しない。iOSのネイティブStackは、
     `usePreventRemove` で止めると伝えない限り、戻るボタン・スワイプをネイティブ側で先に実行し、
     JS側で止められない（"was removed natively" のエラーになる。iOSシミュレータで確認）。
+-   戻るボタンに `(tabs)` が出る問題は2通りある。文字は、各画面の `headerBackButtonDisplayMode:
+    'minimal'` で隠す。iOSの長押しメニューは、前の画面の題を並べ、題の無い `(tabs)` はルート名が
+    そのまま出る（`minimal` では隠れない。iOSシミュレータで確認）。そのため `app/_layout.tsx` の
+    Stackの `screenOptions` で `headerBackButtonMenuEnabled: false` にしている。外さない。画面ごとの
+    指定に「簡略化」しない（画面を足すたびに復活する）。
 -   新しいタグは、Add / Edit Song で追加した時点ではなく、曲を保存するときに、Serviceが曲と
     同じトランザクションで作る（`createSong` / `updateSong` の `newTagNames`）。追加した時点で
     作ると、保存せずに戻ったとき、使われないタグが残る。画面で `getOrCreateTag` を呼んでから

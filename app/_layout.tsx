@@ -64,7 +64,11 @@ export default function RootLayout() {
     <I18nProvider initialSetting={settings.language}>
       <ThemeProvider initialAppearance={settings.appearance}>
         <StatusBar style="auto" />
-        <Stack screenOptions={{ headerShown: false }}>
+        {/* iOSの戻るボタンの長押しメニューは、前の画面の題を並べる。下の画面は `(tabs)`（題を付けて
+            いない画面は、ルート名がそのまま出る）で、意味のある文字にならない。Stackは浅く、
+            まとめて戻るメニューも要らないので、全画面で出さない（画面ごとに指定すると、画面を足した
+            ときに `(tabs)` が復活する）。 */}
+        <Stack screenOptions={{ headerShown: false, headerBackButtonMenuEnabled: false }}>
           {/* 同じ曲の画面を、素早い連打で重ねて開かないようにする（`push` は、既に同じ画面が
               あっても、毎回積む）。重なると、戻る操作が増えるだけでなく、下の Edit Song は
               開いた時点の内容のままで、上で保存した内容を、下で保存して上書きしてしまう
