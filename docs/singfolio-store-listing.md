@@ -202,8 +202,13 @@ Apple へ送る検索語があるため、次の1項目を申告する。他は�
 -   **スクリーンショット**: 6枚（Songs・Song Detail・Add Song・Practice・Show Mode・Profile のダーク表示）を、
     English と日本語で、それぞれ用意した。見出し・補足つきで、`assets/store-screenshots/` にある。
     -   `raw/{en,ja}/` はシミュレータ（iPhone 18 Pro、1206×2622）の撮影画像で、`scripts/store-screenshots/compose.sh` が
-        見出し・補足・背景（Mint。Profile だけ Purple）を合成して、`ios/` と `play/` に出す。ブランドの色と書体
+        見出し・補足・背景を合成して、`ios/` と `play/` に出す。ブランドの色と書体
         （Inter / Noto Sans JP。`assets/fonts/`）を使い、採点や順位を連想させる表現は使わない。
+    -   **背景**は、Mint `#C9FCED` と Lavender `#EEE5FF` を交互にし（1〜5枚目）、6枚目だけ Purple `#9C70FE`。
+        Lavender は Purple を白に約18%混ぜた派生色（ブランド表にはない）。白に近い中立色は、白いストアの
+        ページで画像の縁が消える（白との差が 1.09:1）ので、背景にしない。見出しは Text Primary `#17171A`。
+        補足は `#52525B`（Text Secondary `#71717A` は、Mint の上で 4.29:1、Lavender の上で 3.98:1 と、AA の
+        4.5 に足りないため、濃くした）。6枚目の補足だけ `#17171A`（Purple の上では、グレーが読めない）。
     -   **App Store** 用は 1320×2868（`ios/`）。App Store Connect の「Dynamic Island (large)」で、小さい大きさへは
         自動で縮小される。
     -   **Google Play** 用は 1080×1920（`play/`。9:16）。Play は長辺が短辺の2倍までなので、iPhone の画像

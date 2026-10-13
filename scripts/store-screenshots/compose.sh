@@ -25,10 +25,15 @@ font_ja_bold="$font_dir/NotoSansJP-Bold.ttf"
 font_ja_reg="$font_dir/NotoSansJP-Regular.ttf"
 
 # colors.ts のブランドの色。紫の面の上の文字は濃い色にする（紫は白の上で約3.4:1）。
+# bg_lavender は、Purple を白に約18%混ぜた淡い色（ブランド表にない派生色）。白に近い中立色は、
+# 白いストアのページで画像の縁が消えるので、背景にしない（Mint・Lavender は色味があり、縁が見える）。
 bg_mint='#C9FCED'
+bg_lavender='#EEE5FF'
 bg_purple='#9C70FE'
 headline_color='#17171A'
-subhead_color='#71717A'
+# 補足の色は、ブランドの Text Secondary（#71717A）より濃い。Mint の上で 4.29:1（AA の 4.5 未満）、
+# Lavender の上で 3.98:1 になるため。#52525B なら、どちらも 6:1 以上。
+subhead_color='#52525B'
 subhead_on_purple='#17171A'
 
 # 文字の大きさ・余白は、幅1320のときの値。キャンバスの幅に比例させる。
@@ -122,7 +127,7 @@ read_slides() {
     subhead[02-detail]='Remember how you sing each song.'
     headline[03-add]='Add a song in seconds.'
     subhead[03-add]='Title, artist, key, tags, and notes.'
-    headline[04-practice]='Keep practicing.'
+    headline[04-practice]='From Practice to Ready.'
     subhead[04-practice]='Mark a song Ready when you’ve got it.'
     headline[05-show]='Show what you can sing.'
     subhead[05-show]='No keys. No notes. Just your songs.'
@@ -135,7 +140,7 @@ read_slides() {
     subhead[02-detail]='自分の歌い方を、そのまま残せます。'
     headline[03-add]='曲の追加は、かんたん。'
     subhead[03-add]='曲名・アーティスト・キー・タグ・メモ。'
-    headline[04-practice]='練習中の曲をまとめて。'
+    headline[04-practice]='練習中から、歌える曲へ。'
     subhead[04-practice]='歌えるようになったら「歌える」へ。'
     headline[05-show]='歌える曲を、人に見せよう。'
     subhead[05-show]='キーも非公開メモも出ません。'
@@ -143,8 +148,8 @@ read_slides() {
     subhead[06-profile]='日本語でも English でも使えます。'
   fi
   background=(
-    [01-songs]="$bg_mint" [02-detail]="$bg_mint" [03-add]="$bg_mint"
-    [04-practice]="$bg_mint" [05-show]="$bg_mint" [06-profile]="$bg_purple"
+    [01-songs]="$bg_mint" [02-detail]="$bg_lavender" [03-add]="$bg_mint"
+    [04-practice]="$bg_lavender" [05-show]="$bg_mint" [06-profile]="$bg_purple"
   )
 }
 
