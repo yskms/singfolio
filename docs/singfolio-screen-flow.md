@@ -606,8 +606,8 @@ Profile（§7）の下半分に、`Appearance` / `Language` / `Suggestions` / `T
 
 ### About
 
-アプリの名前、バージョン（app.json の `version`）、同梱フォントのライセンス（Profile の `About` から
-開く画面）。
+アプリの名前、バージョン（app.json の `version`）、自前で同梱したフォントのライセンス（Profile の
+`About` から開く画面）。
 
 -   フォントは、書体名・著作権表示・「SIL Open Font License 1.1」を出し、「ライセンスを表示」で全文を
     開閉する。SIL OFL は、フォントを再配布するとき、著作権表示とライセンス全文を付けることを求める。
@@ -615,6 +615,10 @@ Profile（§7）の下半分に、`Appearance` / `Language` / `Suggestions` / `T
     残らないように）。字は変えない（`src/legal/reflowLicense.ts`）。
 -   全文は `assets/fonts/OFL-*.txt` と同じ内容を、`src/legal/fontLicenses.ts` に写している。食い違いは
     `npm test` が検出する。フォントを入れ替えたら直す。
+-   **載せる範囲は、`assets/fonts/` に自前で同梱した書体（Inter・Noto Sans JP）だけ**。アイコンフォント
+    （Ionicons。MIT）や、Expo の依存で入るもの（Material Symbols）、npm の依存（React Native など）は、
+    ここには載せない。MIT などの許諾も、著作権表示と許諾表示を含めることを求めるので、別に、依存関係
+    から生成した一覧を作って出す（WBS 6.6。ストア提出の前に済ませる）。
 
 ### Data
 

@@ -1,5 +1,5 @@
-// 同梱フォントのライセンス（`fontLicenses.ts`）が、`assets/fonts/OFL-*.txt` と食い違っていない
-// ことのテスト。`npm test` で実行する。
+// 自前で同梱したフォントのライセンス（`fontLicenses.ts`）が、`assets/fonts/OFL-*.txt` と食い違って
+// いないことのテスト。`npm test` で実行する。アイコンフォントや npm の依存は対象外（WBS 6.6）。
 /// <reference types="node" />
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -15,7 +15,7 @@ const normalize = (text: string) =>
   text.replace(/\r\n/g, '\n').replace(/[ \t]+$/gm, '').replace(/\s+$/, '');
 
 describe('FONT_LICENSES', () => {
-  it('同梱している書体（fontFamilies）を、過不足なく持つ', () => {
+  it('自前で同梱した書体（fontFamilies。assets/fonts/）を、過不足なく持つ', () => {
     assert.deepEqual(
       FONT_LICENSES.map((license) => license.name).sort(),
       Object.values(fontFamilies).sort(),

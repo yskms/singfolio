@@ -1,4 +1,5 @@
-// 同梱しているフォントのライセンス（About に出す）。SIL Open Font License は、フォントを再配布する
+// 自前で同梱したフォント（`assets/fonts/`）のライセンス（About に出す）。アイコンフォントや、npm の
+// 依存のライセンスは対象外（別に一覧を作る。WBS 6.6）。SIL Open Font License は、フォントを再配布する
 // ときに、著作権表示とライセンス全文を付けることを求める。本文は `assets/fonts/OFL-*.txt`
 // （`scripts/generate-fonts.py` が、フォントのパッケージからコピーする）と同じ内容を、JSから
 // 読める形で写したもの（行末の空白と、末尾の改行を除く）。食い違いは `npm test`

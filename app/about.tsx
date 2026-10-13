@@ -19,8 +19,10 @@ const SCREEN_OPTIONS = {
   headerTitleAlign: 'left',
 } as const;
 
-// About。Profile の Settings から開く。アプリの名前とバージョン、同梱しているフォントのライセンス
-// （SIL Open Font License は、再配布するときに、著作権表示とライセンス全文を付けることを求める）。
+// About。Profile の Settings から開く。アプリの名前とバージョン、自前で同梱したフォント（`assets/fonts/`）
+// のライセンス（SIL Open Font License は、再配布するときに、著作権表示とライセンス全文を付けることを
+// 求める）。アイコンフォント（Ionicons など）と npm の依存のライセンスは、ここには載せず、別に
+// 一覧を作って出す（WBS 6.6）。
 export default function AboutScreen() {
   const { colors } = useTheme();
   const { t } = useI18n();
