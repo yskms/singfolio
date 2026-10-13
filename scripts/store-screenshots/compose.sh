@@ -2,22 +2,33 @@
 set -euo pipefail
 
 # ストア用スクリーンショットに、見出し・補足・背景を合成する。
-# 構図は solo-plus-us の store-screenshots/ios/build.sh と同じ（見出し・補足・角丸の撮影画像・影）。
+# 構図: 上に見出し・補足、その下に、角丸の撮影画像（影つき）。撮影画像は下へはみ出させて切る。
 #
-# 入力: assets/store-screenshots/raw/{en,ja}/NN-name.png（iOSシミュレータの撮影画像。
-#       iPhone 18 Pro の 1206×2622。`seed.py` の仮名のデータで撮る）
+# 入力: assets/store-screenshots/raw/{en,ja}/NN-name.png ... iOSシミュレータの撮影画像
+#         （iPhone 18 Pro の 1206×2622）。App Store 用。
+#       assets/store-screenshots/raw-android/{en,ja}/NN-name.png ... Androidエミュレータの
+#         撮影画像（1080×2424）。Google Play 用。
+#       どちらも `seed.py` の仮名のデータで撮る。画像の大きさは、`magick identify` で読む。
 # 出力: assets/store-screenshots/ios/{en,ja}/ ... 1320×2868（App Store Connect の
 #         「Dynamic Island (large)」。小さい端末の大きさへは自動で縮小される）
 #       assets/store-screenshots/play/{en,ja}/ ... 1080×1920（Google Play。長辺が短辺の
-#         2倍以内、9:16）。iPhone で撮った画像を、Android にも使う。
-# 撮影画像は横幅を保って縮小し、はみ出た下部はキャンバスの外へ切り捨てる。
+#         2倍以内。9:16）
+# 画像の下部は、iOS はタブバーが全部見える大きさに縮めて、下端を少しはみ出させる。Play は縦が
+# 足りないので、はみ出させて切るが、切り口が要素の途中に当たらないよう、余白の帯に合わせて
+# 画像の大きさを少し変える（find_cut.py）。
 # 色・書体はブランド（CLAUDE.md「ブランド」「フォント」）。書体は assets/fonts/ の同梱のもの。
-# 見出しは、枠に収まらないとき、文字の大きさを自動で下げる。
+# 見出しは、枠に収まらないとき、文字の大きさを自動で下げる（全スライドで同じ大きさにそろえる）。
 asset_dir="${0:A:h}/../../assets/store-screenshots"
 asset_dir="${asset_dir:A}"
 font_dir="${0:A:h}/../../assets/fonts"
 font_dir="${font_dir:A}"
-raw_dir="$asset_dir/raw"
+raw_dir_ios="$asset_dir/raw"
+raw_dir_android="$asset_dir/raw-android"
+script_dir="${0:A:h}"
+
+# 一時ファイルは、専用のディレクトリに作り、終わったら（途中で止まっても）消す。
+tmp_dir=$(mktemp -d)
+trap 'rm -rf "$tmp_dir"' EXIT
 
 font_en_bold="$font_dir/Inter-Bold.ttf"
 font_en_reg="$font_dir/Inter-Regular.ttf"
@@ -63,7 +74,7 @@ fit_size() {
 
 make_slide() {
   local input="$1" output="$2" canvas_w="$3" canvas_h="$4" headline="$5" subhead="$6" bg="$7" \
-    font_bold="$8" font_reg="$9" sub_color="${10}" fit="${11}" headline_size="${12}" subhead_size="${13}"
+    font_bold="$8" font_reg="$9" sub_color="${10}" store="${11}" headline_size="${12}" subhead_size="${13}"
   local unit_num=$canvas_w unit_den=$base_w
   local margin=$(( 90 * unit_num / unit_den ))
   local top=$(( 130 * unit_num / unit_den ))
@@ -80,14 +91,29 @@ make_slide() {
   subhead_h=$(magick -font "$font_reg" -pointsize "$subhead_size" label:"$subhead" -format '%h' info:)
   local shot_y=$(( subhead_y + subhead_h + below ))
 
-  # iOS（fit が 1）は、タブバーが全部見えるよう、下端に少しはみ出す大きさに縮める（アイコンが半端に
-  # 切れて見えるのを避ける）。Play（9:16）は縦が足りないので、構図どおり下をはみ出させる。
-  if [[ "$fit" == 1 ]]; then
-    local fitted=$(( (canvas_h - shot_y + 36 * unit_num / unit_den) * 1206 / 2622 ))
+  local in_w in_h
+  in_w=$(magick identify -format '%w' "$input")
+  in_h=$(magick identify -format '%h' "$input")
+
+  if [[ "$store" == ios ]]; then
+    # タブバーが全部見えるよう、下端に少しはみ出す大きさに縮める（アイコンが半端に切れて見えるのを避ける）。
+    local fitted=$(( (canvas_h - shot_y + 36 * unit_num / unit_den) * in_w / in_h ))
     (( fitted < shot_w )) && shot_w=$fitted
+  else
+    # Play は、キャンバスの下端が、余白の帯に当たるよう、画像の大きさを少し変える
+    # （大きすぎる・小さすぎる変更になるときは、そのまま切る）。
+    # 影を合成した画像は、影の分だけ上に 32px 広がっている（-shadow 30x25+0+18 の余白。上 32・左右 50）ので、
+    # スマホの上端は shot_y より 32px 下になる。
+    local room=$(( canvas_h - shot_y - 32 ))
+    local visible=$(( room * in_w / shot_w )) cut
+    cut=$(python3 "$script_dir/find_cut.py" "$input" "$visible")
+    if [[ -n "$cut" ]]; then
+      local aligned=$(( room * in_w / cut ))
+      (( aligned >= canvas_w * 80 / 100 && aligned <= canvas_w * 95 / 100 )) && shot_w=$aligned
+    fi
   fi
 
-  local base="$asset_dir/.tmp-base.png" rounded="$asset_dir/.tmp-rounded.png" shadowed="$asset_dir/.tmp-shadowed.png"
+  local base="$tmp_dir/base.png" rounded="$tmp_dir/rounded.png" shadowed="$tmp_dir/shadowed.png"
 
   magick -size ${canvas_w}x${canvas_h} xc:"$bg" \
     -font "$font_bold" -fill "$headline_color" -pointsize "$headline_size" -gravity north \
@@ -112,10 +138,9 @@ make_slide() {
     -strip -colorspace sRGB -alpha off -depth 8 \
     "$output"
 
-  rm -f "$base" "$rounded" "$shadowed"
 }
 
-# 1行目: 見出し / 2行目: 補足。見出しの改行は \n。
+# 見出し・補足の改行は、文字列の中の \n（読み込みのとき、本物の改行に直す）。
 typeset -A headline subhead background
 read_slides() {
   local lang="$1"
@@ -151,6 +176,12 @@ read_slides() {
     [01-songs]="$bg_mint" [02-detail]="$bg_lavender" [03-add]="$bg_mint"
     [04-practice]="$bg_lavender" [05-show]="$bg_mint" [06-profile]="$bg_purple"
   )
+  # fit_size は本物の改行で行を分け、ImageMagick は \n を改行とみなす。両方で同じに見えるよう、先に直す。
+  local key
+  for key in ${(k)headline}; do
+    headline[$key]=${headline[$key]//\\n/$'\n'}
+    subhead[$key]=${subhead[$key]//\\n/$'\n'}
+  done
 }
 
 # 引数があれば、その名前（例: 01-songs）だけ作る。
@@ -162,8 +193,8 @@ for lang in en ja; do
   else font_bold="$font_ja_bold"; font_reg="$font_ja_reg"; fi
 
   for store in ios play; do
-    if [[ "$store" == ios ]]; then canvas_w=1320 canvas_h=2868 fit=1
-    else canvas_w=1080 canvas_h=1920 fit=0; fi
+    if [[ "$store" == ios ]]; then canvas_w=1320 canvas_h=2868 raw_dir="$raw_dir_ios"
+    else canvas_w=1080 canvas_h=1920 raw_dir="$raw_dir_android"; fi
     mkdir -p "$asset_dir/$store/$lang"
 
     # 見出し・補足の大きさは、全スライドで同じにする（一番長い文言が収まる大きさに合わせる。
@@ -182,7 +213,7 @@ for lang in en ja; do
       sub_color="$subhead_color"
       [[ "${background[$name]}" == "$bg_purple" ]] && sub_color="$subhead_on_purple"
       make_slide "$input" "$asset_dir/$store/$lang/$name.png" "$canvas_w" "$canvas_h" \
-        "${headline[$name]}" "${subhead[$name]}" "${background[$name]}" "$font_bold" "$font_reg" "$sub_color" "$fit" "$h_size" "$s_size"
+        "${headline[$name]}" "${subhead[$name]}" "${background[$name]}" "$font_bold" "$font_reg" "$sub_color" "$store" "$h_size" "$s_size"
       print "$store/$lang/$name.png"
     done
   done

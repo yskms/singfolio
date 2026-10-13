@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
-"""ストア用スクリーンショットを撮るための、仮名のデータをシミュレータのDBへ入れる。
+"""ストア用スクリーンショットを撮るための、仮名のデータを、シミュレータ・エミュレータのDBへ入れる。
 
 使い方: python3 seed.py <en|ja> <DBのパス> [light|dark] [on|off]
 
 第4引数は候補（Suggestions）の設定。Add Song の撮影では、入力した曲名が Apple へ送られないよう off にする。
 
 - アプリを止めてから実行する（実行のあと、アプリを起動し直す）。
-- 曲・タグ・設定を、全部入れ替える（撮影用のシミュレータ専用。実際のデータがあるDBに使わない）。
+- 曲・タグ・設定を、全部入れ替える（撮影用の端末専用。実際のデータがあるDBに使わない）。
 - 曲名・アーティスト名は、すべて架空。審査で第三者の素材（5.2.1）を指摘されないため、実在の
-  アーティストを使わない。足すときは、Apple の検索 API（entity=musicArtist）で、同じ名前の
-  アーティストが居ないことを確かめる（`docs/singfolio-store-listing.md`「スクリーンショット」）。
-- `updated_at` は実行時刻からの経過で決める（Songsの並び順・Practiceの「Last updated」に出る）。
+  アーティストを使わない。足すときは、`check_names.py` で、同じ名前のアーティストが居ないことを
+  確かめる（架空のつもりの名前が、実在した例が多い）。曲名は、短い一般的な語の組み合わせなので、
+  実在の曲と偶然一致してもよい（保護されず、架空のアーティストと組み合わせて出るため）。
+- `updated_at` は実行時刻からの経過で決める。Practice の「Last updated」の日付は、撮った日で変わる
+  ので、English・日本語の6枚は、同じ日に撮る。
+- Add Song の画面は、DBでは作れないので、撮影のとき、`ADD_SONG` の値を、手で入力する（保存はしない）。
 """
 import sqlite3
 import sys
@@ -64,6 +67,26 @@ SONGS = {
 }
 
 
+# Add Song の撮影で、入力する値（保存しない）。キーは「半音を上げる」の回数、タグは既存のタグから選ぶ。
+# check_names.py の対象。
+ADD_SONG = {
+    'en': {
+        'title': 'Moonlit Ferry',
+        'artist': 'Kit Ravenne',
+        'key': 2,
+        'tags': ['Acoustic', 'Ballad'],
+        'note': 'Slow down at the bridge.',
+    },
+    'ja': {
+        'title': '月明かりの渡し船',
+        'artist': 'ともしびの庭',
+        'key': 2,
+        'tags': ['弾き語り', 'バラード'],
+        'note': 'ゆっくりやさしく',
+    },
+}
+
+
 def main() -> None:
     language, db_path = sys.argv[1], sys.argv[2]
     appearance = sys.argv[3] if len(sys.argv) > 3 else 'light'
@@ -102,4 +125,5 @@ def main() -> None:
     print(f'seeded {len(SONGS[language])} songs ({language}, {appearance}, suggestions {suggestions})')
 
 
-main()
+if __name__ == '__main__':
+    main()

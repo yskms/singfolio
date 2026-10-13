@@ -48,3 +48,6 @@ yarn-error.*
 
 # TypeScript
 *.tsbuildinfo
+
+# Python
+__pycache__/
