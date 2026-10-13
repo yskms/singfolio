@@ -181,7 +181,7 @@ Apple へ送る検索語があるため、次の1項目を申告する。他は�
 
 ## 4. スクリーンショット・フィーチャーグラフィック
 
-フィーチャーグラフィックは作成済み。スクリーンショットは未作成（WBS 6.3）。
+フィーチャーグラフィック・スクリーンショットは作成済み（WBS 6.3）。
 
 -   **Google Play のフィーチャーグラフィック**: 1024×500（JPEG または 24ビットPNG。透過なし）。
     `assets/play-feature-graphic-1024x500.png`。ロゴとキャッチコピーを横に並べた元の画像（2048×768）を
@@ -199,13 +199,31 @@ Apple へ送る検索語があるため、次の1項目を申告する。他は�
     （`https://developer.apple.com/app-store/asset-best-practices/`）の素材に使う。このページには
     3840×1646 の記載が無く（Product page header・Search results asset などは、Apple が配る
     テンプレートの寸法に従う）、どの素材にどの寸法かは、提出時にテンプレートで確認する。
--   **スクリーンショット**: Songs・Song Detail・Add Song（候補が出ている状態）・Practice・Show Mode・
-    Profile（ダーク表示も1枚）。ブランドの色と書体（Mint・Purple・Inter / Noto Sans JP）を使い、
-    採点や順位を連想させる表現は使わない。English と日本語で、それぞれ用意する。
+-   **スクリーンショット**: 6枚（Songs・Song Detail・Add Song・Practice・Show Mode・Profile のダーク表示）を、
+    English と日本語で、それぞれ用意した。見出し・補足つきで、`assets/store-screenshots/` にある。
+    -   `raw/{en,ja}/` はシミュレータ（iPhone 18 Pro、1206×2622）の撮影画像で、`scripts/store-screenshots/compose.sh` が
+        見出し・補足・背景（Mint。Profile だけ Purple）を合成して、`ios/` と `play/` に出す。ブランドの色と書体
+        （Inter / Noto Sans JP。`assets/fonts/`）を使い、採点や順位を連想させる表現は使わない。
+    -   **App Store** 用は 1320×2868（`ios/`）。App Store Connect の「Dynamic Island (large)」で、小さい大きさへは
+        自動で縮小される。
+    -   **Google Play** 用は 1080×1920（`play/`。9:16）。Play は長辺が短辺の2倍までなので、iPhone の画像
+        （比率 約2.17）はそのまま使えず、同じ撮影画像を別のキャンバスに合成している。撮影は iPhone だけで、
+        Android には撮り直さない（ヘッダー・戻るボタン・ステータスバーは、iOS の見た目になる）。
+    -   **曲名・アーティスト名はすべて架空**（`scripts/store-screenshots/seed.py` が、撮影用のDBへ入れる）。
+        実在のアーティスト・曲を、画面に出さない。審査で第三者の素材（App Store 5.2.1）を指摘されないためと、
+        実在の人名を、許可なく宣伝の画像に載せないため。足すときは、Apple の検索 API
+        （`entity=musicArtist`）で、同じ名前のアーティストが居ないことを確かめる（`Marlo Vance`・`Luna Quill`・
+        `Hollis Gray` など、架空のつもりの名前が、実在した）。
+    -   **候補（Suggestions）が出ている画面は、スクリーンショットにしない**。候補は Apple のカタログの実在の曲
+        で、避けられない。Add Song は、候補をオフにして、架空の曲を入力した画面にしている（入力した文字が、
+        撮影中に Apple へ送られることも避ける）。候補があることは、掲載文で伝える。
+    -   撮影は Release ビルド（debug は、LogBox が写り、ダーク表示の配色も変わる）。ステータスバーは
+        `xcrun simctl status_bar <UDID> override --time 9:41 ...` で揃え、撮影後に `clear` で戻す。
 -   App Store のサイズは、App Store Connect の最新の仕様を、提出時に確認する（2026年10月に確認した
     ときは、6.1インチ 1179×2556 が必須、6.9インチ 1320×2868 などは任意で、足りない大きさは自動で
     縮小。1枚から10枚。JPEG・PNG、透過なし）。
--   Google Play は、スマートフォン用に2〜8枚（JPEG または 24ビットPNG。辺は320〜3840px）。
+-   Google Play は、スマートフォン用に2〜8枚（JPEG または 24ビットPNG。辺は320〜3840px。長辺は短辺の2倍まで）。
+    9:16 の 1080px 以上を4枚以上出すと、おすすめの掲載の対象になる。
 
 ## 5. この内容が前提にしていること
 

@@ -281,6 +281,17 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     別の行にしている。上流から写した全文は `scripts/license-texts/` にある（取得元はスクリプトの設定）。
 -   About の「Fonts」（`fontLicenses.ts`）は、自前で同梱した書体だけで、この一覧とは別。
 
+### ストア用のスクリーンショット
+
+詳細は `docs/singfolio-store-listing.md` §4。
+
+-   画面に出す曲名・アーティスト名は、すべて架空（`scripts/store-screenshots/seed.py`）。実在の曲・
+    アーティストに「簡略化」しない（審査の5.2.1と、実在の人名を宣伝に載せないため）。名前を足すときは、
+    Apple の検索 API で同名の実在が無いことを確かめる（架空のつもりの名前が実在した例が多い）。
+-   候補（Suggestions）が出ている画面は撮らない（実在の曲が出るため）。Add Song は、候補をオフにして撮る。
+-   `assets/store-screenshots/{ios,play}/` は `compose.sh` の生成物で、手で編集しない。撮影は iPhone のシミュレータ
+    だけで、Play 用は同じ撮影画像から作る（Play は長辺が短辺の2倍まで。iPhone の画像はそのまま使えない）。
+
 ### ネイティブビルド
 
 -   `ios/`・`android/` は `expo prebuild` の生成物（gitignore）。直接直さず、
