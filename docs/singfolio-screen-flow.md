@@ -22,12 +22,12 @@
           │              │         ┌────┴────┐
           │              │         │         │
       Song Detail    Song Detail  Show Mode  Tags / About
-          │
-       Add / Edit
+          │                                      │
+       Add / Edit                          Open source licenses
 ```
 
 設定（Appearance・Language・Suggestions）は、Profile 自身に並ぶ（§9）。Tags・About は、
-Profile から開く別の画面。
+Profile から開く別の画面。Open source licenses は、About から開く画面。
 
 v1.0ではログインを必須にしない。
 
@@ -519,6 +519,7 @@ Profile（§7）の下半分に、`Appearance` / `Language` / `Suggestions` / `T
 -   `Suggestions` は、行の中のスイッチ。切り替えは、保存の完了を待たずに反映し、保存に失敗したら
     元に戻して、ダイアログで伝える。
 -   `Tags`・`About` は、押すと別の画面を開く（連打で重ねない）。ヘッダーの題は、項目の名前。
+    `About` の中に、`Open source licenses` の行がある（下の「Open source licenses」）。
 -   読み込み前（数ミリ秒）は、設定の並び全体を出さない（項目が後から増えて、位置が動かないように）。
 
 ### Appearance
@@ -606,19 +607,39 @@ Profile（§7）の下半分に、`Appearance` / `Language` / `Suggestions` / `T
 
 ### About
 
-アプリの名前、バージョン（app.json の `version`）、自前で同梱したフォントのライセンス（Profile の
-`About` から開く画面）。
+アプリの名前、バージョン（app.json の `version`）、Open source licenses への行、自前で同梱した
+フォントのライセンス（Profile の `About` から開く画面）。
 
+-   「Open source licenses」の行は、バージョンの下に置き、押すと下の画面を開く（連打で重ねない）。
 -   フォントは、書体名・著作権表示・「SIL Open Font License 1.1」を出し、「ライセンスを表示」で全文を
     開閉する。SIL OFL は、フォントを再配布するとき、著作権表示とライセンス全文を付けることを求める。
 -   全文は、元の約75桁の改行を、段落の中で詰めて出す（スマホの幅で、折り返しの後に、短い行が
     残らないように）。字は変えない（`src/legal/reflowLicense.ts`）。
 -   全文は `assets/fonts/OFL-*.txt` と同じ内容を、`src/legal/fontLicenses.ts` に写している。食い違いは
     `npm test` が検出する。フォントを入れ替えたら直す。
--   **載せる範囲は、`assets/fonts/` に自前で同梱した書体（Inter・Noto Sans JP）だけ**。アイコンフォント
-    （Ionicons。MIT）や、Expo の依存で入るもの（Material Symbols）、npm の依存（React Native など）は、
-    ここには載せない。MIT などの許諾も、著作権表示と許諾表示を含めることを求めるので、別に、依存関係
-    から生成した一覧を作って出す（WBS 6.6。ストア提出の前に済ませる）。
+-   **ここに載せるのは、`assets/fonts/` に自前で同梱した書体（Inter・Noto Sans JP）だけ**。アイコン
+    フォントや npm の依存は、Open source licenses に載せる。
+
+### Open source licenses
+
+About から開く画面。アプリに入る、npm の依存とアイコンフォントの一覧。MIT・ISC・Apache-2.0 は、
+著作権表示とライセンスの全文を含めることを求める。
+
+-   上に、短い説明（「項目を押すと、ライセンスの全文を表示します」）。その下に、名前の順に、1行ずつ
+    パッケージ名と、「版 · ライセンスの種類」（アイコンフォントは版が無く、種類だけ）を出す。行を押すと、
+    全文（著作権表示を含む）を開閉する。全文の詰め方は About と同じ。共著の著作権表示は1行ずつ残す。
+-   アイコンフォントは `Ionicons (icon font)`（MIT）・`Material Symbols (icon font)`（Apache-2.0。
+    Expo の依存で Android に入る）。npm のパッケージ（`@expo/vector-icons`・
+    `@expo-google-fonts/material-symbols`）の LICENSE は、そのコードのもので、フォント自体の
+    ライセンスではないため、別の行にしている。
+-   **一覧は生成物**（`src/legal/thirdPartyLicenses.ts`）。`node scripts/generate-licenses.mjs` が、
+    実際にアプリに入るもの（`expo export` の JS バンドルの sourcemap と、autolinking が取り込む
+    ネイティブのパッケージ。`dependencies` を機械的にたどるのではない）から作る。依存を更新・追加
+    したら作り直す（`npm test` が、版の食い違いと `dependencies` の載せ漏れを検出する）。許可して
+    いない種類のライセンス（MIT・ISC・Apache-2.0 以外）や、LICENSE の見つからないパッケージが
+    入ると、生成が失敗する（条件を確認してから、スクリプトの設定に足す）。
+-   **載せる範囲は、npm のパッケージとアイコンフォントまで**。React Native・Hermes がネイティブに
+    含む C++ などのライブラリ（CocoaPods・Gradle 経由）は、載せていない。
 
 ### Data
 

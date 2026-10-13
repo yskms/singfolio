@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import Constants from 'expo-constants';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,6 +9,7 @@ import { FONT_LICENSES, type FontLicense } from '../src/legal/fontLicenses';
 import { reflowLicense } from '../src/legal/reflowLicense';
 import { decorative } from '../ui/decorative';
 import { useI18n } from '../ui/i18n';
+import { SettingsRow } from '../ui/SettingsRow';
 import { Text } from '../ui/Text';
 import { useTheme } from '../ui/theme';
 
@@ -21,12 +22,13 @@ const SCREEN_OPTIONS = {
 
 // About。Profile の Settings から開く。アプリの名前とバージョン、自前で同梱したフォント（`assets/fonts/`）
 // のライセンス（SIL Open Font License は、再配布するときに、著作権表示とライセンス全文を付けることを
-// 求める）。アイコンフォント（Ionicons など）と npm の依存のライセンスは、ここには載せず、別に
-// 一覧を作って出す（WBS 6.6）。
+// 求める）。アイコンフォント（Ionicons など）と npm の依存のライセンスは、ここには載せず、
+// 「Open source licenses」（app/licenses.tsx）に出す。
 export default function AboutScreen() {
   const { colors } = useTheme();
   const { t } = useI18n();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   // app.json の `version`。取れなければ、バージョンの行は出さない。
   const version = Constants.expoConfig?.version;
 
@@ -46,7 +48,9 @@ export default function AboutScreen() {
           )}
         </View>
 
-        <Text role="heading" style={[styles.section, { color: colors.textSecondary }]}>
+        <SettingsRow label={t('about.licenses')} onPress={() => router.push('/licenses')} />
+
+        <Text role="heading" style={[styles.section, styles.fonts, { color: colors.textSecondary }]}>
           {t('about.fonts')}
         </Text>
         {FONT_LICENSES.map((license) => (
@@ -100,6 +104,7 @@ const styles = StyleSheet.create({
   appName: { fontSize: 24, lineHeight: 32, fontWeight: '700' },
   version: { fontSize: 15, lineHeight: 22 },
   section: { marginBottom: 8, fontSize: 13, lineHeight: 18, fontWeight: '700' },
+  fonts: { marginTop: 24 },
   font: { paddingVertical: 12, gap: 2, borderBottomWidth: StyleSheet.hairlineWidth },
   fontName: { fontSize: 16, lineHeight: 22, fontWeight: '700' },
   fontNote: { fontSize: 13, lineHeight: 18 },

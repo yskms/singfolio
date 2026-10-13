@@ -130,7 +130,8 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     ボタンの素早い連打で同じ画面が重なる。Edit Songが重なると、下の画面は開いた時点の内容のまま
     で、上で保存した内容を、下で保存して上書きする（iOSシミュレータで確認）。曲の画面を
     足すときも同じ指定を足す。Show Mode・Tags・About も同じ指定（Profile の行の連打で重なる。
-    6連打して、戻る1回でProfileへ戻ることをiOSシミュレータで確認）。
+    6連打して、戻る1回でProfileへ戻ることをiOSシミュレータで確認）。Open source licenses
+    （Aboutの行の連打）も同じ。
 -   言語の選択肢の名前（English / 日本語）は、文言のカタログ（`en.ts`・`ja.ts`）に入れず、
     `languageNames`（`src/i18n`）から出す（表示言語に依らず、その言語自身の名前）。
 -   `app/_layout.tsx` は、DB初期化（`getServices()`）と、保存済みのAppearanceの
@@ -243,9 +244,23 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     生成は fonttools 4.66.1 で、同じ版なら何度作っても同じバイナリになる（版が違うと変わりうる）。
 -   `assets/fonts/OFL-*.txt` はフォントのライセンス（SIL OFL。再配布に付ける必要がある）。
     消さない。アプリ内のAbout（`app/about.tsx`）にも、自前で同梱したフォントのライセンスを
-    表記する（アイコンフォント・npm依存の表記は、別に一覧を作る。WBS 6.6）。
+    表記する（アイコンフォント・npm依存の表記は、「第三者ライセンス」節の一覧で別にする）。
     JSからは読めないので、`src/legal/fontLicenses.ts` に同じ内容を写していて、食い違いは
     `npm test`（`fontLicenses.test.ts`）が検出する。フォントを入れ替えたら、ここも直す。
+
+### 第三者ライセンス
+
+詳細は `docs/singfolio-screen-flow.md`「Open source licenses」。
+
+-   `src/legal/thirdPartyLicenses.ts` は生成物。手で直さず、依存（`package.json`・ロックファイル）を
+    変えたら `node scripts/generate-licenses.mjs` で作り直す（`npm test` が食い違いを検出する）。
+    載せるものは、`dependencies` をたどらず、実際にアプリに入るもの（JSバンドルのsourcemapと
+    autolinking）から決める。「`dependencies` から機械的に作る形に簡略化」しない（ビルドにしか
+    使わないパッケージが大量に入る）。
+-   MIT・ISC・Apache-2.0 以外のライセンスが入ると生成が失敗する。黙って許可を足さず、条件を確認する。
+-   アイコンフォント（Ionicons・Material Symbols）は、npmパッケージのLICENSEとは別のライセンスなので、
+    別の行にしている。Ionicons の全文は依存の中に無く、`scripts/license-texts/` に上流の写しがある。
+-   About の「Fonts」（`fontLicenses.ts`）は、自前で同梱した書体だけで、この一覧とは別。
 
 ### ネイティブビルド
 

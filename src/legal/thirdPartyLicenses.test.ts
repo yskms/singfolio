@@ -1,0 +1,71 @@
+// 第三者のライセンスの一覧（`thirdPartyLicenses.ts`。`scripts/generate-licenses.mjs` の生成物）が、
+// 依存と食い違っていないことのテスト。`npm test` で実行する。依存を更新・追加したときは、
+// `node scripts/generate-licenses.mjs` で作り直す。
+/// <reference types="node" />
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { describe, it } from 'node:test';
+
+import { THIRD_PARTY_LICENSE_TEXTS, THIRD_PARTY_PACKAGES } from './thirdPartyLicenses.ts';
+
+const readJson = (file: string) => JSON.parse(readFileSync(new URL(file, import.meta.url), 'utf8'));
+const lock: { packages: Record<string, { version?: string }> } = readJson('../../package-lock.json');
+const manifest: { dependencies: Record<string, string> } = readJson('../../package.json');
+
+const ICON_FONT = / \(icon font\)$/;
+const npmPackages = THIRD_PARTY_PACKAGES.filter((entry) => !ICON_FONT.test(entry.name));
+
+// 許可しているライセンスの全文に、必ず含まれる文（生成のとき、種類は package.json の license で
+// 確認しているので、ここでは、別の種類の全文が入っていないことだけを見る）。
+const LICENSE_MARKERS: Record<string, RegExp> = {
+  MIT: /Permission is hereby granted, free of charge/,
+  ISC: /Permission to use, copy, modify, and\/or distribute this software/,
+  'Apache-2.0': /Apache License\s+Version 2\.0/,
+};
+
+describe('THIRD_PARTY_PACKAGES', () => {
+  it('名前と版の組は重ならない。全文の添字は範囲内', () => {
+    const keys = THIRD_PARTY_PACKAGES.map((entry) => `${entry.name}@${entry.version ?? ''}`);
+    assert.equal(new Set(keys).size, keys.length);
+    for (const entry of THIRD_PARTY_PACKAGES) {
+      assert.ok(THIRD_PARTY_LICENSE_TEXTS[entry.text] !== undefined, entry.name);
+    }
+  });
+
+  it('全文は、すべてどれかのパッケージから使われている（使われない全文が残らない）', () => {
+    const used = new Set(THIRD_PARTY_PACKAGES.map((entry) => entry.text));
+    assert.equal(used.size, THIRD_PARTY_LICENSE_TEXTS.length);
+  });
+
+  it('ライセンスの種類は、全文と合っている', () => {
+    for (const entry of THIRD_PARTY_PACKAGES) {
+      const marker = LICENSE_MARKERS[entry.license];
+      assert.ok(marker, `${entry.name}: 許可していないライセンス ${entry.license}`);
+      assert.match(THIRD_PARTY_LICENSE_TEXTS[entry.text] ?? '', marker, entry.name);
+    }
+  });
+
+  it('npmのパッケージは、package-lock.json に、その名前と版で入っている（依存を更新したら作り直す）', () => {
+    const installed = new Set(
+      Object.entries(lock.packages).map(([path, info]) => {
+        const name = path.slice(path.lastIndexOf('node_modules/') + 'node_modules/'.length);
+        return `${name}@${info.version}`;
+      }),
+    );
+    for (const entry of npmPackages) {
+      assert.ok(installed.has(`${entry.name}@${entry.version}`), `${entry.name}@${entry.version}`);
+    }
+  });
+
+  it('package.json の dependencies は、すべて載っている（依存を足したら作り直す）', () => {
+    const listed = new Set(npmPackages.map((entry) => entry.name));
+    for (const name of Object.keys(manifest.dependencies)) {
+      assert.ok(listed.has(name), name);
+    }
+  });
+
+  it('アイコンフォント（Ionicons・Material Symbols）が載っている', () => {
+    const fonts = THIRD_PARTY_PACKAGES.filter((entry) => ICON_FONT.test(entry.name)).map((entry) => entry.name);
+    assert.deepEqual(fonts.sort(), ['Ionicons (icon font)', 'Material Symbols (icon font)']);
+  });
+});

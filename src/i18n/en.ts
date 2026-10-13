@@ -113,12 +113,15 @@ export const en = {
   'tags.deleteConfirm': 'Delete',
   'tags.deleteFailedTitle': 'Couldn’t delete',
 
-  // About（app/about.tsx）。
+  // About（app/about.tsx）と、そこから開く Open source licenses（app/licenses.tsx）。
   'about.version': 'Version {version}',
   'about.fonts': 'Fonts',
   'about.fontLicense': 'SIL Open Font License 1.1',
   'about.showLicense': 'Show license',
   'about.hideLicense': 'Hide license',
+  'about.licenses': 'Open source licenses',
+  'licenses.intro':
+    'This app uses the open source software and icon fonts below. Tap an item to see its license.',
 
   // Show Mode（app/show.tsx）。人に見せる画面。検索欄・「一致する曲がありません」の題・検索とタグの
   // クリアは、Songs の文言（songs.*）を使う。文言の中の機能名「Show Mode」は、日本語でも訳さない。
