@@ -193,6 +193,12 @@ Apple へ送る検索語があるため、次の1項目を申告する。他は�
     紫のマーク）と揃えるため。ストアのページは白（ダークモードでは暗い色）で、白い背景だと画像の縁が
     ページに溶けて、ダークモードでは白い板になる。
     アプリアイコンの 512×512 は、`assets/play-store-icon-512.png`。
+-   **App Store 用の横長の素材**: 3840×1646（24ビットPNG、透過なし）。`assets/app-store-artwork-3840x1646.png`。
+    Google Play のフィーチャーグラフィックと同じ色・同じロゴで、ロゴは拡大せず、まわりの余白だけを
+    広げた（ロゴは幅の約36%）。Apple の「App Store asset best practices」
+    （`https://developer.apple.com/app-store/asset-best-practices/`）の素材に使う。このページには
+    3840×1646 の記載が無く（Product page header・Search results asset などは、Apple が配る
+    テンプレートの寸法に従う）、どの素材にどの寸法かは、提出時にテンプレートで確認する。
 -   **スクリーンショット**: Songs・Song Detail・Add Song（候補が出ている状態）・Practice・Show Mode・
     Profile（ダーク表示も1枚）。ブランドの色と書体（Mint・Purple・Inter / Noto Sans JP）を使い、
     採点や順位を連想させる表現は使わない。English と日本語で、それぞれ用意する。
