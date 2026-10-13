@@ -25,8 +25,10 @@ App Store（iOS）と Google Play（Android）の掲載文・申告の内容。�
 サポートURL・プライバシーポリシーURLは、GitHub Pages（このリポジトリの `docs/`）で公開する。
 `docs/index.md` と `docs/privacy-policy.md` が、それぞれのページになる。`docs/_config.yml` の
 `exclude` で、他の docs（仕様・WBS・このファイル・ブランド資料）は、サイトには公開しない。アプリの
-About にも、プライバシーポリシーへのリンクがある（`src/legal/legalUrls.ts`）。ストアに入れる前に、
-2つのURLが開けることと、他の docs のページが開けないことを確認する。
+About にも、プライバシーポリシーへのリンクがある（`src/legal/legalUrls.ts`）。公開後に、2つのURLが
+開けることと、他の docs（`.html`・`.md`・画像）が404になることを確認した。公開する2ページは、
+`.md` のソースも同じ名前（`privacy-policy.md` など）で取れる（中身はHTMLの元で、リポジトリにも出ている）。
+docs の構成や `_config.yml` を変えたときは、ストアに入れる前に、同じ確認をやり直す。
 
 ## 2. App Store（iOS）
 
