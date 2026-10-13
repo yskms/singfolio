@@ -644,22 +644,30 @@ About から開く画面。アプリに入る、npm の依存・取り込まれ�
         （Apache-2.0。Expo の依存で入る）。npm のパッケージ（`@expo/vector-icons`・
         `@expo-google-fonts/material-symbols`）の LICENSE は、そのコードのもので、フォント自体の
         ライセンスではないため、別の行にしている。
-    -   `native`: React Native が同梱する C++ のライブラリと、Android の Maven の依存。
+    -   `native`: React Native が同梱する C++ のライブラリ、Android の Maven の依存、Maven の成果物が
+        `.so` に埋め込んでいる C/C++ のライブラリ。
         React Native のもの: Hermes・Folly・glog・double-conversion・Boost・{fmt}・fast_float・
         SocketRocket（iOS）。版は React Native のマニフェストから読む。Maven の依存は、Gradle の
-        `releaseRuntimeClasspath` を、POM のライセンスで、プロジェクトごとにまとめる。
--   **載せていないもの**: Maven の成果物（AAR）の中に、さらに取り込まれた C/C++ のコードやデータ
-    （Fresco の画像コーデック、zstd-kmp の zstd、OkHttp の public suffix のリストなど）。OS・NDK が
-    提供する実行時のライブラリ（libc++ など）と、SQLite（パブリックドメイン）も載せていない。
+        `releaseRuntimeClasspath`（制約は除く）を、POM のライセンスで、プロジェクトごとにまとめる。
+        埋め込みのもの: Fresco の libjpeg-turbo・libwebp・giflib、zstd-kmp の Zstandard（APK の `.so` で、
+        入っていることを確かめた。成果物の版が変わったら、生成が失敗する）。
+-   **載せていないもの**: OS・NDK が提供する実行時のライブラリ（libc++ など。LLVM の例外で、
+    バイナリでの表記は要らない）、SQLite（パブリックドメイン）、OkHttp の public suffix のリスト
+    （APK の中に、出典とライセンスの NOTICE がある）。Maven の成果物の中を、これ以上は掘り下げない。
 -   **生成と確認**: `node scripts/generate-licenses.mjs` で作り直す（`node_modules`・`ios/`・`android/`
     が要る。依存を更新・追加したら、必ず作り直す）。`--check` を付けると、作り直した結果が今のファイルと
-    同じかを確かめる（ストア提出の前に実行する）。`npm test` が検出するのは、一覧の版がロックファイルに
-    あるか、`dependencies` が全部載っているかまで。バンドルに入るものが増えても（インストール済みの
-    依存を、新しく import したなど）、テストは気づけないので、`--check` を使う。
-    許可していない種類のライセンス（MIT・ISC・Apache-2.0・BSD-3-Clause・BSL-1.0 以外）、LICENSE の
-    見つからないパッケージ、`vendor/`・`fork/`・`react-navigation/` の下のファイルがバンドルに入る
-    （設定にない取り込み）、Maven の groupId や、React Native の C++ の依存の版が変わったときは、
-    生成が失敗する（条件を確認してから、スクリプトの設定に足す）。
+    同じかを確かめる（ストア提出の前に実行する）。`--check --apk <APK・AAB>` は、さらに、`lib/` の `.so`
+    が、把握しているものだけかを確かめる（release のビルドで実行する）。`npm test` が検出するのは、一覧の
+    版がロックファイルにあるか、`dependencies` が全部載っているかまで。バンドルに入るものが増えても
+    （インストール済みの依存を、新しく import したなど）、テストは気づけないので、`--check` を使う。
+    次のときは、生成が失敗する（条件を確認してから、スクリプトの設定に足す）。
+    -   許可していない種類のライセンス（MIT・ISC・Apache-2.0・BSD-3-Clause・BSL-1.0・libjpeg-turbo の
+        複合以外）、LICENSE の見つからないパッケージ
+    -   `vendor/`・`fork/`・`react-navigation/` の下のファイルがバンドルに入る（設定にない取り込み）
+    -   Maven の groupId が知らないもの、Gradle の依存の行が読めない形、React Native の C++ の依存・
+        埋め込み元の成果物の版が変わった
+    -   `ios/Podfile.lock` に、node_modules（と codegen の生成物）の外から入る Pod がある
+        （CocoaPods の trunk から入る Pod など）
 
 ### Data
 

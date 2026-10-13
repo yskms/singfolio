@@ -3,6 +3,8 @@
 //
 //     node scripts/generate-licenses.mjs           # src/legal/thirdPartyLicenses.ts を作り直す
 //     node scripts/generate-licenses.mjs --check   # 作り直した結果が、今のファイルと同じかを確かめる（提出前など）
+//     node scripts/generate-licenses.mjs --check --apk <app.apk|app.aab>
+//                                                  # 上に加えて、APK・AAB の .so が、把握しているものだけかを確かめる
 //
 // 出力  src/legal/thirdPartyLicenses.ts（About > Open source licenses が出す。手で編集しない。
 //       依存を更新・追加したら、必ず作り直す）
@@ -18,10 +20,14 @@
 //   3. font     : アプリに入る .ttf（`expo export` のアセット）のうち、npm の依存と別のライセンスを持つもの
 //   4. native   : React Native が同梱する C++ のライブラリ（Hermes・Folly など。版は React Native の
 //                 マニフェストから読む）と、Android の Maven の依存（Gradle の releaseRuntimeClasspath。
-//                 POM のライセンスから、プロジェクトごとにまとめる）
-// 載せていないもの: Maven の成果物（AAR）の中に、さらに取り込まれた C/C++ のコードや、データ
-// （Fresco の画像コーデック、zstd-kmp の zstd、OkHttp の public suffix のリストなど）。OS・NDK が
-// 提供する実行時のライブラリ（libc++ など）と、SQLite（パブリックドメイン）も載せていない。
+//                 POM のライセンスから、プロジェクトごとにまとめる）、Maven の成果物（AAR）が .so に
+//                 埋め込んでいる C/C++ のライブラリ（Fresco の libjpeg-turbo・libwebp・giflib、zstd-kmp の zstd。
+//                 APK の .so で確かめたもの。MAVEN_EMBEDDED_LIBS）
+//                 iOS は、Podfile.lock に、node_modules の外から入る Pod（CocoaPods の trunk など）があれば失敗にする
+// 載せていないもの: OS・NDK が提供する実行時のライブラリ（libc++ など。LLVM の例外で、バイナリでの表記は
+// 不要）、SQLite（パブリックドメイン）、OkHttp の public suffix のリスト（APK の中に出典とライセンスの
+// NOTICE がある）。上の Maven の成果物の中を、これ以上は掘り下げない。release の APK・AAB に、把握して
+// いない .so が入っていないかは、`--apk` で確かめる。
 //
 // ライセンスの全文は、パッケージ直下の LICENSE をそのまま使う。見つからないときや、許可していない
 // 種類のライセンスのときは、黙って流さず、失敗にする（新しい依存が入ったら、下の設定に足すかどうかを
@@ -39,7 +45,15 @@ const textsDir = path.join(root, 'scripts/license-texts');
 
 // 載せてよいライセンス（SPDX）。ここに無いものが依存に入ったら失敗にして、条件（著作権表示の方法、
 // 配布の条件）を確認してから足す。
-const ALLOWED_LICENSES = new Set(['MIT', 'ISC', 'Apache-2.0', 'BSD-3-Clause', 'BSL-1.0']);
+const ALLOWED_LICENSES = new Set([
+  'MIT',
+  'ISC',
+  'Apache-2.0',
+  'BSD-3-Clause',
+  'BSL-1.0',
+  // libjpeg-turbo。IJG の条件は、文書に「この製品は Independent JPEG Group の仕事に一部基づく」と書くことを求める
+  'IJG AND BSD-3-Clause AND Zlib',
+]);
 
 // ---------------------------------------------------------------------------------------------
 // npm
@@ -154,7 +168,7 @@ const RN_NATIVE_LIBS = [
 // ---------------------------------------------------------------------------------------------
 
 // npm のパッケージ（上で載せている）や React Native 自身のため、ここでは載せない groupId。
-const MAVEN_EXCLUDED_GROUPS = /^(expo\.modules(\..*)?|host\.exp\.exponent|com\.facebook\.react)$/;
+const MAVEN_EXCLUDED_GROUPS = /^(expo\.modules(\..*)?|host\.exp\.exponent|com\.facebook\.(react|hermes))$/;
 
 // groupId ごとに、プロジェクトの名前にまとめる。ここに無い groupId が入ったら失敗にする。
 // `file` は、そのプロジェクトのライセンスの全文（Apache-2.0 以外は必須。Apache-2.0 は標準の全文）。
@@ -187,6 +201,42 @@ const MAVEN_FAMILIES = [
   { match: /^commons-(codec|io)$/, name: 'Apache Commons' },
   { match: /^org\.brotli$/, name: 'Brotli', file: 'Brotli.txt', source: 'https://github.com/google/brotli/blob/master/LICENSE' },
   { match: /^org\.jspecify$/, name: 'JSpecify' },
+];
+
+// Maven の成果物（AAR）が .so に埋め込んでいる C/C++ のライブラリ。APK の `lib/` の .so で、入っていることを
+// 確かめたもの（libnative-imagetranscoder.so に libjpeg-turbo 2.1.5.1 の版の文字列。libstatic-webp.so に
+// WebPDecode など。libgifimage.so に DGifOpen など。libzstd-kmp.so に ZSTD_ の関数）。版は、成果物の
+// ソースの記述から読んだ（Fresco 3.6.0 の gradle.properties の LIBJPEG_TURBO_VERSION・LIBWEBP_VERSION・
+// GIFLIB_VERSION。zstd-kmp 0.4.0 の zstd のサブモジュールの zstd.h）。`in` の成果物の版が変わったら
+// 失敗にする（埋め込みの版とライセンスを確かめ直して、全文と `inVersion` を更新する）。
+// `in` は Maven の成果物（nativeimagetranscoder → libnative-imagetranscoder.so、webpsupport → libstatic-webp.so、
+// animated-gif → libgifimage.so）。libpng は、Fresco のソースにあるが、libstatic-webp.so にはリンクされて
+// いない（符号・文字列が無い）。
+const MAVEN_EMBEDDED_LIBS = [
+  { name: 'libjpeg-turbo', version: '2.1.5.1', license: 'IJG AND BSD-3-Clause AND Zlib', file: 'libjpeg-turbo.txt',
+    source: 'https://github.com/libjpeg-turbo/libjpeg-turbo/blob/2.1.5.1/LICENSE.md',
+    in: 'com.facebook.fresco:nativeimagetranscoder', inVersion: '3.6.0' },
+  { name: 'libwebp', version: '1.3.2', license: 'BSD-3-Clause', file: 'libwebp.txt',
+    source: 'https://github.com/webmproject/libwebp/blob/v1.3.2/COPYING',
+    in: 'com.facebook.fresco:webpsupport', inVersion: '3.6.0' },
+  { name: 'giflib', version: '5.2.1', license: 'MIT', file: 'giflib.txt',
+    source: 'https://sourceforge.net/p/giflib/code/ci/5.2.1/tree/COPYING',
+    in: 'com.facebook.fresco:animated-gif', inVersion: '3.6.0' },
+  // zstd-kmp 0.4.0 が持つ zstd は、1.5.7 の後の開発中のコミット（1dbc2e0。zstd.h は 1.5.8）。版は載せない。
+  { name: 'Zstandard', license: 'BSD-3-Clause', file: 'zstd.txt',
+    source: 'https://github.com/facebook/zstd/blob/1dbc2e09084e843f6c0dcc2d0791610015c50979/LICENSE',
+    in: 'com.squareup.zstd:zstd-kmp-android', inVersion: '0.4.0' },
+];
+
+// APK・AAB の `lib/<abi>/` に入っていてよい .so（`--apk`）。理由は、一覧に載せている・載せなくてよい、のどちらか。
+const KNOWN_SO = [
+  /^libappmodules$/, /^libreact_codegen_.+$/, /^libreactnative$/, /^libjsi$/, /^libhermesvm$/, /^libhermestooling$/,
+  /^libfbjni$/, // React Native・Hermes・fbjni（載せている）
+  /^libexpo-modules-core$/, /^libexpo-sqlite$/, /^libgesturehandler$/, /^libreanimated$/, /^librnscreens$/,
+  /^libworklets$/, /^libandroidx\.graphics\.path$/, // npm のパッケージ・AndroidX（載せている）
+  /^libimagepipeline$/, /^libnative-filters$/, // Fresco 自身のコード（Fresco を載せている）
+  /^libnative-imagetranscoder$/, /^libstatic-webp$/, /^libgifimage$/, /^libzstd-kmp$/, // MAVEN_EMBEDDED_LIBS
+  /^libc\+\+_shared$/, // NDK の libc++（LLVM の例外で、バイナリでの表記は不要）
 ];
 
 // POM のライセンスの名前 → SPDX。
@@ -430,17 +480,47 @@ function gradleResolvedArtifacts() {
     ['-n', '10', './gradlew', ':app:dependencies', '--configuration', 'releaseRuntimeClasspath', '-q'],
     { cwd: android, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'inherit'], env },
   );
-  const artifacts = new Map(); // 'group:artifact' → version
+  const artifacts = new Map(); // 'group:artifact' → 解決された版
   for (const line of output.split('\n')) {
-    const match = line.match(/^[|\s]*(?:\+---|\\---) (\S+?)(?: -> (\S+))?(?: \(.*\))?$/);
-    if (!match || match[1].startsWith('project')) continue;
-    const parts = match[1].split(':');
-    if (parts.length < 2) continue;
-    const version = match[2] ?? parts[2];
-    if (!version) continue;
-    artifacts.set(`${parts[0]}:${parts[1]}`, version);
+    const tree = line.match(/^[|\s]*(?:\+---|\\---) (.+)$/);
+    if (!tree) continue;
+    const parsed = parseGradleDependency(tree[1]);
+    if (parsed) artifacts.set(`${parsed.group}:${parsed.artifact}`, parsed.version);
   }
+  if (artifacts.size === 0) throw new Error('Gradle の出力から、依存を1つも読めない');
   return artifacts;
+}
+
+// 依存の木の1行（`+--- ` の後ろ）。読めない形は、黙って流さず、失敗にする。
+//   group:artifact:version [-> resolved] [(*)]    group:artifact -> resolved    group:artifact:{strictly v} -> resolved
+//   group:artifact -> group2:artifact2:version（モジュールの置き換え）    project :name
+// 制約（`(c)`）は、依存ではないので読み飛ばす。
+function parseGradleDependency(body) {
+  let rest = body.trim();
+  if (rest.startsWith('project ')) return null;
+  if (/ \(c\)$/.test(rest)) return null;
+  rest = rest.replace(/ \((\*|n)\)$/, '');
+  const [left, right, ...extra] = rest.split(' -> ');
+  if (extra.length > 0) throw new Error(`Gradle の依存の行を読めない: ${body}`);
+  // `{strictly 1.0}`・`{require 1.0}` などは、中の版だけ残す。
+  const parts = left.replace(/\{[a-z]+ ([^}\s]+)\}/g, '$1').split(':');
+  const coordinate = /^[\w.+-]+$/;
+  if (parts.length < 2 || parts.length > 3 || !parts.every((part) => coordinate.test(part))) {
+    throw new Error(`Gradle の依存の行を読めない: ${body}`);
+  }
+  let [group, artifact, version] = parts;
+  if (right !== undefined) {
+    const resolved = right.split(':');
+    if (resolved.length === 3 && resolved.every((part) => coordinate.test(part))) {
+      [group, artifact, version] = resolved; // 置き換え先
+    } else if (resolved.length === 1 && coordinate.test(resolved[0])) {
+      version = resolved[0];
+    } else {
+      throw new Error(`Gradle の依存の行を読めない: ${body}`);
+    }
+  }
+  if (!version) throw new Error(`Gradle の依存の行に版が無い: ${body}`);
+  return { group, artifact, version };
 }
 
 // Gradle のキャッシュの POM から、ライセンス（なければ親の POM をたどる）。
@@ -459,9 +539,9 @@ function pomLicenses(group, artifact, version, depth = 0) {
   return parent ? pomLicenses(parent[1].trim(), parent[2].trim(), parent[3].trim(), depth + 1) : [];
 }
 
-function mavenEntries() {
+function mavenEntries(resolved) {
   const families = new Map(); // name → { family, license, artifacts: [] }
-  for (const [coordinate, version] of gradleResolvedArtifacts()) {
+  for (const [coordinate, version] of resolved) {
     const [group, artifact] = coordinate.split(':');
     if (MAVEN_EXCLUDED_GROUPS.test(group)) continue;
     const family = MAVEN_FAMILIES.find((candidate) => candidate.match.test(group));
@@ -477,7 +557,7 @@ function mavenEntries() {
     found.artifacts.push(`${group}:${artifact}:${version}`);
     families.set(family.name, found);
   }
-  return [...families.values()].map(({ family, license, artifacts }) => {
+  const entries = [...families.values()].map(({ family, license, artifacts }) => {
     checkAllowed(family.name, license);
     let text;
     if (family.file) text = textFile(family.file);
@@ -490,6 +570,71 @@ function mavenEntries() {
       includes: artifacts.sort(),
     };
   });
+
+  for (const lib of MAVEN_EMBEDDED_LIBS) {
+    const host = resolved.get(lib.in);
+    if (host !== lib.inVersion) {
+      throw new Error(
+        `${lib.name}: 埋め込み先の ${lib.in} の版が ${host ?? '(無い)'} になった（確かめたのは ${lib.inVersion}）。` +
+          '埋め込みの版とライセンスを確かめ直して、全文と inVersion を更新する',
+      );
+    }
+    checkAllowed(lib.name, lib.license);
+    entries.push({
+      kind: 'native', name: lib.name, ...(lib.version ? { version: lib.version } : {}), license: lib.license,
+      text: textFile(lib.file), platform: 'android',
+    });
+  }
+  return entries;
+}
+
+// iOS の Pod。React Native・Expo の Pod は、node_modules のもの（EXTERNAL SOURCES）と、codegen が作る
+// コードとして入る。
+// CocoaPods の trunk など、node_modules の外から入る Pod（例: expo-image が入れる SDWebImage）があれば、
+// 載せるものが増えるので、失敗にする（`SPEC REPOS:` の節が出る）。
+function checkIosPods() {
+  const lock = path.join(root, 'ios/Podfile.lock');
+  if (!existsSync(lock)) throw new Error('ios/Podfile.lock が無い。`npx expo prebuild --platform ios` で作ってから実行する');
+  const text = readText(lock);
+  const outside = [];
+  const specRepos = text.match(/^SPEC REPOS:\n((?: {2,}.*\n)+)/m);
+  if (specRepos) {
+    outside.push(...[...specRepos[1].matchAll(/^ {4}- (\S+)/gm)].map((match) => `${match[1]}（SPEC REPOS）`));
+  }
+  const external = text.match(/^EXTERNAL SOURCES:\n((?: {2,}.*\n)+)/m);
+  if (external) {
+    for (const block of external[1].split(/^ {2}(?=\S)/m).filter(Boolean)) {
+      const name = block.split(':')[0];
+      const source = block.match(/:(?:path|podspec): "?([^"\n]+)"?/);
+      // `build/generated/ios/` は、React Native の codegen がビルドで作る、このアプリのコード。
+      const local = source && (source[1].includes('node_modules/') || source[1].startsWith('build/generated/ios/'));
+      if (!local) outside.push(`${name}（${source ? source[1] : '出どころが読めない'}）`);
+    }
+  }
+  if (outside.length > 0) {
+    throw new Error(
+      'node_modules の外から入る iOS の Pod がある: ' + outside.join(', ') +
+        '\nライセンスの全文を調べて、RN_NATIVE_LIBS のような設定に足す（Pod の検査を緩める前に）',
+    );
+  }
+}
+
+// `--apk`: APK・AAB の `lib/<abi>/` の .so が、把握しているものだけかを確かめる。
+function checkApk(file) {
+  const names = execFileSync('unzip', ['-Z1', file], { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 })
+    .split('\n')
+    .map((entry) => entry.match(/(?:^|\/)lib\/[^/]+\/([^/]+)\.so$/))
+    .filter(Boolean)
+    .map((match) => match[1]);
+  if (names.length === 0) throw new Error(`${file}: lib/ の .so が1つも無い。APK・AAB のパスを確かめる`);
+  const unknown = [...new Set(names)].filter((name) => !KNOWN_SO.some((known) => known.test(name)));
+  if (unknown.length > 0) {
+    throw new Error(
+      `把握していない .so が入っている: ${unknown.sort().join(', ')}\n` +
+        '埋め込まれたライブラリのライセンスを調べて、MAVEN_EMBEDDED_LIBS・KNOWN_SO に足す',
+    );
+  }
+  console.log(`${file}: .so ${new Set(names).size} 種、すべて把握しているもの`);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -548,14 +693,20 @@ export interface ThirdPartyPackage {
 }
 
 function main() {
+  const apkAt = process.argv.indexOf('--apk');
+  const apk = apkAt >= 0 ? process.argv[apkAt + 1] : undefined;
+  if (apkAt >= 0 && (!apk || apk.startsWith('--'))) throw new Error('--apk には、APK・AAB のパスを渡す');
+  if (apk && !process.argv.includes('--check')) throw new Error('--apk は --check と一緒に使う');
+
   const { dirs, assets, bundledHits } = collectNpm();
   const npm = npmEntries(dirs);
+  checkIosPods();
   const entries = [
     ...npm.entries,
     ...bundledEntries(bundledHits, npm.dirByName),
     ...fontEntries(assets, npm.dirByName),
     ...reactNativeNativeEntries(),
-    ...mavenEntries(),
+    ...mavenEntries(gradleResolvedArtifacts()),
   ];
   const { content, count, textCount } = render(entries);
   const relative = path.relative(root, outFile);
@@ -565,10 +716,14 @@ function main() {
       process.exit(1);
     }
     console.log(`${relative}: 今の依存と同じ（${count} 件）`);
+    if (apk) checkApk(apk);
     return;
   }
   writeFileSync(outFile, content);
   console.log(`${relative}: ${count} 件、全文 ${textCount} 種`);
 }
 
-main();
+// 直接実行したときだけ動かす（`parseGradleDependency` は、確認のために import できる）。
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
+
+export { parseGradleDependency };

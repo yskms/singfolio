@@ -23,6 +23,7 @@ const LICENSE_MARKERS: Record<string, RegExp> = {
   'Apache-2.0': /Apache License\s+Version 2\.0/,
   'BSD-3-Clause': /Redistribution and use in source and binary forms/,
   'BSL-1.0': /Boost Software License - Version 1\.0/,
+  'IJG AND BSD-3-Clause AND Zlib': /Independent JPEG Group/,
 };
 
 describe('THIRD_PARTY_PACKAGES', () => {
@@ -84,6 +85,11 @@ describe('THIRD_PARTY_PACKAGES', () => {
     }
     for (const name of ['AndroidX', 'OkHttp', 'Okio', 'Fresco', 'SoLoader', 'fbjni', 'Kotlin']) {
       assert.ok(names.has(name), name);
+    }
+    // Maven の成果物（Fresco・zstd-kmp）が .so に埋め込んでいるライブラリ（APK の .so で確かめたもの）。
+    for (const name of ['libjpeg-turbo', 'libwebp', 'giflib', 'Zstandard']) {
+      assert.ok(names.has(name), name);
+      assert.equal(THIRD_PARTY_PACKAGES.find((item) => item.name === name)?.platform, 'android', name);
     }
     // SocketRocket は iOS だけ、Maven の依存は Android だけ。
     assert.equal(THIRD_PARTY_PACKAGES.find((item) => item.name === 'SocketRocket')?.platform, 'ios');

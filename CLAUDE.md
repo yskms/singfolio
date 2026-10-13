@@ -262,7 +262,11 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
 -   npm のパッケージの中に取り込まれた別のプロジェクトのコード（今は expo-router の React Navigation）は、
     パッケージの LICENSE では足りない。`BUNDLED` に足して、別の行にする（`vendor/`・`fork/` などが
     バンドルに入ると、生成が失敗する）。
--   許可していないライセンスが入ると生成が失敗する。黙って許可を足さず、条件を確認する。
+-   許可していないライセンス・知らない Maven の groupId・node_modules の外から入る iOS の Pod・読めない
+    Gradle の行などが入ると、生成が失敗する。黙って許可を足さず、条件を確認する。Maven の成果物が
+    `.so` に埋め込むライブラリ（Fresco の libjpeg-turbo など）は `MAVEN_EMBEDDED_LIBS` に、APK の `.so`
+    で確かめて足す。release のビルドでは `--check --apk <APK・AAB>` で、把握していない `.so` が
+    入っていないかを確かめる。
 -   アイコンフォント（Ionicons・Material Symbols）は、npmパッケージのLICENSEとは別のライセンスなので、
     別の行にしている。上流から写した全文は `scripts/license-texts/` にある（取得元はスクリプトの設定）。
 -   About の「Fonts」（`fontLicenses.ts`）は、自前で同梱した書体だけで、この一覧とは別。
