@@ -9,7 +9,7 @@
 //   と原曲、US: `Senbonzakura`）。他の国は不安定（KRは0件、存在しない国はHTTP 400）。
 // - `lang` は結果に影響しない。送らない。
 // - `explicit` も送らない。指定しなくても `explicit` の曲は返らず（`cleaned` / `notExplicit` だけ）、
-//   `explicit=No` を足しても結果は同じだった（2026-10、米国ストアの8つの検索）。
+//   `explicit=No` を足しても結果は同じだった（2026-10、米国・日本ストアの、それぞれ8つの検索）。
 // - アーティスト名は、アーティスト検索（`entity=musicArtist`）ではなく、曲の検索の
 //   `attribute=artistTerm` から取る。前者は日本のアーティストを英字の表記
 //   （`Kenshi Yonezu`）で返す。後者はタグ付けされた表記（`米津玄師`）で返る。

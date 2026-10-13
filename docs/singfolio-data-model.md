@@ -234,7 +234,7 @@ UI → `suggestions`（Service）→ `songCatalogRepository`（外部の楽曲�
     （`storeForLanguage`）。この2つに限る。他の国は結果が不安定で（KRは0件、存在しない国は
     HTTP 400）、`lang` は結果に影響しない。画面が言語を渡す。
 -   **`explicit` は指定しない**。指定しなくても `explicit` の曲は返らず、`explicit=No` を足しても結果は
-    変わらない（実測。`docs/singfolio-store-listing.md` の年齢指定）。
+    変わらない（米国・日本ストアで実測。`docs/singfolio-store-listing.md` の年齢指定）。
 -   **アーティスト名は曲の検索から取る**（`attribute=artistTerm`）。アーティスト検索
     （`entity=musicArtist`）は、日本のアーティストを英字の表記（`Kenshi Yonezu`）で返す。
     曲の検索の結果は、タグ付けされた表記（`米津玄師`）で返る。
