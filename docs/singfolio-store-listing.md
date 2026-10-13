@@ -23,9 +23,10 @@ App Store（iOS）と Google Play（Android）の掲載文・申告の内容。�
 | 言語 | English（既定）・日本語 |
 
 サポートURL・プライバシーポリシーURLは、GitHub Pages（このリポジトリの `docs/`）で公開する。
-`docs/index.md` と `docs/privacy-policy.md` が、それぞれのページになる。アプリの About にも、
-プライバシーポリシーへのリンクがある（`src/legal/legalUrls.ts`）。ストアに入れる前に、2つのURLが
-開けることを確認する。
+`docs/index.md` と `docs/privacy-policy.md` が、それぞれのページになる。`docs/_config.yml` の
+`exclude` で、他の docs（仕様・WBS・このファイル・ブランド資料）は、サイトには公開しない。アプリの
+About にも、プライバシーポリシーへのリンクがある（`src/legal/legalUrls.ts`）。ストアに入れる前に、
+2つのURLが開けることと、他の docs のページが開けないことを確認する。
 
 ## 2. App Store（iOS）
 
@@ -117,6 +118,11 @@ SHOW MODE
 ユーザーが作る内容は端末内にとどまり、他の人へ共有されないため、「ユーザー生成コンテンツ」も
 「いいえ」。「制限のないWebアクセス」も「いいえ」（アプリ内にブラウザを持たない。
 プライバシーポリシーは外部のブラウザで開く）。結果は 4+。
+
+候補（Suggestions）の曲名は、Apple の楽曲カタログのまま出る。検索の `explicit` は指定しない
+（`explicit=No` を足さない）。実測（2026年10月、米国ストア、ラップなど8つの検索）では、指定しなくても
+`trackExplicitness` が `explicit` の曲は返らず（`cleaned` / `notExplicit` だけ）、`explicit=No` を
+足しても結果は同じだった。審査で、候補に出る曲名を指摘されたら、年齢指定を見直す。
 
 ### 輸出コンプライアンス
 

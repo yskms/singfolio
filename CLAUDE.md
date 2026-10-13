@@ -73,6 +73,8 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
 -   ストアは、実際に使う言語（`resolveLanguage` の結果）で決める（決定済み。端末の地域では決めない）。
 -   候補は補助。自由入力はいつでも保存でき、外部IDは保存しない。通信の失敗は「候補が出ない」だけに
     し、失敗を0件としてキャッシュしない。
+-   外部の検索に `explicit` は指定しない。実測（2026-10）で、指定しなくても `explicit` の曲は返らず、
+    `explicit=No` を足しても結果は変わらない（`docs/singfolio-store-listing.md` の年齢指定）。
 -   候補の欄には提供元（「Suggestions from Apple」）を表記する。外さない。
 -   候補を選んだとき、Title / Artist の入力欄を `key` で作り直す（`SongForm` の `titleEpoch` /
     `artistEpoch`）。「簡略化」して `setTitle` だけにしない（iOSの日本語の変換中の欄は、JSからの

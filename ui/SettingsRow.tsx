@@ -8,16 +8,20 @@ import { useTheme } from './theme';
 /**
  * 設定の項目（Profile の Appearance・Language・Tags・About）。押すと、選択肢のシートや別の画面を
  * 開く。`value` は、今の設定（右端に控えめに出す）。読み上げは、名前と値が続けて読まれる。
+ * `external` は、アプリの外（ブラウザ）が開く項目。右端を、画面へ進む矢印ではなく、外へ出る印にする
+ * （読み上げには、`accessibilityHint` で伝える）。
  */
 export function SettingsRow({
   label,
   value,
   accessibilityHint,
+  external = false,
   onPress,
 }: {
   label: string;
   value?: string;
   accessibilityHint?: string;
+  external?: boolean;
   onPress: () => void;
 }) {
   const { colors } = useTheme();
@@ -35,7 +39,12 @@ export function SettingsRow({
             {value}
           </Text>
         )}
-        <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} {...decorative} />
+        <Ionicons
+          name={external ? 'open-outline' : 'chevron-forward'}
+          size={18}
+          color={colors.textSecondary}
+          {...decorative}
+        />
       </View>
     </Pressable>
   );
