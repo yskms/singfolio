@@ -200,7 +200,7 @@ Apple へ送る検索語があるため、次の1項目を申告する。他は�
     3840×1646 の記載が無く（Product page header・Search results asset などは、Apple が配る
     テンプレートの寸法に従う）、どの素材にどの寸法かは、提出時にテンプレートで確認する。
 -   **スクリーンショット**: Songs・Song Detail・Add Song・Practice・Show Mode・Profile（ダーク表示）の6枚を、
-    English と日本語で用意した（日本語の Google Play 用は、Add Song を除く5枚。下記）。見出し・補足つきで、
+    English と日本語で用意した。見出し・補足つきで、
     `assets/store-screenshots/` にある。ブランドの色と書体（Inter / Noto Sans JP。`assets/fonts/`）を使い、
     採点や順位を連想させる表現は使わない。
     -   **撮影画像**は、App Store 用が `raw/{en,ja}/`（iOS シミュレータ。iPhone 18 Pro、1206×2622）、
@@ -214,9 +214,11 @@ Apple へ送る検索語があるため、次の1項目を申告する。他は�
     -   **Google Play** 用は 1080×1920（`play/`。9:16）。Play は長辺が短辺の2倍までなので、Android の撮影画像
         （比率 約2.24）もそのまま使えず、別のキャンバスに合成している。下端は、画像をはみ出させて切るが、切り口が
         ボタンや行の途中に当たらないよう、余白の帯に合わせて画像の大きさを少し変える（`find_cut.py`）。
-    -   **日本語の Google Play 用に、Add Song が無い理由**: Android エミュレータには日本語の入力手段が無い
-        （Gboard に日本語が入っておらず、クリップボードの共有・エミュレータコンソールの `event text`・
-        ADBKeyBoard のどれも使えなかった）。足すときは、Android 実機で撮る。
+    -   **Android エミュレータへの日本語の入力**: Gboard に、日本語（QWERTY）のキーボードを足す（設定 → On-screen keyboard →
+        Gboard → Languages → Add keyboard → 日本語 → QWERTY → Done）。足したあと、ソフトキーボードの地球儀キーで日本語に
+        切り替え、ローマ字を `adb shell input text` で送ると、かなになり、変換の候補が出る。候補を押して確定する
+        （先頭の候補で、アーティストは「灯火の庭」になった）。エミュレータを停止すれば、この設定は消える。
+        クリップボードの共有・エミュレータコンソールの `event text`・ADBKeyBoard は、使えなかった。
     -   **背景**は、Mint `#C9FCED` と Lavender `#EEE5FF` を交互にし（1〜5枚目）、6枚目だけ Purple `#9C70FE`。
         Lavender は Purple を白に約18%混ぜた派生色（ブランド表にはない）。白に近い中立色は、白いストアの
         ページで画像の縁が消える（白との差が 1.09:1）ので、背景にしない。見出しは Text Primary `#17171A`。

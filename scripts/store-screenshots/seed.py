@@ -68,7 +68,8 @@ SONGS = {
 
 
 # Add Song の撮影で、入力する値（保存しない）。キーは「半音を上げる」の回数、タグは既存のタグから選ぶ。
-# check_names.py の対象。
+# check_names.py の対象。日本語のアーティストは、iOS では「ともしびの庭」を入力し、Android では、変換の先頭の候補
+# 「灯火の庭」を選んだ（読みは同じ。「灯火の庭」は、上の SONGS にもあり、確認済み）。
 ADD_SONG = {
     'en': {
         'title': 'Moonlit Ferry',
