@@ -1,10 +1,6 @@
 import type { Database } from '../db/appDatabase.ts';
-import {
-  isAppearance,
-  isLanguageSetting,
-  type Appearance,
-  type LanguageSetting,
-} from '../domain/types.ts';
+import { isAppearance, isLanguage, type Appearance, type Language } from '../domain/types.ts';
+import { deviceLanguage } from '../i18n/deviceLanguage.ts';
 import type { SettingsRepository } from '../repositories/settingsRepository.ts';
 import { ServiceError } from './errors.ts';
 
@@ -36,19 +32,24 @@ export function createSettingsService({ db, settings }: SettingsServiceDeps) {
     },
 
     /**
-     * 言語の設定（`system` / `en` / `ja`）。未設定や、型の外から来た値（アプリの将来の
-     * バージョンが保存した言語など）は、起動を止めないよう `system`（端末の言語に従う）に
-     * する。実際に使う言語は、これと端末の言語から `src/i18n` の `resolveLanguage` が決める。
+     * 表示言語（`en` / `ja`）。保存した言語を返す。未保存のとき（初回起動）と、`en` / `ja` 以外の
+     * 値（旧版の `system`、アプリの将来のバージョンが保存した言語など）のときは、端末の言語
+     * （`deviceLanguageTags`。BCP 47、端末の優先順）から決めて、**保存してから**返す。起動を
+     * 止めないため、不正な値でもエラーにしない。決めた後は、端末の言語が変わっても追従しない
+     * （言語の切り替えは、Settingsのみ）。
      */
-    async getLanguageSetting(): Promise<LanguageSetting> {
+    async ensureLanguage(deviceLanguageTags: readonly string[]): Promise<Language> {
       const value = await settings.get(db, LANGUAGE_KEY);
-      return isLanguageSetting(value) ? value : 'system';
+      if (isLanguage(value)) return value;
+      const language = deviceLanguage(deviceLanguageTags);
+      await db.transaction((tx) => settings.set(tx, LANGUAGE_KEY, language));
+      return language;
     },
 
     /** 不正な値は `invalid-language`。 */
-    async setLanguageSetting(setting: LanguageSetting): Promise<void> {
-      if (!isLanguageSetting(setting)) throw new ServiceError('invalid-language');
-      await db.transaction((tx) => settings.set(tx, LANGUAGE_KEY, setting));
+    async setLanguage(language: Language): Promise<void> {
+      if (!isLanguage(language)) throw new ServiceError('invalid-language');
+      await db.transaction((tx) => settings.set(tx, LANGUAGE_KEY, language));
     },
 
     /**

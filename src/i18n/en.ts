@@ -91,7 +91,11 @@ export const en = {
   'settings.appearance.light': 'Light',
   'settings.appearance.dark': 'Dark',
   'settings.language': 'Language',
-  'settings.language.system': 'System',
+  // 言語を切り替える前の確認。ダイアログは、切り替える前の言語で出る。
+  'settings.language.confirmTitle': 'Change language?',
+  'settings.language.confirmMessage':
+    'Switch to {language}? This also changes the rules for entering an artist’s reading.',
+  'settings.language.confirmAction': 'Change',
   'settings.suggestions': 'Suggestions',
   'settings.suggestionsNote':
     'What you type in Title and Artist is sent to Apple to find suggestions. Nothing else is sent.',

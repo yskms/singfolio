@@ -11,7 +11,7 @@ export {
   type ErrorScreenContent,
 } from './errors.ts';
 export { formatDay } from './formatDay.ts';
-export { resolveLanguage } from './resolveLanguage.ts';
+export { deviceLanguage } from './deviceLanguage.ts';
 export type { MessageKey } from './en.ts';
 
 /** 言語ごとの文言。言語を足すと、ここに足すまで型エラーになる。 */

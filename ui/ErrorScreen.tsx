@@ -1,7 +1,8 @@
+import { useLocales } from 'expo-localization';
 import type { ErrorBoundaryProps } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
-import { errorScreenContent } from '../src/i18n';
+import { deviceLanguage, errorScreenContent } from '../src/i18n';
 import { I18nProvider, useI18n } from './i18n';
 import { MessageScreen } from './MessageScreen';
 
@@ -32,13 +33,14 @@ function ErrorContent({ error, retry }: ErrorBoundaryProps) {
  * Expo Router の `ErrorBoundary`（`app/_layout.tsx` が export する）として使う。
  *
  * ルートの `ErrorBoundary` は `app/_layout.tsx` の Provider の外で描画される。DBが使えない
- * 場面もあるため、保存した設定は読まず、言語は常に端末の言語（`system`）で出す。配色は
+ * 場面もあるため、保存した設定は読まず、言語は常に端末の言語（`deviceLanguage`）で出す。配色は
  * `useColorScheme()` に従うので、起動に失敗したときは端末の設定、起動が終わった後の描画の
  * 失敗では、`applyAppearance` で反映済みの保存したAppearance。
  */
 export function ErrorScreen(props: ErrorBoundaryProps) {
+  const locales = useLocales();
   return (
-    <I18nProvider initialSetting="system">
+    <I18nProvider initialLanguage={deviceLanguage(locales.map((locale) => locale.languageTag))}>
       <StatusBar style="auto" />
       <ErrorContent {...props} />
     </I18nProvider>

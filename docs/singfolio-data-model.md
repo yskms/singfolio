@@ -81,11 +81,10 @@ UIの表示名「My Key」は、モデル・DBでは `keyOffset` / `key_offset` 
 -   `appearance`: `system` / `light` / `dark`。未保存の場合は `system`（端末の設定に従う）。
     保存された値が上の3つ以外（将来のバージョンが書いた値など）でも、エラーにせず `system`
     として読む（起動を止めない）。
--   `language`: `system` / `en` / `ja`。未保存の場合は `system`（端末の言語に従う。決め方は
-    `singfolio-screen-flow.md` のLanguage）。初回起動時に、端末の言語から決めた言語
-    （`en` / `ja`）を書き込まない（書くと、System のまま端末の言語に追従できなくなる）。
-    保存された値が上の3つ以外（将来のバージョンが追加した言語など）でも、エラーにせず
-    `system` として読む（起動を止めない）。
+-   `language`: `en` / `ja`（`system` は無い）。初回起動のとき（未保存）は、端末の言語から決めた
+    言語を書き込む（決め方は `singfolio-screen-flow.md` のLanguage）。以後は、端末の言語が
+    変わっても追従しない。保存された値が `en` / `ja` 以外（旧版の `system`、将来のバージョンが
+    追加した言語など）でも、エラーにせず、端末の言語から決め直して書き込む（起動を止めない）。
 -   `suggestions`: `on` / `off`。曲名・アーティストの候補を外部の楽曲検索から出すか。
     未保存、または `off` 以外の値は `on`（既定）として読む。
 
@@ -131,7 +130,7 @@ expo-sqliteの `withTransactionAsync` は排他ではなく、トランザクシ
     持たない。`songs.listSongs` を使うので、検索の判定・同順位の並びは Songs と同じ。タグの一覧は、
     Readyの曲に付いているものだけ。読み取りだけ）
 -   `settings`: `getAppearance` / `setAppearance`（`system` / `light` / `dark`）、
-    `getLanguageSetting` / `setLanguageSetting`（`system` / `en` / `ja`）、
+    `ensureLanguage`（保存した言語。未保存なら、端末の言語から決めて保存して返す）/ `setLanguage`（`en` / `ja`）、
     `getSuggestionsEnabled` / `setSuggestionsEnabled`（候補の外部検索のオン / オフ。既定はオン）
 -   `suggestions`: `available`（外部の検索が組み込まれているか）/ `localArtists` /
     `catalogArtists` / `catalogSongs`（「候補検索」。外部の検索は、探せなかったとき `null`）
@@ -232,7 +231,7 @@ UI → `suggestions`（Service）→ `songCatalogRepository`（外部の楽曲�
     `createServices` に注入する（Nodeのテストは偽の `fetch` で動かす）。注入しなければ
     `suggestions.available` が `false` になり、外部へは何も送らない。失敗は
     `CatalogError`（`rate-limited` / `network` / `invalid-response`）。タイムアウトを持つ。
--   **ストア**: 実際に使う言語（`resolveLanguage` の結果）が `ja` なら `JP`、それ以外は `US`
+-   **ストア**: 実際に使う言語が `ja` なら `JP`、それ以外は `US`
     （`storeForLanguage`）。この2つに限る。他の国は結果が不安定で（KRは0件、存在しない国は
     HTTP 400）、`lang` は結果に影響しない。画面が言語を渡す。
 -   **`explicit` は指定しない**。指定しなくても `explicit` の曲は返らず、`explicit=No` を足しても結果は

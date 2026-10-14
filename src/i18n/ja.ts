@@ -67,7 +67,11 @@ export const ja: Record<MessageKey, Message> = {
   'settings.appearance.light': 'ライト',
   'settings.appearance.dark': 'ダーク',
   'settings.language': '言語',
-  'settings.language.system': 'システム',
+  // 言語を切り替える前の確認。ダイアログは、切り替える前の言語で出る。
+  'settings.language.confirmTitle': '言語を変更しますか？',
+  'settings.language.confirmMessage':
+    '{language}に切り替えます。アーティストの読みの入力ルールも変わります。',
+  'settings.language.confirmAction': '変更',
   'settings.suggestions': '候補',
   'settings.suggestionsNote':
     '入力中の曲名・アーティスト名を Apple に送って、候補を探します。それ以外は送りません。',

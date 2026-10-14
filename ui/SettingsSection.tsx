@@ -4,9 +4,9 @@ import { Alert, Platform, StyleSheet, Switch, View } from 'react-native';
 
 import {
   APPEARANCES,
-  LANGUAGE_SETTINGS,
+  LANGUAGES,
   type Appearance,
-  type LanguageSetting,
+  type Language,
 } from '../src/domain/types';
 import { errorMessageKey, languageNames, type MessageKey } from '../src/i18n';
 import { getServices } from '../src/services';
@@ -32,7 +32,7 @@ const appearanceKeys = {
  */
 export function SettingsSection() {
   const { colors } = useTheme();
-  const { t, languageSetting, setLanguageSetting } = useI18n();
+  const { t, language, setLanguage } = useI18n();
   const { appearance, setAppearance } = useAppearance();
   const router = useRouter();
 
@@ -55,13 +55,23 @@ export function SettingsSection() {
     if (next !== appearance) setAppearance(next).catch(showSaveFailure);
   };
 
-  const chooseLanguage = (next: LanguageSetting) => {
+  // 言語は、読みの入力ルール（日本語は、かなだけ）も変わるので、切り替える前に確認する。
+  // ダイアログの文言は、切り替える前の言語。
+  const chooseLanguage = (next: Language) => {
     setSheet(null);
-    if (next !== languageSetting) setLanguageSetting(next).catch(showSaveFailure);
+    if (next === language) return;
+    Alert.alert(
+      t('settings.language.confirmTitle'),
+      t('settings.language.confirmMessage', { language: languageNames[next] }),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('settings.language.confirmAction'),
+          onPress: () => setLanguage(next).catch(showSaveFailure),
+        },
+      ],
+    );
   };
-
-  const languageLabel = (setting: LanguageSetting) =>
-    setting === 'system' ? t('settings.language.system') : languageNames[setting];
 
   // 切り替えは、すぐ反映して、保存できなかったら戻す（スイッチが、指を離した後で戻らないように）。
   const toggleSuggestions = (next: boolean, previous: boolean) => {
@@ -97,7 +107,7 @@ export function SettingsSection() {
       />
       <SettingsRow
         label={t('settings.language')}
-        value={languageLabel(languageSetting)}
+        value={languageNames[language]}
         onPress={() => setSheet('language')}
       />
 
@@ -145,8 +155,8 @@ export function SettingsSection() {
       <OptionSheet
         visible={sheet === 'language'}
         title={t('settings.language')}
-        options={LANGUAGE_SETTINGS.map((value) => ({ value, label: languageLabel(value) }))}
-        selected={languageSetting}
+        options={LANGUAGES.map((value) => ({ value, label: languageNames[value] }))}
+        selected={language}
         onSelect={chooseLanguage}
         onClose={() => setSheet(null)}
       />

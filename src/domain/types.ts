@@ -17,7 +17,8 @@ export function isAppearance(value: unknown): value is Appearance {
 }
 
 /**
- * 表示言語。端末の言語は、これのどれかに当てはめて使う（src/i18n）。
+ * 表示言語（言語の設定そのもの。`Appearance` と違い、`system` は無い）。端末の言語は、初回起動で
+ * これのどれかに当てはめて保存する（src/i18n の `deviceLanguage`）。
  * 足すときは、src/i18n の文言と、app.json の expo-localization の
  * `supportedLocales`（ios）にも足す（後者は `npm test` が食い違いを検出する）。
  */
@@ -26,14 +27,6 @@ export type Language = (typeof LANGUAGES)[number];
 
 export function isLanguage(value: unknown): value is Language {
   return LANGUAGES.some((language) => language === value);
-}
-
-/** 言語の設定。`system` は端末の言語に従う（既定）。`Appearance` と同じ形。 */
-export const LANGUAGE_SETTINGS = ['system', ...LANGUAGES] as const;
-export type LanguageSetting = (typeof LANGUAGE_SETTINGS)[number];
-
-export function isLanguageSetting(value: unknown): value is LanguageSetting {
-  return LANGUAGE_SETTINGS.some((setting) => setting === value);
 }
 
 export interface Tag {

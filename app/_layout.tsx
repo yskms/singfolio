@@ -1,8 +1,9 @@
+import { getLocales } from 'expo-localization';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 
-import type { Appearance, LanguageSetting } from '../src/domain/types';
+import type { Appearance, Language } from '../src/domain/types';
 import { getServices } from '../src/services';
 import { I18nProvider } from '../ui/i18n';
 import { applyAppearance, ThemeProvider } from '../ui/theme';
@@ -24,7 +25,7 @@ export default function RootLayout() {
   // 保存済みの設定。読み込み（と、外観の端末への反映）が終わるまでは null。
   const [settings, setSettings] = useState<{
     appearance: Appearance;
-    language: LanguageSetting;
+    language: Language;
   } | null>(null);
   // reject の値が undefined などでも失敗を検知できるよう、包んで保持する。
   const [failure, setFailure] = useState<{ error: unknown } | null>(null);
@@ -35,7 +36,8 @@ export default function RootLayout() {
     getServices()
       .then(async ({ settings: service }) => ({
         appearance: await service.getAppearance(),
-        language: await service.getLanguageSetting(),
+        // 初回起動は、端末の言語から決めて保存する（以後は、端末の言語に追従しない）。
+        language: await service.ensureLanguage(getLocales().map((locale) => locale.languageTag)),
       }))
       .then((saved) => {
         // 最初の画面を描く前に端末へ反映する。描いた後だと、既定の配色が一瞬見える。
@@ -61,7 +63,7 @@ export default function RootLayout() {
 
   return (
     // ThemeProvider は、ナビゲーションの書体を表示言語から決めるため、I18nProvider の内側。
-    <I18nProvider initialSetting={settings.language}>
+    <I18nProvider initialLanguage={settings.language}>
       <ThemeProvider initialAppearance={settings.appearance}>
         <StatusBar style="auto" />
         {/* iOSの戻るボタンの長押しメニューは、前の画面の題を並べる。下の画面は `(tabs)`（題を付けて
