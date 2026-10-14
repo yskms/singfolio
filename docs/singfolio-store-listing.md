@@ -247,7 +247,9 @@ Apple へ送る検索語があるため、次の1項目を申告する。他は�
             入れ替え、`adb push` → `run-as ... cp` で戻す。`run-as` は debuggable なアプリにしか使えず、エミュレータ
             （production ビルド）は `adb root` も使えないので、`android/app/build.gradle`（prebuild の生成物）の
             `release` に、一時的に `debuggable true` を足して Release ビルドする（開発者向けの機能は、
-            React Native 側の設定で、debuggable でも有効にならない）。撮影のあとは、この行を消す。
+            React Native 側の設定で、debuggable でも有効にならない）。撮影のあとは、この行を消し、
+            `grep debuggable android/app/build.gradle` が何も出さないことを確かめる（消し忘れた debuggable な AAB は、
+            Play Console が受け付けない）。ストア提出用のビルドの前にも、もう一度確かめる。
         -   Practice の「Last updated」の日付は、撮った日で変わる。English・日本語の6枚は、同じ日に撮る。
 -   App Store は、1枚から10枚。JPEG・PNG、透過なし。サイズの仕様は、提出のとき、App Store Connect で最新の
     ものを確認する（上の「App Store 用」）。
