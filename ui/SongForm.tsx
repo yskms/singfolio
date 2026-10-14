@@ -15,6 +15,7 @@ import {
 } from '../src/domain/types';
 import { errorMessageKey } from '../src/i18n';
 import { getServices, ServiceError, type SongInput } from '../src/services';
+import { lookupReading } from '../src/services/artistReadingDictionary';
 import { defaultReading, readingProblem } from '../src/services/readingRules';
 import { MIN_CATALOG_TERM_LENGTH, mergeArtistSuggestions } from '../src/services/suggestionRules';
 import { resolveTagInput } from '../src/services/tagInput';
@@ -28,6 +29,7 @@ import { SuggestionList } from './SuggestionList';
 import { TagPicker } from './TagPicker';
 import { Text } from './Text';
 import { useTheme } from './theme';
+import { useArtistReadingDictionary } from './useArtistReadingDictionary';
 import { useSuggestions } from './useSuggestions';
 
 /** 追加画面の Status の既定。「曲を登録 → Readyにする」が中心の体験のため。 */
@@ -62,9 +64,10 @@ function sameIds(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
  *
  * - 曲名・アーティストが空なら、保存せずに両方の欄にエラーを出す（Serviceの検証と同じ
  *   `normalizeText` で判定し、Serviceのエラーは念のため受ける）。
- * - アーティストの「読み」（並び替え用の名前）は必須。名前を入れる・候補から選ぶと、登録済みの
- *   アーティストならその読み、そうでなければ名前から決めた初期値が入る（`defaultReading`。日本語の
- *   設定で、漢字・英字を含む名前は空）。自分で書き換えたあとは、名前を変えても上書きしない。
+ * - アーティストの「読み」（並び替え用の名前）は必須。名前を入れる・候補から選ぶと、読みの初期値が入る。
+ *   登録済みのアーティストならその読み、日本語の設定では、そうでなければ辞書（MusicBrainz のデータ。
+ *   端末内だけ）の読み、それも無ければ名前から決めた値（`defaultReading`。日本語の設定で、漢字・英字を
+ *   含む名前は空）。自分で書き換えたあとは、名前を変えても上書きしない。
  *   日本語の設定では、かなだけ（`readingProblem`）。読みを**変えたとき**だけ確認する（編集画面を
  *   開いただけで、保存済みの読みを咎めない）。読みは、そのアーティストの全曲に効く。
  * - 新しいタグは、保存するときに、曲と同じトランザクションで作る（保存せずに戻ったときも、
@@ -167,6 +170,10 @@ export function SongForm({ song, tags }: { song?: Song; tags: readonly Tag[] }) 
     };
   }, []);
 
+  // 辞書は、日本語の設定で、アーティストを入力した（候補から選んだ）ときに、初めて読み込む。英語の
+  // 設定の読みは、並び替え用の名前（`The` を除くなど）で、かなの読みを初期値にしない。
+  const dictionary = useArtistReadingDictionary(language === 'ja' && artistTouched);
+
   // 名前（と言語）から、読みの初期値を決める。自分で書き換えたあとは決めない。
   const knownArtist = useMemo(() => {
     const key = artistNameKey(artist);
@@ -175,8 +182,12 @@ export function SongForm({ song, tags }: { song?: Song; tags: readonly Tag[] }) 
   useEffect(() => {
     if (readingTouched || knownArtists === null) return;
     const name = normalizeText(artist);
-    setReading(name === '' ? '' : (knownArtist?.reading ?? defaultReading(name, language)));
-  }, [artist, language, knownArtist, knownArtists, readingTouched]);
+    const fromDictionary =
+      language === 'ja' && dictionary !== null ? lookupReading(dictionary, name) : undefined;
+    setReading(
+      name === '' ? '' : (knownArtist?.reading ?? fromDictionary ?? defaultReading(name, language)),
+    );
+  }, [artist, language, knownArtist, knownArtists, readingTouched, dictionary]);
 
   const titleActive = titleFocused && titleEdited && title !== pickedTitle;
   const artistActive = artistFocused && artistEdited && artist !== pickedArtist;

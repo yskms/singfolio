@@ -128,6 +128,11 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     `import type`、enumやコンストラクタ引数プロパティは使わない（tsconfigで検出する）。
     importは `.ts` 付き（付け忘れは型チェックを通り、`npm test` の実行時にだけ失敗する）。
     テストファイルの先頭には `/// <reference types="node" />` を置く（エディタ用）。
+-   アーティストの読みの辞書（`assets/artist-readings.json`）は、`scripts/build-artist-readings.mjs` の
+    生成物で、手で直さない。MusicBrainz のコアデータ（CC0）から作り、**端末内だけで引く**（実行時に
+    MusicBrainz の API を呼ばない。商用では有料プランが前提で、外部への送信も増える）。日本語の設定の
+    読みの初期値にだけ使う（英語の設定には使わない）。誤った読みを出さないため、割れる読みは辞書に
+    入れない。詳細は `docs/singfolio-data-model.md`「アーティストの読みの辞書」。
 -   曲名・アーティストの並び替えは、SQLの `ORDER BY ... COLLATE NOCASE` ではなく、Serviceが
     `sortKey`（`src/services/text.ts`）で行う（五十音順。ひらがな・カタカナを混ぜ、濁点・小さい
     かな・長音を整える）。アーティストは、名前ではなく**読み**で並べる。SQLに「簡略化」しない
