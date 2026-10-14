@@ -199,34 +199,56 @@ Apple へ送る検索語があるため、次の1項目を申告する。他は�
     （`https://developer.apple.com/app-store/asset-best-practices/`）の素材に使う。このページには
     3840×1646 の記載が無く（Product page header・Search results asset などは、Apple が配る
     テンプレートの寸法に従う）、どの素材にどの寸法かは、提出時にテンプレートで確認する。
--   **スクリーンショット**: 6枚（Songs・Song Detail・Add Song・Practice・Show Mode・Profile のダーク表示）を、
-    English と日本語で、それぞれ用意した。見出し・補足つきで、`assets/store-screenshots/` にある。
-    -   `raw/{en,ja}/` はシミュレータ（iPhone 18 Pro、1206×2622）の撮影画像で、`scripts/store-screenshots/compose.sh` が
-        見出し・補足・背景を合成して、`ios/` と `play/` に出す。ブランドの色と書体
-        （Inter / Noto Sans JP。`assets/fonts/`）を使い、採点や順位を連想させる表現は使わない。
+-   **スクリーンショット**: Songs・Song Detail・Add Song・Practice・Show Mode・Profile（ダーク表示）の6枚を、
+    English と日本語で用意した（日本語の Google Play 用は、Add Song を除く5枚。下記）。見出し・補足つきで、
+    `assets/store-screenshots/` にある。ブランドの色と書体（Inter / Noto Sans JP。`assets/fonts/`）を使い、
+    採点や順位を連想させる表現は使わない。
+    -   **撮影画像**は、App Store 用が `raw/{en,ja}/`（iOS シミュレータ。iPhone 18 Pro、1206×2622）、
+        Google Play 用が `raw-android/{en,ja}/`（Android エミュレータ。1080×2424）。`scripts/store-screenshots/compose.sh`
+        が、見出し・補足・背景を合成して、`ios/` と `play/` に出す（生成物は手で編集しない）。
+    -   **App Store** 用は 1320×2868（`ios/`）。App Store Connect の「Dynamic Island (large)」。App Store Connect の
+        必須は「Dynamic Island (medium)」（6.1インチ、1179×2556）の1枚以上で、Apple の仕様ページ
+        （2026年10月に確認）は、「UI が各サイズで一貫していれば、必要な最高の解像度だけ出せば、App Store Connect が
+        小さい大きさへ縮小する」としている。1320×2868 だけで 1179×2556 の枠が埋まるかは、提出のとき、
+        App Store Connect にアップロードして確かめる。埋まらなければ、`compose.sh` に 1179×2556 の出力を足す。
+    -   **Google Play** 用は 1080×1920（`play/`。9:16）。Play は長辺が短辺の2倍までなので、Android の撮影画像
+        （比率 約2.24）もそのまま使えず、別のキャンバスに合成している。下端は、画像をはみ出させて切るが、切り口が
+        ボタンや行の途中に当たらないよう、余白の帯に合わせて画像の大きさを少し変える（`find_cut.py`）。
+    -   **日本語の Google Play 用に、Add Song が無い理由**: Android エミュレータには日本語の入力手段が無い
+        （Gboard に日本語が入っておらず、クリップボードの共有・エミュレータコンソールの `event text`・
+        ADBKeyBoard のどれも使えなかった）。足すときは、Android 実機で撮る。
     -   **背景**は、Mint `#C9FCED` と Lavender `#EEE5FF` を交互にし（1〜5枚目）、6枚目だけ Purple `#9C70FE`。
         Lavender は Purple を白に約18%混ぜた派生色（ブランド表にはない）。白に近い中立色は、白いストアの
         ページで画像の縁が消える（白との差が 1.09:1）ので、背景にしない。見出しは Text Primary `#17171A`。
         補足は `#52525B`（Text Secondary `#71717A` は、Mint の上で 4.29:1、Lavender の上で 3.98:1 と、AA の
         4.5 に足りないため、濃くした）。6枚目の補足だけ `#17171A`（Purple の上では、グレーが読めない）。
-    -   **App Store** 用は 1320×2868（`ios/`）。App Store Connect の「Dynamic Island (large)」で、小さい大きさへは
-        自動で縮小される。
-    -   **Google Play** 用は 1080×1920（`play/`。9:16）。Play は長辺が短辺の2倍までなので、iPhone の画像
-        （比率 約2.17）はそのまま使えず、同じ撮影画像を別のキャンバスに合成している。撮影は iPhone だけで、
-        Android には撮り直さない（ヘッダー・戻るボタン・ステータスバーは、iOS の見た目になる）。
     -   **曲名・アーティスト名はすべて架空**（`scripts/store-screenshots/seed.py` が、撮影用のDBへ入れる）。
-        実在のアーティスト・曲を、画面に出さない。審査で第三者の素材（App Store 5.2.1）を指摘されないためと、
-        実在の人名を、許可なく宣伝の画像に載せないため。足すときは、Apple の検索 API
-        （`entity=musicArtist`）で、同じ名前のアーティストが居ないことを確かめる（`Marlo Vance`・`Luna Quill`・
-        `Hollis Gray` など、架空のつもりの名前が、実在した）。
+        実在のアーティスト・曲を、画面に出さない。第三者の素材（App Store 5.2.1）に当たらないためと、
+        実在の人名を、許可なく宣伝の画像に載せないため。足すときは、`check_names.py`（Apple の検索 API の
+        `entity=musicArtist`）で、同じ名前のアーティストが居ないことを確かめる（`Marlo Vance`・`Luna Quill`・
+        `Hollis Gray` など、架空のつもりの名前が、実在した）。曲名は、実在の曲と偶然一致してもよい。
     -   **候補（Suggestions）が出ている画面は、スクリーンショットにしない**。候補は Apple のカタログの実在の曲
-        で、避けられない。Add Song は、候補をオフにして、架空の曲を入力した画面にしている（入力した文字が、
-        撮影中に Apple へ送られることも避ける）。候補があることは、掲載文で伝える。
-    -   撮影は Release ビルド（debug は、LogBox が写り、ダーク表示の配色も変わる）。ステータスバーは
-        `xcrun simctl status_bar <UDID> override --time 9:41 ...` で揃え、撮影後に `clear` で戻す。
--   App Store のサイズは、App Store Connect の最新の仕様を、提出時に確認する（2026年10月に確認した
-    ときは、6.1インチ 1179×2556 が必須、6.9インチ 1320×2868 などは任意で、足りない大きさは自動で
-    縮小。1枚から10枚。JPEG・PNG、透過なし）。
+        で、避けられない。Add Song は、候補をオフにして、`seed.py` の `ADD_SONG` の値を手で入力した画面にしている
+        （入力した文字が、撮影中に Apple へ送られることも避ける）。候補があることは、掲載文で伝える。
+    -   **撮影の手順**（再現できるよう、使ったコマンドを残す）:
+        -   Release ビルドで撮る（debug は、LogBox が写り、ダーク表示の配色も変わる）。撮影用のデータは、アプリを止めて、
+            DB を `seed.py` で入れ替える（`seed.py <en|ja> <DB> [light|dark] [on|off]`）。
+        -   iOS: ステータスバーを `xcrun simctl status_bar <UDID> override --time 9:41 --batteryState charged
+            --batteryLevel 100 --wifiBars 3 --cellularBars 4 --operatorName ''` で揃え、撮影後に `status_bar <UDID> clear`
+            で戻す。撮影は `xcrun simctl io <UDID> screenshot`。
+        -   Android: ステータスバーはデモモード（`settings put global sysui_demo_allowed 1` のあと、
+            `am broadcast -a com.android.systemui.demo -e command` に、`enter`・`clock -e hhmm 0941`・
+            `battery -e level 100 -e plugged false`・`network -e wifi show -e level 4 -e fully true`・
+            `network -e mobile hide`・`notifications -e visible false` を順に渡す。戻すときは `exit` と
+            `settings delete global sysui_demo_allowed`）。撮影は `adb exec-out screencap -p`。
+            DB は、`adb exec-out run-as com.yskms.singfolio cat files/SQLite/singfolio.db` で取り出して `seed.py` で
+            入れ替え、`adb push` → `run-as ... cp` で戻す。`run-as` は debuggable なアプリにしか使えず、エミュレータ
+            （production ビルド）は `adb root` も使えないので、`android/app/build.gradle`（prebuild の生成物）の
+            `release` に、一時的に `debuggable true` を足して Release ビルドする（開発者向けの機能は、
+            React Native 側の設定で、debuggable でも有効にならない）。撮影のあとは、この行を消す。
+        -   Practice の「Last updated」の日付は、撮った日で変わる。English・日本語の6枚は、同じ日に撮る。
+-   App Store は、1枚から10枚。JPEG・PNG、透過なし。サイズの仕様は、提出のとき、App Store Connect で最新の
+    ものを確認する（上の「App Store 用」）。
 -   Google Play は、スマートフォン用に2〜8枚（JPEG または 24ビットPNG。辺は320〜3840px。長辺は短辺の2倍まで）。
     9:16 の 1080px 以上を4枚以上出すと、おすすめの掲載の対象になる。
 

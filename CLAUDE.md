@@ -289,8 +289,9 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     アーティストに「簡略化」しない（審査の5.2.1と、実在の人名を宣伝に載せないため）。名前を足すときは、
     Apple の検索 API で同名の実在が無いことを確かめる（架空のつもりの名前が実在した例が多い）。
 -   候補（Suggestions）が出ている画面は撮らない（実在の曲が出るため）。Add Song は、候補をオフにして撮る。
--   `assets/store-screenshots/{ios,play}/` は `compose.sh` の生成物で、手で編集しない。撮影は iPhone のシミュレータ
-    だけで、Play 用は同じ撮影画像から作る（Play は長辺が短辺の2倍まで。iPhone の画像はそのまま使えない）。
+-   `assets/store-screenshots/{ios,play}/` は `compose.sh` の生成物で、手で編集しない。撮影画像は、App Store 用が
+    iOS シミュレータ（`raw/`）、Google Play 用が Android エミュレータ（`raw-android/`）。Play は長辺が短辺の2倍
+    までなので、撮影画像をそのままは出せず、`compose.sh` が別のキャンバスに合成する。
 
 ### ネイティブビルド
 
