@@ -8,6 +8,10 @@ export { DatabaseTooNewError } from '../db/errors.ts';
 export type ServiceErrorCode =
   | 'title-required'
   | 'artist-required'
+  | 'artist-reading-required'
+  | 'artist-name-required'
+  | 'artist-name-duplicate'
+  | 'artist-not-found'
   | 'invalid-status'
   | 'invalid-key-offset'
   | 'song-not-found'

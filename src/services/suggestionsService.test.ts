@@ -334,6 +334,16 @@ describe('localArtists', () => {
     assert.equal(calls.length, 0);
   });
 
+  it('アーティストの読みでも探せる（ひらがな・カタカナを区別しない）。候補は名前', async () => {
+    const { services } = await createTestServices();
+    await services.songs.createSong({ title: 'a', artist: '米津玄師', artistReading: 'よねづけんし', status: 'ready' });
+    await services.songs.createSong({ title: 'b', artist: 'ELLEGARDEN', artistReading: 'えるれがーでん', status: 'ready' });
+    assert.deepEqual(await services.suggestions.localArtists('よねづ'), ['米津玄師']);
+    assert.deepEqual(await services.suggestions.localArtists('エルレ'), ['ELLEGARDEN']);
+    // 名前にも合う（大文字小文字は区別しない。入力と同じ字面だけが除かれる）。
+    assert.deepEqual(await services.suggestions.localArtists('ellegarden'), ['ELLEGARDEN']);
+  });
+
   it('1文字から出す。空・入力と同じ文字列は出さない。最大4件', async () => {
     const { services } = await createTestServices();
     for (let i = 0; i < 6; i++) {

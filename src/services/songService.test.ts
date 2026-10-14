@@ -33,10 +33,13 @@ describe('createSong', () => {
       artist: 'スピッツ',
       status: 'ready',
     });
+    // アーティスト（id-1）が先に作られ、曲は id-2。読みは省略すると名前になる。
     assert.deepEqual(song, {
-      id: 'id-1',
+      id: 'id-2',
       title: 'チェリー',
       artist: 'スピッツ',
+      artistId: 'id-1',
+      artistReading: 'スピッツ',
       status: 'ready',
       keyOffset: 0,
       privateNote: '',
@@ -44,8 +47,8 @@ describe('createSong', () => {
       createdAt: 1_000,
       updatedAt: 1_000,
     });
-    assert.equal(env.newId(), 'id-2', 'IDはRepositoryが生成する');
-    assert.deepEqual(await services.songs.getSong('id-1'), song);
+    assert.equal(env.newId(), 'id-3', 'IDはRepositoryが生成する');
+    assert.deepEqual(await services.songs.getSong('id-2'), song);
   });
 
   it('全項目を保存できる（My Keyは負の値も可）', async () => {
@@ -247,6 +250,149 @@ describe('createSong', () => {
     assert.equal(count('tags'), 0);
     assert.equal(count('songs'), 0);
     assert.equal(count('song_tags'), 0);
+  });
+});
+
+describe('アーティスト', () => {
+  const artistRows = (sqlite: { prepare(sql: string): { all(): unknown[] } }) =>
+    sqlite.prepare('SELECT name, reading FROM artists ORDER BY name').all().map((row) => ({ ...(row as object) }));
+
+  it('読みを渡すと、新しいアーティストの読みになる。省略すると名前になる', async () => {
+    const { services, sqlite } = await setup();
+    const withReading = await services.songs.createSong({
+      title: 'a', artist: 'ELLEGARDEN', artistReading: 'えるれがーでん', status: 'ready',
+    });
+    await services.songs.createSong({ title: 'b', artist: 'Queen', status: 'ready' });
+    assert.equal(withReading.artistReading, 'えるれがーでん');
+    assert.deepEqual(artistRows(sqlite), [
+      { name: 'ELLEGARDEN', reading: 'えるれがーでん' },
+      { name: 'Queen', reading: 'Queen' },
+    ]);
+  });
+
+  it('同じアーティスト（大文字小文字・全角半角の違いを除く）は、1つにまとまる。名前は最初の表記のまま', async () => {
+    const { services, sqlite } = await setup();
+    const first = await services.songs.createSong({ title: 'a', artist: 'Mr.Children', status: 'ready' });
+    const second = await services.songs.createSong({ title: 'b', artist: 'MR.CHILDREN', status: 'ready' });
+    const third = await services.songs.createSong({ title: 'c', artist: 'Ｍｒ．Ｃｈｉｌｄｒｅｎ', status: 'ready' });
+    assert.equal(second.artistId, first.artistId);
+    assert.equal(third.artistId, first.artistId);
+    assert.equal(third.artist, 'Mr.Children', '既存の名前は書き換えない');
+    assert.equal((sqlite.prepare('SELECT count(*) AS c FROM artists').get() as { c: number }).c, 1);
+  });
+
+  it('ひらがなとカタカナは、別のアーティスト', async () => {
+    const { services } = await setup();
+    const a = await services.songs.createSong({ title: 'a', artist: 'ひなた', status: 'ready' });
+    const b = await services.songs.createSong({ title: 'b', artist: 'ヒナタ', status: 'ready' });
+    assert.notEqual(a.artistId, b.artistId);
+  });
+
+  it('既存のアーティストに読みを渡すと、アーティストの読みが変わり、全曲に効く', async () => {
+    const { services } = await setup();
+    const a = await services.songs.createSong({ title: 'a', artist: 'ELLEGARDEN', status: 'ready' });
+    const b = await services.songs.createSong({ title: 'b', artist: 'ELLEGARDEN', status: 'ready' });
+    await services.songs.createSong({
+      title: 'c', artist: 'ELLEGARDEN', artistReading: 'えるれがーでん', status: 'ready',
+    });
+    assert.equal((await services.songs.getSong(a.id))?.artistReading, 'えるれがーでん');
+    assert.equal((await services.songs.getSong(b.id))?.artistReading, 'えるれがーでん');
+  });
+
+  it('読みを省略した保存は、既存のアーティストの読みを変えない', async () => {
+    const { services } = await setup();
+    await services.songs.createSong({
+      title: 'a', artist: 'ELLEGARDEN', artistReading: 'えるれがーでん', status: 'ready',
+    });
+    const b = await services.songs.createSong({ title: 'b', artist: 'ELLEGARDEN', status: 'ready' });
+    assert.equal(b.artistReading, 'えるれがーでん');
+  });
+
+  it('読みは正規化して保存する（全角英数字・半角カナ）。空は保存しない', async () => {
+    const { services, sqlite, count } = await setup();
+    const song = await services.songs.createSong({
+      title: 'a', artist: 'Maroon 5', artistReading: 'ﾏﾙｰﾝ５', status: 'ready',
+    });
+    assert.equal(song.artistReading, 'マルーン5');
+    await rejectsWith(
+      services.songs.createSong({ title: 'b', artist: 'X', artistReading: '  ', status: 'ready' }),
+      'artist-reading-required',
+    );
+    assert.equal(count('songs'), 1);
+    assert.equal(count('artists'), 1, '失敗した保存で、アーティストも作らない');
+    assert.deepEqual(artistRows(sqlite), [{ name: 'Maroon 5', reading: 'マルーン5' }]);
+  });
+
+  it('曲の保存が失敗したら、作ったアーティストも残らない', async () => {
+    const { services, count } = await setup();
+    await rejectsWith(
+      services.songs.createSong({ title: 'a', artist: 'X', status: 'ready', tagIds: ['nope'] }),
+      'tag-not-found',
+    );
+    assert.equal(count('artists'), 0);
+  });
+
+  it('曲のアーティストを別のアーティストに付け替えると、曲が無くなったアーティストは消える', async () => {
+    const { services, sqlite } = await setup();
+    const song = await services.songs.createSong({ title: 'a', artist: 'Old', status: 'ready' });
+    await services.songs.createSong({ title: 'b', artist: 'Other', status: 'ready' });
+    const moved = await services.songs.updateSong(song.id, {
+      title: 'a', artist: 'New', status: 'ready', keyOffset: 0, privateNote: '', tagIds: [],
+    });
+    assert.equal(moved.artist, 'New');
+    assert.deepEqual(artistRows(sqlite).map((row) => (row as { name: string }).name), ['New', 'Other']);
+  });
+
+  it('付け替えても、他の曲があるアーティストは残る', async () => {
+    const { services, sqlite } = await setup();
+    const a = await services.songs.createSong({ title: 'a', artist: 'Keep', status: 'ready' });
+    await services.songs.createSong({ title: 'b', artist: 'Keep', status: 'ready' });
+    await services.songs.updateSong(a.id, {
+      title: 'a', artist: 'Move', status: 'ready', keyOffset: 0, privateNote: '', tagIds: [],
+    });
+    assert.deepEqual(artistRows(sqlite).map((row) => (row as { name: string }).name), ['Keep', 'Move']);
+  });
+
+  it('曲を削除して、そのアーティストの最後の曲なら、アーティストも消える', async () => {
+    const { services, count } = await setup();
+    const a = await services.songs.createSong({ title: 'a', artist: 'X', status: 'ready' });
+    const b = await services.songs.createSong({ title: 'b', artist: 'X', status: 'ready' });
+    await services.songs.deleteSong(a.id);
+    assert.equal(count('artists'), 1);
+    await services.songs.deleteSong(b.id);
+    assert.equal(count('artists'), 0);
+  });
+
+  it('読みだけを変えた保存では、曲の updatedAt は変わらず、アーティストの読みは変わる', async () => {
+    const { services, advance } = await setup();
+    const song = await services.songs.createSong({ title: 'a', artist: 'X', status: 'ready' });
+    advance();
+    const saved = await services.songs.updateSong(song.id, {
+      title: 'a', artist: 'X', artistReading: 'えっくす', status: 'ready', keyOffset: 0, privateNote: '', tagIds: [],
+    });
+    assert.equal(saved.artistReading, 'えっくす');
+    assert.equal(saved.updatedAt, song.updatedAt);
+  });
+
+  it('大文字小文字だけ違うアーティスト名での保存は、曲の内容が変わらない（updatedAt も変えない）', async () => {
+    const { services, advance } = await setup();
+    const song = await services.songs.createSong({ title: 'a', artist: 'Queen', status: 'ready' });
+    advance();
+    const saved = await services.songs.updateSong(song.id, {
+      title: 'a', artist: 'QUEEN', status: 'ready', keyOffset: 0, privateNote: '', tagIds: [],
+    });
+    assert.equal(saved.artist, 'Queen');
+    assert.equal(saved.updatedAt, song.updatedAt);
+  });
+
+  it('ステータスの変更は、アーティストの読みを変えない', async () => {
+    const { services } = await setup();
+    const song = await services.songs.createSong({
+      title: 'a', artist: 'ELLEGARDEN', artistReading: 'えるれがーでん', status: 'ready',
+    });
+    const changed = await services.songs.setStatus(song.id, 'practice');
+    assert.equal(changed.artistReading, 'えるれがーでん');
+    assert.equal(changed.artistId, song.artistId);
   });
 });
 
@@ -642,6 +788,91 @@ describe('listSongs', () => {
     // アーティストが同じ曲（Mr.Children）は、曲名の昇順になる。
     assert.deepEqual(await sorted('artist', 'asc'), ['Zeal', 'hanabi', 'Sign', 'Cherry']);
     assert.deepEqual(await sorted('artist', 'desc'), ['Cherry', 'hanabi', 'Sign', 'Zeal']);
+  });
+
+  describe('五十音順', () => {
+    async function kana() {
+      const t = await setup();
+      const add = (title: string, artist: string, artistReading?: string) =>
+        t.services.songs.createSong({ title, artist, artistReading, status: 'ready' });
+      return { ...t, add };
+    }
+
+    it('曲名は、ひらがな・カタカナを混ぜて五十音順に並べる（英字・数字は先頭、漢字は最後）', async () => {
+      const { services, add } = await kana();
+      await add('ラーメン', 'x');
+      await add('あめ', 'x');
+      await add('アイス', 'x');
+      await add('ありがとう', 'x');
+      await add('Zebra', 'x');
+      await add('1番', 'x');
+      await add('桜', 'x');
+      await add('かぜ', 'x');
+      await add('ガラス', 'x');
+      await add('きみ', 'x');
+      const sorted = titles(await services.songs.listSongs({ sortBy: 'title', direction: 'asc' }));
+      assert.deepEqual(sorted, ['1番', 'Zebra', 'アイス', 'あめ', 'ありがとう', 'かぜ', 'ガラス', 'きみ', 'ラーメン', '桜']);
+    });
+
+    it('濁点・小さいかな・長音は、五十音順の位置を変えない', async () => {
+      const { services, add } = await kana();
+      await add('がい', 'x'); // か行（濁点は同じ位置）。「かう」より後ろ、ではなく「かう」より前（い < う）。
+      await add('かう', 'x');
+      await add('らいぶ', 'x');
+      await add('ラーメン', 'x'); // らあめん
+      await add('らくだ', 'x');
+      await add('きょう', 'x'); // きよう
+      await add('きよい', 'x');
+      const sorted = titles(await services.songs.listSongs({ sortBy: 'title', direction: 'asc' }));
+      // ラーメン = らあめん < らいぶ < らくだ。きよい < きょう（きよう）。
+      assert.deepEqual(sorted, ['がい', 'かう', 'きよい', 'きょう', 'ラーメン', 'らいぶ', 'らくだ']);
+    });
+
+    it('アーティストは、読みで並べる（漢字・英字の名前も、読みの位置に来る）', async () => {
+      const { services, add } = await kana();
+      await add('a', '米津玄師', 'よねづけんし');
+      await add('b', 'ELLEGARDEN', 'えるれがーでん');
+      await add('c', 'スピッツ', 'すぴっつ');
+      await add('d', 'Linkin Park', 'りんきんぱーく');
+      await add('e', 'The Beatles', 'Beatles');
+      await add('f', 'あいみょん');
+      const asc = await services.songs.listSongs({ sortBy: 'artist', direction: 'asc' });
+      assert.deepEqual(
+        asc.map((song) => song.artist),
+        ['The Beatles', 'あいみょん', 'ELLEGARDEN', 'スピッツ', '米津玄師', 'Linkin Park'],
+      );
+      const desc = await services.songs.listSongs({ sortBy: 'artist', direction: 'desc' });
+      assert.deepEqual(
+        desc.map((song) => song.artist),
+        ['Linkin Park', '米津玄師', 'スピッツ', 'ELLEGARDEN', 'あいみょん', 'The Beatles'],
+      );
+    });
+
+    it('アーティストの読みを変えると、並びが変わる（全曲に効く）', async () => {
+      const { services, add } = await kana();
+      await add('a', 'X', 'い');
+      const b = await add('b', 'Y', 'う');
+      await add('c', 'X'); // 読みを省略した保存は、X の読み（い）を変えない
+      assert.deepEqual(
+        (await services.songs.listSongs({ sortBy: 'artist', direction: 'asc' })).map((song) => song.artist),
+        ['X', 'X', 'Y'],
+      );
+      // Y の読みを、X（い）より前の「あ」にする。
+      await services.artists.updateArtist(b.artistId, { name: 'Y', reading: 'あ' });
+      assert.deepEqual(
+        (await services.songs.listSongs({ sortBy: 'artist', direction: 'asc' })).map((song) => song.artist),
+        ['Y', 'X', 'X'],
+      );
+    });
+
+    it('アーティストの読みでも検索できる（ひらがな・カタカナを区別しない）', async () => {
+      const { services, add } = await kana();
+      await add('a', '米津玄師', 'よねづけんし');
+      await add('b', 'ELLEGARDEN', 'えるれがーでん');
+      assert.deepEqual(titles(await services.songs.listSongs({ search: 'よねづ' })), ['a']);
+      assert.deepEqual(titles(await services.songs.listSongs({ search: 'エルレ' })), ['b']);
+      assert.deepEqual(titles(await services.songs.listSongs({ search: 'ellegarden' })), ['b']);
+    });
   });
 
   it('登録日・更新日で並べる', async () => {

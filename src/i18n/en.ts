@@ -100,10 +100,21 @@ export const en = {
   'settings.suggestionsNote':
     'What you type in Title and Artist is sent to Apple to find suggestions. Nothing else is sent.',
   'settings.tags': 'Tags',
+  'settings.artists': 'Artists',
   'settings.about': 'About',
   'settings.saveFailedTitle': 'Couldn’t save the setting',
 
   // Tags（app/tags.tsx）。タグ名の入力の誤りは、error.tagName* を使う。
+  // Artists（app/artists.tsx）。Settings から開く。読みの文言は songForm.reading を使う。
+  'artists.title': 'Artists',
+  'artists.empty.title': 'No artists yet',
+  'artists.empty.message': 'The artists of the songs you add will appear here.',
+  'artists.rowHint': 'Edit this artist’s name and sort name',
+  'artists.songCount': { one: '{count} song', other: '{count} songs' },
+  'artists.editTitle': 'Edit artist',
+  'artists.nameLabel': 'Name',
+  'artists.save': 'Save',
+
   'tags.title': 'Tags',
   'tags.empty.title': 'No tags yet',
   'tags.empty.message': 'Tags you add to songs will appear here.',
@@ -165,6 +176,10 @@ export const en = {
   'songForm.notFoundTitle': 'Song not found',
   'songForm.title': 'Title',
   'songForm.artist': 'Artist',
+  // 読み（アーティストの並び替え用の名前）。英語は、`The` を除くなど、自由に決められる。
+  'songForm.reading': 'Sort name',
+  'songForm.readingNote':
+    'Used to sort this artist’s songs. For example, enter “Beatles” for “The Beatles”.',
   // 必須の項目。見た目は「*」で、読み上げでは、この文言を添える。
   'songForm.requiredHint': 'Required',
   'songForm.status': 'Status',
@@ -194,6 +209,12 @@ export const en = {
   // ServiceErrorCode → 文言の対応は errors.ts。
   'error.titleRequired': 'Enter a title.',
   'error.artistRequired': 'Enter an artist.',
+  'error.artistReadingRequired': 'Enter a sort name.',
+  'error.artistNameRequired': 'Enter an artist name.',
+  'error.artistNameDuplicate': 'An artist with this name already exists.',
+  'error.artistNotFound': 'This artist no longer exists.',
+  // 画面だけの確認（Serviceのエラーではない）。日本語の設定で、読みに漢字・英字を使ったとき。
+  'error.readingKanaOnly': 'Use hiragana or katakana only.',
   'error.songNotFound': 'This song no longer exists.',
   'error.tagNotFound': 'This tag no longer exists.',
   'error.tagNameRequired': 'Enter a tag name.',

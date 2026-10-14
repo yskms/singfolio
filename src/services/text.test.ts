@@ -3,7 +3,15 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { normalizeTagName, normalizeText, searchKey, tagNameKey } from './text.ts';
+import {
+  artistNameKey,
+  normalizeReading,
+  normalizeTagName,
+  normalizeText,
+  searchKey,
+  sortKey,
+  tagNameKey,
+} from './text.ts';
 
 describe('normalizeText（曲名・アーティスト）', () => {
   it('前後の空白（全角を含む）を除く', () => {
@@ -123,5 +131,91 @@ describe('searchKey', () => {
 
   it('漢字の読みは同一視しない（読みのデータが無い）', () => {
     assert.notEqual(searchKey('桜'), searchKey('さくら'));
+  });
+});
+
+describe('artistNameKey', () => {
+  it('大文字小文字・全角半角・空白の量を同一視する', () => {
+    assert.equal(artistNameKey('Mr.Children'), artistNameKey('MR.CHILDREN'));
+    assert.equal(artistNameKey('Mr.Children'), artistNameKey('Ｍｒ．Ｃｈｉｌｄｒｅｎ'));
+    assert.equal(artistNameKey('Number  Girl'), artistNameKey(' number girl '));
+    assert.equal(artistNameKey('ﾅﾝﾊﾞｰｶﾞｰﾙ'), artistNameKey('ナンバーガール'));
+  });
+
+  it('ひらがなとカタカナは同一視しない（別のアーティストになりうる）', () => {
+    assert.notEqual(artistNameKey('ひなた'), artistNameKey('ヒナタ'));
+  });
+});
+
+describe('normalizeReading', () => {
+  it('全角の英数字を半角に、半角カナを全角カナにし、空白を整える', () => {
+    assert.equal(normalizeReading('ﾏﾙｰﾝ５'), 'マルーン5');
+    assert.equal(normalizeReading('  ミスター\u3000 チルドレン '), 'ミスター チルドレン');
+    assert.equal(normalizeReading('Ｂeatles'), 'Beatles');
+  });
+
+  it('ひらがなとカタカナは、入力のまま保存する', () => {
+    assert.equal(normalizeReading('くいーん'), 'くいーん');
+    assert.equal(normalizeReading('クイーン'), 'クイーン');
+  });
+
+  it('空白だけは空になる', () => {
+    assert.equal(normalizeReading(' \u3000 '), '');
+  });
+});
+
+describe('sortKey', () => {
+  const sorted = (texts: string[]) => [...texts].sort((a, b) => (sortKey(a) < sortKey(b) ? -1 : sortKey(a) > sortKey(b) ? 1 : 0));
+
+  it('ひらがなとカタカナを混ぜて、五十音順に並べる', () => {
+    assert.deepEqual(sorted(['さくら', 'アイス', 'くま', 'あめ', 'コスモス', 'いぬ']), [
+      'アイス', 'あめ', 'いぬ', 'くま', 'コスモス', 'さくら',
+    ]);
+  });
+
+  it('記号・数字・英字 → かな → 漢字の順（漢字は文字コード順）', () => {
+    assert.deepEqual(sorted(['桜', 'さくら', 'Zebra', 'apple', '1番', '#tag', 'アイス']), [
+      '#tag', '1番', 'apple', 'Zebra', 'アイス', 'さくら', '桜',
+    ]);
+  });
+
+  it('英字は大文字小文字を区別せず、全角半角を同一視する', () => {
+    assert.equal(sortKey('ABC'), sortKey('abc'));
+    assert.equal(sortKey('ＡＢＣ'), sortKey('abc'));
+    assert.deepEqual(sorted(['hanabi', 'Cherry', 'Sign']), ['Cherry', 'hanabi', 'Sign']);
+  });
+
+  it('濁点・半濁点は、五十音順の位置を変えない（同じ字が先、濁点つきが後）', () => {
+    // か行の中で、かう < がい（い < う ではなく、第1のキーは かい と かう）。
+    assert.deepEqual(sorted(['かう', 'がい', 'かい', 'きい']), ['かい', 'がい', 'かう', 'きい']);
+    assert.deepEqual(sorted(['ぱい', 'はい', 'ばい', 'ひい']), ['はい', 'ばい', 'ぱい', 'ひい']);
+  });
+
+  it('小さいかなは、大きいかなと同じ位置（きよい < きよう < きょう）', () => {
+    assert.deepEqual(sorted(['きょう', 'きよい', 'きよう']), ['きよい', 'きよう', 'きょう']);
+  });
+
+  it('長音（ー）は、直前のかなの母音として扱う（らあめん < らいぶ < らくだ）', () => {
+    assert.deepEqual(sorted(['らくだ', 'ラーメン', 'らいぶ']), ['ラーメン', 'らいぶ', 'らくだ']);
+    assert.equal(sortKey('コーヒー').split('\u0000')[0], 'こおひい');
+    assert.equal(sortKey('スピーチ').split('\u0000')[0], 'すひいち'); // ぴ → ひ（半濁点を除く）
+  });
+
+  it('第1のキーが同じなら、母音が長音より先（らあめん < らーめん）', () => {
+    assert.deepEqual(sorted(['らーめん', 'らあめん']), ['らあめん', 'らーめん']);
+  });
+
+  it('長音の直前にかなが無ければ、そのまま', () => {
+    assert.equal(sortKey('ーあ').split('\u0000')[0], 'ーあ');
+    assert.equal(sortKey('Aー').split('\u0000')[0], 'aー');
+  });
+
+  it('半角カナ（濁点つき）も、五十音順の位置に来る', () => {
+    assert.equal(sortKey('ﾎﾞｶﾛ'), sortKey('ボカロ'));
+  });
+
+  it('同じ文字列は同じキー。空は空', () => {
+    assert.equal(sortKey('さくら'), sortKey('さくら'));
+    assert.equal(sortKey(''), '\u0000');
   });
 });

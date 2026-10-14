@@ -51,11 +51,16 @@ const columns = (raw: DatabaseSync, table: string) =>
     (c) => c.name,
   );
 
-const insertSong = (raw: DatabaseSync, id: string, status = 'ready') =>
+// 曲を入れる。アーティスト（'a1'）は、無ければ作る。
+const insertSong = (raw: DatabaseSync, id: string, status = 'ready') => {
   raw.exec(
-    `INSERT INTO songs (id, title, artist, status, created_at, updated_at)
-     VALUES ('${id}', 'title', 'artist', '${status}', 1, 1)`,
+    "INSERT OR IGNORE INTO artists (id, name, reading, created_at) VALUES ('a1', 'artist', 'artist', 1)",
   );
+  raw.exec(
+    `INSERT INTO songs (id, title, artist_id, status, created_at, updated_at)
+     VALUES ('${id}', 'title', 'a1', '${status}', 1, 1)`,
+  );
+};
 
 describe('runMigrations', () => {
   it('新規DBにすべてのマイグレーションを適用し、再実行しても何も変わらない', async () => {
@@ -67,7 +72,7 @@ describe('runMigrations', () => {
         .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
         .all() as { name: string }[]
     ).map((t) => t.name);
-    assert.deepEqual(tables, ['settings', 'song_tags', 'songs', 'tags']);
+    assert.deepEqual(tables, ['artists', 'settings', 'song_tags', 'songs', 'tags']);
 
     await runMigrations(db, migrations);
     assert.equal(userVersion(raw), migrations.length);
@@ -140,7 +145,7 @@ describe('runMigrations', () => {
         CREATE TABLE songs_new (
           id TEXT PRIMARY KEY NOT NULL,
           title TEXT NOT NULL,
-          artist TEXT NOT NULL,
+          artist_id TEXT NOT NULL REFERENCES artists (id),
           status TEXT NOT NULL CHECK (status IN ('ready', 'practice', 'want')),
           key_offset INTEGER NOT NULL DEFAULT 0,
           private_note TEXT NOT NULL DEFAULT '',
@@ -149,7 +154,7 @@ describe('runMigrations', () => {
           extra TEXT
         );
         INSERT INTO songs_new
-          SELECT id, title, artist, status, key_offset, private_note,
+          SELECT id, title, artist_id, status, key_offset, private_note,
                  created_at, updated_at, NULL
           FROM songs;
         DROP TABLE songs;
@@ -219,7 +224,7 @@ describe('v1スキーマ', () => {
     assert.throws(
       () =>
         raw.exec(
-          "INSERT INTO songs (id, title, artist, status, created_at, updated_at) VALUES ('s2', NULL, 'a', 'ready', 1, 1)",
+          "INSERT INTO songs (id, title, artist_id, status, created_at, updated_at) VALUES ('s2', NULL, 'a1', 'ready', 1, 1)",
         ),
       /NOT NULL/,
     );
@@ -260,5 +265,99 @@ describe('v1スキーマ', () => {
     raw.exec("DELETE FROM tags WHERE id = 't1'");
     assert.equal(count(raw, 'song_tags'), 0);
     assert.equal(count(raw, 'songs'), 1, '曲は残る');
+  });
+});
+
+describe('v3: アーティストのテーブル', () => {
+  async function migratedToV2() {
+    const { raw, db } = openDb();
+    await runMigrations(db, migrations.slice(0, 2));
+    return { raw, db };
+  }
+  const oldSong = (raw: DatabaseSync, id: string, artist: string, createdAt: number) =>
+    raw.exec(
+      `INSERT INTO songs (id, title, artist, status, key_offset, private_note, created_at, updated_at)
+       VALUES ('${id}', 'title-${id}', '${artist}', 'ready', 2, 'note-${id}', ${createdAt}, ${createdAt + 5})`,
+    );
+
+  it('既存の曲を、アーティスト名ごとのアーティストに移し、読みは名前そのままにする', async () => {
+    const { raw, db } = await migratedToV2();
+    oldSong(raw, 's1', 'Queen', 10);
+    oldSong(raw, 's2', 'スピッツ', 20);
+    oldSong(raw, 's3', 'QUEEN', 30); // 大文字小文字だけ違う（ASCII）。最初の表記 Queen に寄せる。
+    raw.exec("INSERT INTO tags (id, name, created_at) VALUES ('t1', 'Rock', 1)");
+    raw.exec("INSERT INTO song_tags VALUES ('s1', 't1')");
+
+    await runMigrations(db, migrations);
+    assert.equal(userVersion(raw), 3);
+
+    const artists = raw
+      .prepare('SELECT id, name, reading, created_at FROM artists ORDER BY name')
+      .all() as { id: string; name: string; reading: string; created_at: number }[];
+    assert.deepEqual(
+      artists.map((a) => [a.name, a.reading, a.created_at]),
+      [
+        ['Queen', 'Queen', 10],
+        ['スピッツ', 'スピッツ', 20],
+      ],
+    );
+    for (const artist of artists) {
+      assert.match(artist.id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    }
+    assert.notEqual(artists[0]?.id, artists[1]?.id);
+
+    // 曲は、id・タイトル・メモ・日時を保ったまま、アーティストへつながる。タグも残る。
+    const songs = raw
+      .prepare(
+        `SELECT s.id, s.title, a.name AS artist, s.key_offset, s.private_note, s.created_at, s.updated_at
+         FROM songs s JOIN artists a ON a.id = s.artist_id ORDER BY s.id`,
+      )
+      .all();
+    assert.deepEqual(songs.map((s) => ({ ...s })), [
+      { id: 's1', title: 'title-s1', artist: 'Queen', key_offset: 2, private_note: 'note-s1', created_at: 10, updated_at: 15 },
+      { id: 's2', title: 'title-s2', artist: 'スピッツ', key_offset: 2, private_note: 'note-s2', created_at: 20, updated_at: 25 },
+      { id: 's3', title: 'title-s3', artist: 'Queen', key_offset: 2, private_note: 'note-s3', created_at: 30, updated_at: 35 },
+    ]);
+    assert.equal(count(raw, 'song_tags'), 1);
+    assert.ok(!columns(raw, 'songs').includes('artist'), '曲の artist 列は無くなる');
+    assert.equal(foreignKeys(raw), 1);
+  });
+
+  it('曲が無いDBも、そのまま移せる', async () => {
+    const { raw, db } = await migratedToV2();
+    await runMigrations(db, migrations);
+    assert.equal(count(raw, 'artists'), 0);
+    assert.equal(count(raw, 'songs'), 0);
+  });
+
+  it('読みは空にできない。名前は大文字小文字（ASCIIのみ）を区別せず一意', async () => {
+    const { raw, db } = openDb();
+    await runMigrations(db, migrations);
+    assert.throws(
+      () => raw.exec("INSERT INTO artists (id, name, reading, created_at) VALUES ('a1', 'Queen', '', 1)"),
+      /CHECK/,
+    );
+    raw.exec("INSERT INTO artists (id, name, reading, created_at) VALUES ('a1', 'Queen', 'Queen', 1)");
+    assert.throws(
+      () => raw.exec("INSERT INTO artists (id, name, reading, created_at) VALUES ('a2', 'queen', 'queen', 1)"),
+      /UNIQUE/,
+    );
+  });
+
+  it('曲は、存在しないアーティストを指せない。曲があるアーティストは消せない', async () => {
+    const { raw, db } = openDb();
+    await runMigrations(db, migrations);
+    assert.throws(
+      () =>
+        raw.exec(
+          "INSERT INTO songs (id, title, artist_id, status, created_at, updated_at) VALUES ('s1', 't', 'nope', 'ready', 1, 1)",
+        ),
+      /FOREIGN/,
+    );
+    insertSong(raw, 's1');
+    assert.throws(() => raw.exec("DELETE FROM artists WHERE id = 'a1'"), /FOREIGN/);
+    raw.exec("DELETE FROM songs WHERE id = 's1'");
+    raw.exec("DELETE FROM artists WHERE id = 'a1'");
+    assert.equal(count(raw, 'artists'), 0);
   });
 });

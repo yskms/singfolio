@@ -9,6 +9,10 @@ export type ErrorMessageKey = Extract<MessageKey, `error.${string}`>;
 const errorMessageKeys: Record<ServiceErrorCode, ErrorMessageKey> = {
   'title-required': 'error.titleRequired',
   'artist-required': 'error.artistRequired',
+  'artist-reading-required': 'error.artistReadingRequired',
+  'artist-name-required': 'error.artistNameRequired',
+  'artist-name-duplicate': 'error.artistNameDuplicate',
+  'artist-not-found': 'error.artistNotFound',
   'song-not-found': 'error.songNotFound',
   'tag-not-found': 'error.tagNotFound',
   'tag-name-required': 'error.tagNameRequired',

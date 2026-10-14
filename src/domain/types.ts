@@ -37,11 +37,40 @@ export interface Tag {
 }
 
 /** 端末内の曲（Local Song）。公開用のモデルとは別（My Key・Private Noteを持つ）。 */
+/**
+ * アーティスト。曲は、アーティストを1つ持つ（`Song.artistId`）。同じアーティストの曲は、
+ * 名前と読みを共有する（読みは、アーティストごとに1か所）。曲が1つも無くなったアーティストは、
+ * 自動で消える。
+ */
+export interface Artist {
+  /** UUID */
+  id: string;
+  /** 表示する名前（正規化した形）。同じアーティストかは、`artistNameKey` で判定する */
+  name: string;
+  /**
+   * 読み（並び替え用の名前）。空にならない。日本語は、かな（日本語の設定のときの入力の規則は
+   * `readingProblem`）。英語は、`The` を除いた名前など、自由。並び替えは、これで行う。
+   */
+  reading: string;
+  /** 登録日時（Unixエポックのミリ秒） */
+  createdAt: number;
+}
+
+/** Artists 画面の一覧の行。 */
+export interface ArtistSummary extends Artist {
+  /** このアーティストの曲数（1以上） */
+  songCount: number;
+}
+
 export interface Song {
   /** UUID */
   id: string;
   title: string;
+  /** アーティストの名前（`Artist.name`） */
   artist: string;
+  artistId: string;
+  /** アーティストの読み（`Artist.reading`）。並び替え・検索に使う */
+  artistReading: string;
   status: SongStatus;
   /** My Key。原曲からの半音差。`0` = Original */
   keyOffset: number;

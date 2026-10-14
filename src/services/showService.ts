@@ -64,8 +64,8 @@ export function createShowService({ songs, tags }: ShowServiceDeps) {
   async function getShowView(query: ShowQuery = {}): Promise<ShowView> {
     // 型の外から来た値は、アーティスト別にする。
     const sort: ShowSort = query.sort === 'title' ? 'title' : 'artist';
-    // 並びは Songs の「アーティスト順」「曲名順」と同じ（同順位は曲名・アーティスト・IDの昇順。
-    // 日本語は読み順にならない。docs/singfolio-data-model.md「曲の一覧」）。
+    // 並びは Songs の「アーティスト順」（アーティストの読み）「曲名順」と同じ（五十音順。同順位は
+    // 曲名・アーティストの読み・IDの昇順。docs/singfolio-data-model.md「曲の一覧」）。
     const base = { status: 'ready', sortBy: sort, direction: 'asc' } as const;
     const [ready, shown, allTags] = await Promise.all([
       songs.listSongs(base),
@@ -93,23 +93,19 @@ export function createShowService({ songs, tags }: ShowServiceDeps) {
       };
     }
 
-    // アーティストは、登録された表記のまま（`MR.CHILDREN` と `Mr.Children` は別の見出しになる）。
-    // 読んだ並びでは、同じアーティストの曲が間に別の表記の曲を挟んで並びうる（大文字小文字を
-    // 区別しない並びのため）ので、隣り合う曲をまとめるのではなく、アーティストごとに集める
-    // （見出しの位置は、最初の曲の位置）。
-    const groups = new Map<string, ShowSong[]>();
+    // アーティストごとにまとめる（同じアーティスト = 同じ `artistId`。大文字小文字・全角半角だけが
+    // 違う表記は、同じアーティストにまとまっている）。見出しは、アーティストの名前。読んだ並びは
+    // 読み順なので、同じアーティストの曲は隣り合うが、念のため、隣り合うかに頼らず、アーティスト
+    // ごとに集める（見出しの位置は、最初の曲の位置）。
+    const groups = new Map<string, { artist: string; songs: ShowSong[] }>();
     for (const song of shown) {
       const entry: ShowSong = { id: song.id, title: song.title, tags: song.tags.map(toShowTag) };
-      const group = groups.get(song.artist);
-      if (group) group.push(entry);
-      else groups.set(song.artist, [entry]);
+      const group = groups.get(song.artistId);
+      if (group) group.songs.push(entry);
+      else groups.set(song.artistId, { artist: song.artist, songs: [entry] });
     }
 
-    return {
-      ...common,
-      sort,
-      groups: [...groups].map(([artist, groupSongs]) => ({ artist, songs: groupSongs })),
-    };
+    return { ...common, sort, groups: [...groups.values()] };
   }
 
   return { getShowView };

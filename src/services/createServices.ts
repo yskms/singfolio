@@ -1,4 +1,5 @@
 import type { Database } from '../db/appDatabase.ts';
+import { createArtistRepository } from '../repositories/artistRepository.ts';
 import type { RepositoryEnv } from '../repositories/env.ts';
 import { createSettingsRepository } from '../repositories/settingsRepository.ts';
 import {
@@ -7,6 +8,7 @@ import {
 } from '../repositories/songCatalogRepository.ts';
 import { createSongRepository } from '../repositories/songRepository.ts';
 import { createTagRepository } from '../repositories/tagRepository.ts';
+import { createArtistService, type ArtistService } from './artistService.ts';
 import { createSettingsService, type SettingsService } from './settingsService.ts';
 import { createShowService, type ShowService } from './showService.ts';
 import { createSongService, type SongService } from './songService.ts';
@@ -16,6 +18,8 @@ import { createTagService, type TagService } from './tagService.ts';
 export interface Services {
   songs: SongService;
   tags: TagService;
+  /** アーティスト（名前と読み）の一覧と変更（Artists 画面）。曲の保存は `songs` */
+  artists: ArtistService;
   /** Show Mode（人に見せる画面）用。Readyの曲だけを、管理情報を持たない形で返す */
   show: ShowService;
   settings: SettingsService;
@@ -45,18 +49,26 @@ export function createServices(
 ): Services {
   const songRepository = createSongRepository(env);
   const tagRepository = createTagRepository(env);
+  const artistRepository = createArtistRepository(env);
   const settingsRepository = createSettingsRepository();
   const settings = createSettingsService({ db, settings: settingsRepository });
-  const songs = createSongService({ db, songs: songRepository, tags: tagRepository });
+  const songs = createSongService({
+    db,
+    songs: songRepository,
+    tags: tagRepository,
+    artists: artistRepository,
+  });
   const tags = createTagService({ db, tags: tagRepository });
   return {
     songs,
     tags,
+    artists: createArtistService({ db, artists: artistRepository }),
     show: createShowService({ songs, tags }),
     settings,
     suggestions: createSuggestionsService({
       db,
       songs: songRepository,
+      artists: artistRepository,
       catalog: options.catalogFetch ? createSongCatalogRepository(options.catalogFetch) : null,
       isEnabled: () => settings.getSuggestionsEnabled(),
       now: env.now,

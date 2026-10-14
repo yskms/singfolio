@@ -76,8 +76,18 @@ export const ja: Record<MessageKey, Message> = {
   'settings.suggestionsNote':
     '入力中の曲名・アーティスト名を Apple に送って、候補を探します。それ以外は送りません。',
   'settings.tags': 'タグ',
+  'settings.artists': 'アーティスト',
   'settings.about': 'このアプリについて',
   'settings.saveFailedTitle': '設定を保存できませんでした',
+
+  'artists.title': 'アーティスト',
+  'artists.empty.title': 'まだアーティストがいません',
+  'artists.empty.message': '追加した曲のアーティストがここに並びます。',
+  'artists.rowHint': 'このアーティストの名前と読みの編集',
+  'artists.songCount': { other: '{count}曲' },
+  'artists.editTitle': 'アーティストを編集',
+  'artists.nameLabel': '名前',
+  'artists.save': '保存',
 
   'tags.title': 'タグ',
   'tags.empty.title': 'まだタグがありません',
@@ -126,6 +136,9 @@ export const ja: Record<MessageKey, Message> = {
   'songForm.notFoundTitle': '曲が見つかりません',
   'songForm.title': '曲名',
   'songForm.artist': 'アーティスト',
+  'songForm.reading': '読み',
+  'songForm.readingNote':
+    'このアーティストの曲の並び替えに使います。ひらがな・カタカナで入力してください（漢字・英字は使えません）。',
   'songForm.requiredHint': '必須',
   'songForm.status': 'ステータス',
   'songForm.myKey': 'My Key',
@@ -157,6 +170,11 @@ export const ja: Record<MessageKey, Message> = {
   'error.tagNotFound': 'このタグは見つかりませんでした。',
   'error.tagNameRequired': 'タグ名を入力してください。',
   'error.tagNameDuplicate': '同じ名前のタグがすでにあります。',
+  'error.artistReadingRequired': '読みを入力してください。',
+  'error.artistNameRequired': 'アーティスト名を入力してください。',
+  'error.artistNameDuplicate': '同じ名前のアーティストがすでにいます。',
+  'error.artistNotFound': 'このアーティストは、もういません。',
+  'error.readingKanaOnly': 'ひらがな・カタカナで入力してください（漢字・英字は使えません）。',
   'error.unexpected': '問題が発生しました。もう一度お試しください。',
 
   'errorScreen.title': '問題が発生しました',

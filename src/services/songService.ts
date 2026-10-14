@@ -5,16 +5,25 @@ import {
   type SongListQuery,
   type SongStatus,
 } from '../domain/types.ts';
+import type { ArtistRepository } from '../repositories/artistRepository.ts';
 import type { SongRepository } from '../repositories/songRepository.ts';
 import type { TagRepository } from '../repositories/tagRepository.ts';
+import { findOrCreateArtist } from './artistLookup.ts';
 import { ServiceError } from './errors.ts';
 import { findOrCreateTag } from './tagLookup.ts';
-import { normalizeText, searchKey } from './text.ts';
+import { normalizeReading, normalizeText, searchKey, sortKey } from './text.ts';
 
 /** 曲の編集画面で保存する内容。 */
 export interface SongInput {
   title: string;
+  /** アーティストの名前。同じアーティスト（大文字小文字・全角半角を区別しない）があれば、それに付ける */
   artist: string;
+  /**
+   * アーティストの読み（並び替え用の名前）。渡すと、そのアーティストの読みを、この値にする
+   * （同じアーティストの全曲に効く）。空は `artist-reading-required`。省略すると、既存のアーティストの
+   * 読みはそのまま、新しいアーティストは名前を読みにする。
+   */
+  artistReading?: string;
   status: SongStatus;
   /** My Key。原曲からの半音差の整数。`0` = Original */
   keyOffset: number;
@@ -36,12 +45,17 @@ export interface SongServiceDeps {
   db: Database;
   songs: SongRepository;
   tags: TagRepository;
+  artists: ArtistRepository;
 }
 
 /** 保存する形にした入力。タグは、新しいタグを作る前のもの。 */
-type NormalizedInput = Required<SongInput>;
-/** 新しいタグを作って、タグIDにまとめた後の入力。 */
-type ResolvedInput = Omit<SongInput, 'newTagNames'>;
+type NormalizedInput = Omit<Required<SongInput>, 'artistReading'> & {
+  artistReading: string | undefined;
+};
+/** 新しいタグを作って、タグIDにまとめ、アーティストを決めた後の入力。 */
+type ResolvedInput = Omit<NormalizedInput, 'newTagNames' | 'artist' | 'artistReading'> & {
+  artistId: string;
+};
 
 /** 入力を検証し、保存する形（曲名・アーティストの正規化、タグIDの重複の除去など）にする。 */
 function normalizeInput(input: SongInput): NormalizedInput {
@@ -49,6 +63,9 @@ function normalizeInput(input: SongInput): NormalizedInput {
   if (title === '') throw new ServiceError('title-required');
   const artist = normalizeText(input.artist);
   if (artist === '') throw new ServiceError('artist-required');
+  const artistReading =
+    input.artistReading === undefined ? undefined : normalizeReading(input.artistReading);
+  if (artistReading === '') throw new ServiceError('artist-reading-required');
   if (!isSongStatus(input.status)) throw new ServiceError('invalid-status');
   if (!Number.isSafeInteger(input.keyOffset)) {
     throw new ServiceError('invalid-key-offset');
@@ -56,6 +73,7 @@ function normalizeInput(input: SongInput): NormalizedInput {
   return {
     title,
     artist,
+    artistReading,
     status: input.status,
     keyOffset: input.keyOffset,
     // 空白だけのメモは「メモなし」（空文字）にそろえる。
@@ -69,6 +87,7 @@ function toInput(song: Song): SongInput {
   return {
     title: song.title,
     artist: song.artist,
+    artistReading: song.artistReading,
     status: song.status,
     keyOffset: song.keyOffset,
     privateNote: song.privateNote,
@@ -80,7 +99,7 @@ function isUnchanged(current: Song, next: ResolvedInput): boolean {
   const currentTagIds = new Set(current.tags.map((tag) => tag.id));
   return (
     current.title === next.title &&
-    current.artist === next.artist &&
+    current.artistId === next.artistId &&
     current.status === next.status &&
     current.keyOffset === next.keyOffset &&
     current.privateNote === next.privateNote &&
@@ -89,8 +108,41 @@ function isUnchanged(current: Song, next: ResolvedInput): boolean {
   );
 }
 
+function compareKeys(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+/**
+ * 曲名順・アーティスト順の並び替え（五十音順。アーティストは読みで並べる）。ほかの並び（登録日・
+ * 更新日）はSQLが決めているので、そのまま返す。向きは、`asc` 以外（不正な値を含む）は降順
+ * （Repositoryと同じ）。同順位は、いつも昇順（曲名・アーティストの読み・IDの順）。
+ */
+function sortByReading(
+  list: Song[],
+  sortBy: SongListQuery['sortBy'],
+  direction: SongListQuery['direction'],
+): Song[] {
+  if (sortBy !== 'title' && sortBy !== 'artist') return list;
+  const sign = direction === 'asc' ? 1 : -1;
+  const keyed = list.map((song) => ({
+    song,
+    title: sortKey(song.title),
+    artist: sortKey(song.artistReading),
+  }));
+  keyed.sort((a, b) => {
+    const primary = sortBy === 'title' ? compareKeys(a.title, b.title) : compareKeys(a.artist, b.artist);
+    return (
+      sign * primary ||
+      compareKeys(a.title, b.title) ||
+      compareKeys(a.artist, b.artist) ||
+      compareKeys(a.song.id, b.song.id)
+    );
+  });
+  return keyed.map(({ song }) => song);
+}
+
 // 書き込みは必ず `db.transaction` の中で行う（理由は db/appDatabase.ts）。
-export function createSongService({ db, songs, tags }: SongServiceDeps) {
+export function createSongService({ db, songs, tags, artists }: SongServiceDeps) {
   async function assertTagsExist(
     executor: ReadExecutor,
     tagIds: readonly string[],
@@ -111,6 +163,17 @@ export function createSongService({ db, songs, tags }: SongServiceDeps) {
     return [...ids];
   }
 
+  /**
+   * アーティストを決め（同じアーティストがあればそれ、なければ作る。読みを渡していれば、アーティスト
+   * の読みを書き換える）、曲の書き込みに渡す形にする。`tx` の中で呼ぶ（曲の保存が失敗したとき、
+   * 作ったアーティストも取り消すため）。
+   */
+  async function resolveInput(tx: WriteExecutor, input: NormalizedInput): Promise<ResolvedInput> {
+    const { artist: name, artistReading, newTagNames: _newTagNames, ...rest } = input;
+    const artist = await findOrCreateArtist(tx, artists, { name, reading: artistReading });
+    return { ...rest, artistId: artist.id, tagIds: await resolveTagIds(tx, input) };
+  }
+
   async function requireSong(executor: ReadExecutor, id: string): Promise<Song> {
     const song = await songs.get(executor, id);
     if (!song) throw new ServiceError('song-not-found');
@@ -126,13 +189,18 @@ export function createSongService({ db, songs, tags }: SongServiceDeps) {
       const current = await requireSong(tx, id);
       const normalized = normalizeInput(next(current));
       // 新しいタグを作った場合は、そのIDが現在のタグに無いので、必ず「変更あり」になる
-      // （内容が変わらないのに、タグだけが作られることは無い）。
-      const input = { ...normalized, tagIds: await resolveTagIds(tx, normalized) };
-      if (isUnchanged(current, input)) return current;
+      // （内容が変わらないのに、タグだけが作られることは無い）。アーティストも、別のアーティスト
+      // （新しく作った場合を含む）になれば、IDが変わるので「変更あり」。
+      const input = await resolveInput(tx, normalized);
+      // 曲は変わらなくても、読みを変えた場合は、アーティストが書き換わっている（曲の `updatedAt` は
+      // 変えない。アーティストの読みの変更は、曲の編集ではない）。
+      if (isUnchanged(current, input)) return requireSong(tx, id);
 
       await assertTagsExist(tx, input.tagIds);
       await songs.update(tx, id, input);
       await songs.replaceTags(tx, id, input.tagIds);
+      // 付け替えて、曲が1つも無くなったアーティストは消す。
+      await artists.deleteWithoutSongs(tx);
       return requireSong(tx, id);
     });
   }
@@ -143,18 +211,23 @@ export function createSongService({ db, songs, tags }: SongServiceDeps) {
     },
 
     /**
-     * 条件をすべて満たす曲を返す。曲名・アーティストの検索は、SQLではなくここで行う
-     * （`searchKey` が、大文字小文字・全角半角・ひらがな/カタカナの違いを同一視する。
-     * SQLiteの `LIKE` にはできない）。絞り込んだ曲を全部読んでから検索するが、端末内の
-     * 曲数（数百曲）なら問題にならない。
+     * 条件をすべて満たす曲を返す。曲名・アーティストの検索と、曲名・アーティストの並び替えは、
+     * SQLではなくここで行う。検索は `searchKey`（大文字小文字・全角半角・ひらがな/カタカナの違いを
+     * 同一視する。SQLiteの `LIKE` にはできない）で、アーティストは名前だけでなく読みにも
+     * 一致する（`えるれ` で `ELLEGARDEN` が見つかる）。並び替えは `sortKey`（五十音順。
+     * アーティストは読みで並べる）。絞り込んだ曲を全部読んでから行うが、端末内の曲数
+     * （数百曲）なら問題にならない。
      */
     async listSongs(query: SongListQuery = {}): Promise<Song[]> {
       const { search, ...filter } = query;
-      const found = await songs.list(db, filter);
+      const found = sortByReading(await songs.list(db, filter), filter.sortBy, filter.direction);
       const key = search === undefined ? '' : searchKey(search);
       if (key === '') return found;
       return found.filter(
-        (song) => searchKey(song.title).includes(key) || searchKey(song.artist).includes(key),
+        (song) =>
+          searchKey(song.title).includes(key) ||
+          searchKey(song.artist).includes(key) ||
+          searchKey(song.artistReading).includes(key),
       );
     },
 
@@ -171,6 +244,7 @@ export function createSongService({ db, songs, tags }: SongServiceDeps) {
       const normalized = normalizeInput({
         title: input.title,
         artist: input.artist,
+        artistReading: input.artistReading,
         status: input.status,
         keyOffset: input.keyOffset ?? 0,
         privateNote: input.privateNote ?? '',
@@ -178,10 +252,10 @@ export function createSongService({ db, songs, tags }: SongServiceDeps) {
         newTagNames: input.newTagNames,
       });
       return db.transaction(async (tx) => {
-        const tagIds = await resolveTagIds(tx, normalized);
-        await assertTagsExist(tx, tagIds);
-        const id = await songs.insert(tx, normalized);
-        await songs.replaceTags(tx, id, tagIds);
+        const input = await resolveInput(tx, normalized);
+        await assertTagsExist(tx, input.tagIds);
+        const id = await songs.insert(tx, input);
+        await songs.replaceTags(tx, id, input.tagIds);
         return requireSong(tx, id);
       });
     },
@@ -201,11 +275,14 @@ export function createSongService({ db, songs, tags }: SongServiceDeps) {
     },
 
     /**
-     * 曲を削除する。付いていたタグは残る。既に無い曲の削除は何もしない
-     * （二重タップで失敗にしないため）。
+     * 曲を削除する。付いていたタグは残る。アーティストは、その曲が最後の1曲なら一緒に消える。
+     * 既に無い曲の削除は何もしない（二重タップで失敗にしないため）。
      */
     async deleteSong(id: string): Promise<void> {
-      await db.transaction((tx) => songs.delete(tx, id));
+      await db.transaction(async (tx) => {
+        await songs.delete(tx, id);
+        await artists.deleteWithoutSongs(tx);
+      });
     },
   };
 }

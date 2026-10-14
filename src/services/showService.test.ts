@@ -53,18 +53,32 @@ describe('getShowView: 対象と並び', () => {
     ]);
   });
 
-  it('アーティストは登録の表記のまま。曲名が間に挟まっても、同じ表記は1つの見出しにまとまる', async () => {
+  it('大文字小文字・全角半角だけが違う表記は、同じアーティスト（最初の表記の見出し）にまとまる', async () => {
     const { services, add } = await setup();
-    // 大文字小文字を区別しない並びでは、(MR.CHILDREN, A) (Mr.Children, B) (MR.CHILDREN, C) の順になる。
     await add('A', 'MR.CHILDREN');
     await add('B', 'Mr.Children');
-    await add('C', 'MR.CHILDREN');
+    await add('C', 'Ｍｒ．Ｃｈｉｌｄｒｅｎ');
 
     const view = await services.show.getShowView();
-    assert.deepEqual(shape(view.groups), [
-      ['MR.CHILDREN', ['A', 'C']],
-      ['Mr.Children', ['B']],
-    ]);
+    assert.deepEqual(shape(view.groups), [['MR.CHILDREN', ['A', 'B', 'C']]]);
+  });
+
+  it('アーティストは読みの順に並べる（漢字・英字の名前も、読みの位置に来る）', async () => {
+    const { services, add } = await setup();
+    await services.songs.createSong({ title: 'a', artist: '米津玄師', artistReading: 'よねづけんし', status: 'ready' });
+    await services.songs.createSong({ title: 'b', artist: 'ELLEGARDEN', artistReading: 'えるれがーでん', status: 'ready' });
+    await services.songs.createSong({ title: 'c', artist: 'スピッツ', artistReading: 'すぴっつ', status: 'ready' });
+    await services.songs.createSong({ title: 'd', artist: 'The Beatles', artistReading: 'Beatles', status: 'ready' });
+    await add('e', 'あいみょん');
+
+    const byArtist = await services.show.getShowView();
+    assert.deepEqual(
+      byArtist.groups.map((group) => group.artist),
+      ['The Beatles', 'あいみょん', 'ELLEGARDEN', 'スピッツ', '米津玄師'],
+    );
+    // 曲名順の一覧にも、読みは持ち込まない（行は、曲名とアーティストの名前だけ）。
+    const byTitle = await services.show.getShowView({ sort: 'title' });
+    assert.deepEqual(byTitle.songs.map((song) => song.title), ['a', 'b', 'c', 'd', 'e']);
   });
 
   it('曲が無ければ、空を返す', async () => {

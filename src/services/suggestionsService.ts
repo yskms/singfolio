@@ -5,6 +5,7 @@ import {
   storeForLanguage,
   type SongCatalogRepository,
 } from '../repositories/songCatalogRepository.ts';
+import type { ArtistRepository } from '../repositories/artistRepository.ts';
 import type { SongRepository } from '../repositories/songRepository.ts';
 import {
   MAX_ARTIST_SUGGESTIONS,
@@ -18,6 +19,7 @@ import { normalizeText, searchKey } from './text.ts';
 export interface SuggestionsServiceDeps {
   db: Database;
   songs: SongRepository;
+  artists: ArtistRepository;
   /** 外部の楽曲検索。`null` なら（注入しなければ）外部へは何も送らない。 */
   catalog: SongCatalogRepository | null;
   /** 設定で外部の検索がオンか（`settings.getSuggestionsEnabled`）。 */
@@ -50,7 +52,14 @@ function compareText(a: string, b: string): number {
 // `null`（予算切れ・一時停止中・失敗）と空配列（探して0件、または探さない条件）を区別して返す
 // （画面は、`null` のときだけ直前の候補を残す）。
 // 書き込みは行わない（読み取りだけ）ので、`db.transaction` は使わない。
-export function createSuggestionsService({ db, songs, catalog, isEnabled, now }: SuggestionsServiceDeps) {
+export function createSuggestionsService({
+  db,
+  songs,
+  artists,
+  catalog,
+  isEnabled,
+  now,
+}: SuggestionsServiceDeps) {
   const cache = new Map<string, { at: number; value: unknown }>();
   const inFlight = new Map<string, Promise<unknown>>();
   let sentAt: number[] = [];
@@ -109,20 +118,23 @@ export function createSuggestionsService({ db, songs, catalog, isEnabled, now }:
     available: catalog !== null,
 
     /**
-     * 登録済みのアーティストのうち、`text` に合うもの（`searchKey` で、含むもの。前方一致を先に、
-     * 曲数の多い順）。端末内だけで、何も送らない。入力と同じ文字列は出さない。
+     * 登録済みのアーティストのうち、`text` に合うもの（`searchKey` で、名前か読みに含むもの。
+     * 前方一致を先に、曲数の多い順）。端末内だけで、何も送らない。入力と同じ文字列は出さない。
      */
     async localArtists(text: string): Promise<string[]> {
       const key = searchKey(text);
       if (key === '') return [];
       const typed = normalizeText(text);
-      const counts = new Map<string, number>();
-      for (const { artist } of await songs.listTitleArtistPairs(db)) {
-        counts.set(artist, (counts.get(artist) ?? 0) + 1);
-      }
-      const found = [...counts]
-        .filter(([artist]) => artist !== typed && searchKey(artist).includes(key))
-        .map(([artist, count]) => ({ artist, count, prefix: searchKey(artist).startsWith(key) }));
+      const found = (await artists.list(db))
+        .filter(
+          ({ name, reading }) =>
+            name !== typed && (searchKey(name).includes(key) || searchKey(reading).includes(key)),
+        )
+        .map(({ name, reading, songCount }) => ({
+          artist: name,
+          count: songCount,
+          prefix: searchKey(name).startsWith(key) || searchKey(reading).startsWith(key),
+        }));
       found.sort(
         (a, b) =>
           Number(b.prefix) - Number(a.prefix) || b.count - a.count || compareText(a.artist, b.artist),

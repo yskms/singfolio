@@ -8,19 +8,20 @@ import {
 } from '../domain/types.ts';
 import type { RepositoryEnv } from './env.ts';
 
-/** 曲の編集で書き換える項目（タグは `replaceTags` で別に扱う）。 */
+/** 曲の編集で書き換える項目（タグは `replaceTags` で別に扱う）。アーティストは、IDで指す。 */
 export type SongFields = Pick<
   Song,
-  'title' | 'artist' | 'status' | 'keyOffset' | 'privateNote'
+  'title' | 'artistId' | 'status' | 'keyOffset' | 'privateNote'
 >;
 
-// 曲とタグを1回のクエリで取る（1曲につきタグの数だけ行が返る）。曲とタグを別々の
+// 曲とアーティストとタグを1回のクエリで取る（1曲につきタグの数だけ行が返る）。別々の
 // クエリにすると、その間の書き込みで食い違う可能性があるため。
 const SELECT_SONGS = `
-  SELECT s.id, s.title, s.artist, s.status, s.key_offset, s.private_note,
-         s.created_at, s.updated_at,
+  SELECT s.id, s.title, a.name AS artist, a.id AS artist_id, a.reading AS artist_reading,
+         s.status, s.key_offset, s.private_note, s.created_at, s.updated_at,
          t.id AS tag_id, t.name AS tag_name, t.created_at AS tag_created_at
   FROM songs s
+  JOIN artists a ON a.id = s.artist_id
   LEFT JOIN song_tags st ON st.song_id = s.id
   LEFT JOIN tags t ON t.id = st.tag_id`;
 
@@ -28,6 +29,8 @@ interface SongRow {
   id: string;
   title: string;
   artist: string;
+  artist_id: string;
+  artist_reading: string;
   status: SongStatus;
   key_offset: number;
   private_note: string;
@@ -47,6 +50,8 @@ function rowsToSongs(rows: SongRow[]): Song[] {
         id: row.id,
         title: row.title,
         artist: row.artist,
+        artistId: row.artist_id,
+        artistReading: row.artist_reading,
         status: row.status,
         keyOffset: row.key_offset,
         privateNote: row.private_note,
@@ -69,12 +74,12 @@ function rowsToSongs(rows: SongRow[]): Song[] {
 }
 
 // 並び替えの列。文字列で組み立てるため、必ずこの一覧（ホワイトリスト）から選ぶ。
-// 曲名・アーティストは、英字の大文字小文字を区別せずに並べる。日本語は文字コード順で、
-// 読み順にはならない（漢字の読みのデータが無いため。docs/singfolio-data-model.md
-// 「曲の一覧」）。
+// 曲名・アーティストの並びは、ここでは決めない（五十音順にするため、Service（`songService.listSongs`）が
+// `sortKey` で並べ直す。docs/singfolio-data-model.md「曲の一覧」）。ここでは、毎回同じ並びになる
+// 仮の順（英字の大文字小文字を区別しない）にしておく。
 const SORT_COLUMNS: Record<SongSortKey, string> = {
   title: 's.title COLLATE NOCASE',
-  artist: 's.artist COLLATE NOCASE',
+  artist: 'a.name COLLATE NOCASE',
   createdAt: 's.created_at',
   updatedAt: 's.updated_at',
 };
@@ -134,7 +139,7 @@ export function createSongRepository(env: RepositoryEnv) {
       // 主キー以外は常に昇順で、同順位の曲の並びが毎回同じになるようにする。
       const orderBy =
         ` ORDER BY ${primary} ${direction}, s.title COLLATE NOCASE, ` +
-        's.artist COLLATE NOCASE, s.id, t.name, t.id';
+        'a.name COLLATE NOCASE, s.id, t.name, t.id';
 
       const rows = await db.getAllAsync<SongRow>(
         SELECT_SONGS + where + orderBy,
@@ -148,7 +153,9 @@ export function createSongRepository(env: RepositoryEnv) {
      * 候補に使う。端末内の曲数（数百曲）なら、全部読んでも問題にならない。
      */
     async listTitleArtistPairs(db: ReadExecutor): Promise<{ title: string; artist: string }[]> {
-      return db.getAllAsync<{ title: string; artist: string }>('SELECT title, artist FROM songs');
+      return db.getAllAsync<{ title: string; artist: string }>(
+        'SELECT s.title, a.name AS artist FROM songs s JOIN artists a ON a.id = s.artist_id',
+      );
     },
 
     async countByStatus(db: ReadExecutor): Promise<Record<SongStatus, number>> {
@@ -168,12 +175,12 @@ export function createSongRepository(env: RepositoryEnv) {
       const now = env.now();
       await tx.runAsync(
         `INSERT INTO songs
-           (id, title, artist, status, key_offset, private_note, created_at, updated_at)
+           (id, title, artist_id, status, key_offset, private_note, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           fields.title,
-          fields.artist,
+          fields.artistId,
           fields.status,
           fields.keyOffset,
           fields.privateNote,
@@ -192,12 +199,12 @@ export function createSongRepository(env: RepositoryEnv) {
     ): Promise<boolean> {
       const result = await tx.runAsync(
         `UPDATE songs
-         SET title = ?, artist = ?, status = ?, key_offset = ?, private_note = ?,
+         SET title = ?, artist_id = ?, status = ?, key_offset = ?, private_note = ?,
              updated_at = ?
          WHERE id = ?`,
         [
           fields.title,
-          fields.artist,
+          fields.artistId,
           fields.status,
           fields.keyOffset,
           fields.privateNote,

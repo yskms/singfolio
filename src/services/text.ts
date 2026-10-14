@@ -66,3 +66,84 @@ export function searchKey(text: string): string {
     String.fromCharCode(char.charCodeAt(0) - 0x60),
   );
 }
+
+/**
+ * アーティスト名が同じかを比べるキー（同じアーティストとみなす範囲）。全角半角・互換文字
+ * （`normalizeTagName` と同じ）と、大文字小文字（ASCII以外も）を同一視し、空白の量を
+ * そろえる。ひらがなとカタカナは同一視しない（別のアーティストになりうる）。保存する形
+ * （`normalizeText`）ではなく、比べるためだけのキー。
+ */
+export function artistNameKey(name: string): string {
+  return normalizeTagName(name).toLowerCase();
+}
+
+/**
+ * 読み（並び替え用の名前）を正規化する（保存する形）。全角の英数字を半角に、半角カナを
+ * 全角カナにし、空白を整える（`normalizeTagName` と同じ。理由もそちら）。ひらがなとカタカナは
+ * 入力のまま保存する（並び替え・検索で同一視する）。
+ */
+export function normalizeReading(reading: string): string {
+  return normalizeTagName(reading);
+}
+
+const SMALL_KANA: Record<string, string> = {
+  ぁ: 'あ', ぃ: 'い', ぅ: 'う', ぇ: 'え', ぉ: 'お', っ: 'つ', ゃ: 'や', ゅ: 'ゆ', ょ: 'よ', ゎ: 'わ', ゕ: 'か', ゖ: 'け',
+};
+
+// 長音（ー）を、直前のかなの母音（あいうえお）にするための表。あ行〜わ行の、行ごとの母音。
+const KANA_VOWELS: Record<string, string> = {};
+for (const [row, vowels] of [
+  ['あいうえお', 'あいうえお'],
+  ['かきくけこ', 'あいうえお'],
+  ['さしすせそ', 'あいうえお'],
+  ['たちつてと', 'あいうえお'],
+  ['なにぬねの', 'あいうえお'],
+  ['はひふへほ', 'あいうえお'],
+  ['まみむめも', 'あいうえお'],
+  ['やゆよ', 'あうお'],
+  ['らりるれろ', 'あいうえお'],
+  ['わゐゑを', 'あいえお'],
+] as const) {
+  [...row].forEach((kana, index) => {
+    KANA_VOWELS[kana] = vowels[index] as string;
+  });
+}
+
+/**
+ * 並び替えのキー。キー同士を `<` で比べて並べる（コード順）。読み順（五十音順）になるよう、
+ * 次のようにする。
+ * - 検索と同じ同一視（`searchKey`）: 大文字小文字・全角半角・ひらがな/カタカナ。
+ * - 第1のキー（先に比べる）: 濁点・半濁点・アクセントを除く（`か` と `が` は同じ位置）、
+ *   小さいかな（`っ` `ゃ` など）を大きいかなにする、長音（ー）を直前のかなの母音にする
+ *   （`らーめん` は `らあめん`）。
+ * - 第2のキー（第1のキーが同じときの順）: 濁点などの有無（`か` が `が` より先）、大きいかなが
+ *   小さいかなより先（`きよう` が `きょう` より先）、母音が長音より先（`らあめん` が `らーめん` より先）。
+ * 並びは、記号・数字・英字 → かな（五十音順）→ 漢字（文字コード順）。漢字は読みを持たないので、
+ * 読みを入力した欄（アーティストの読み）で並べる。保存する形ではなく、比べるためだけのキー。
+ */
+export function sortKey(text: string): string {
+  let primary = '';
+  let secondary = '';
+  for (const char of searchKey(text).normalize('NFD')) {
+    if (/[\u0300-\u036f\u3099\u309a]/.test(char)) {
+      // 濁点・半濁点・アクセント: 第1のキーには入れず、第2のキーに、直前の字の後ろへ足す。
+      secondary += char;
+      continue;
+    }
+    const large = SMALL_KANA[char];
+    if (large !== undefined) {
+      primary += large;
+      secondary += `${large}\uffff`;
+      continue;
+    }
+    const vowel = char === 'ー' ? KANA_VOWELS[primary.slice(-1)] : undefined;
+    if (vowel !== undefined) {
+      primary += vowel;
+      secondary += `${vowel}\ufffe`;
+      continue;
+    }
+    primary += char;
+    secondary += char;
+  }
+  return `${primary}\u0000${secondary}`;
+}
