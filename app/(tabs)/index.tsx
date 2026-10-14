@@ -1,7 +1,6 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { FlatList, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { FlatList, ScrollView, StyleSheet, View } from 'react-native';
 
 import {
   SONG_STATUSES,
@@ -14,13 +13,13 @@ import {
 } from '../../src/domain/types';
 import type { MessageKey } from '../../src/i18n';
 import { getServices } from '../../src/services';
-import { decorative } from '../../ui/decorative';
 import { EmptyState } from '../../ui/EmptyState';
 import { FilterChip } from '../../ui/FilterChip';
 import { useI18n } from '../../ui/i18n';
 import { OptionSheet } from '../../ui/OptionSheet';
 import { SearchField } from '../../ui/SearchField';
 import { SongRow } from '../../ui/SongRow';
+import { SortButton } from '../../ui/SortButton';
 import { StatusTile } from '../../ui/StatusTile';
 import { Text } from '../../ui/Text';
 import { useTheme } from '../../ui/theme';
@@ -188,16 +187,11 @@ export default function SongsScreen() {
             {songCount === undefined ? '' : String(songCount)}
           </Text>
         </View>
-        <Pressable
-          accessibilityRole="button"
+        <SortButton
+          label={t(SORTS[sort].labelKey)}
           accessibilityLabel={t('songs.sortButtonA11y', { sort: t(SORTS[sort].labelKey) })}
-          hitSlop={8}
           onPress={() => setSortSheetOpen(true)}
-          style={({ pressed }) => [styles.sortButton, { opacity: pressed ? 0.6 : 1 }]}
-        >
-          <Ionicons name="swap-vertical" size={16} color={colors.textSecondary} {...decorative} />
-          <Text style={[styles.sortLabel, { color: colors.textSecondary }]}>{t(SORTS[sort].labelKey)}</Text>
-        </Pressable>
+        />
       </View>
     </View>
   );
@@ -273,6 +267,4 @@ const styles = StyleSheet.create({
   sectionTitle: { flexShrink: 1, flexDirection: 'row', alignItems: 'baseline', gap: 8 },
   sectionLabel: { flexShrink: 1, fontSize: 18, lineHeight: 24, fontWeight: '700' },
   sectionCount: { fontSize: 14, lineHeight: 20 },
-  sortButton: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 4 },
-  sortLabel: { fontSize: 13, lineHeight: 18 },
 });
