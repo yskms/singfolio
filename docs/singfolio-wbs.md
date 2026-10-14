@@ -6,7 +6,7 @@ v1.0の作業（保存・管理は端末内で完結し、外部通信は候補�
 v1.0より後（公開機能・Requests）の実装順序は、
 `singfolio-publishing-backend.md` §9 を参照。
 
-**現在地**：6. リリース準備（6.1・6.4・6.5が残り。6.2・6.3・6.6は完了）
+**現在地**：6. リリース準備（6.1・6.4・6.5が残り。6.2・6.3・6.6は完了。6.1は、Androidの見た目と操作は確認済みで、読み上げとiOS実機が残り）
 
 ## 0. 企画・設計
 
@@ -66,20 +66,19 @@ v1.0より後（公開機能・Requests）の実装順序は、
 
 ## 6. リリース準備
 
--   [ ] 6.1 実機確認（iOS / Android。Song Detail のヘッダーは、Androidの見た目と、画面名を
-    付けていない状態でのVoiceOver・TalkBackの読み上げも見る。Song Detail の Delete song と
-    確認のダイアログも、Androidで見る。Practice の行は、Androidの日本語（Noto Sans JP）で、
-    ボタンの文字の縦位置のずれ・切れが無いかを見る。Practice のボタンの読み上げ
-    （曲名が添わっていること）と、失敗のダイアログも、実機で見る。Show Mode は、実機で
-    ヘッダーの `×`・戻るキーで閉じられることと、アーティストの見出しと曲の行の読み上げ
-    （見出しが「名前、N曲」になっていること）、Show My Songs から連打しても重ならないこと
-    も見る。Settings は、Tags のダイアログとキーボードの重なり（エミュレータ・シミュレータは
-    ソフトキーボードが出ず、未確認）、ダイアログを開いた直後に名前が全選択になること
-    （エミュレータ・シミュレータでは、9回とも全選択だった。実機は未確認。外れていたら、Androidに
-    `selectTextOnFocus` を足す）、スイッチ・Tags・Aboutの読み上げ（VoiceOver・TalkBack。未確認）
-    も見る。Open source licenses は、Android の日本語・ダーク表示と、VoiceOver・TalkBack の
-    読み上げ（名前と「版 · ライセンスの種類」、展開の状態）も見る。About の Privacy Policy の行が、
-    公開したページをブラウザで開くことも見る）
+-   [ ] 6.1 実機確認（iOS / Android）。Androidの見た目と操作は、Pixel 11（release ビルド、日本語）で
+    確認した（Song Detail のヘッダーと削除のダイアログ、Practice のボタンの縦位置・切れ、
+    Show Mode の `×`・戻るキーでの閉じ方と連打、Tags のダイアログとキーボードの重なり・全選択、
+    Open source licenses の日本語・ダーク表示、About の Privacy Policy の行が公開したページを
+    ブラウザで開くこと）。残りは次のとおり。
+    VoiceOver・TalkBack の読み上げ: Song Detail のヘッダー（画面名を付けていない状態）、Practice の
+    ボタン（曲名が添わっていること。アクセシビリティツリーでは確認済み）、Show Mode の見出し
+    （「名前、N曲」になっていること。ツリーでは確認済み）と曲の行、Settings のスイッチ・Tags・About、
+    Open source licenses（名前と「版 · ライセンスの種類」、展開の状態）。
+    Practice の失敗のダイアログ（実機）。
+    Android の Tags のダイアログは、開いた直後にソフトキーボードが出ない（入力欄を押すと出るが、
+    全選択が外れる）。対応を決める。
+    iOS 実機（iPhone 8。TestFlight 経由。VoiceOver を含む）。
 -   [x] 6.2 アイコン・スプラッシュ（1024×1024への縮小、Androidの前景画像、
     Play Store用512×512、favicon）
 -   [x] 6.3 プライバシーポリシー・ストア掲載情報（`docs/privacy-policy.md`・`docs/singfolio-store-listing.md`・
