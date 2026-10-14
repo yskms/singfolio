@@ -6,7 +6,7 @@ v1.0の作業（保存・管理は端末内で完結し、外部通信は候補�
 v1.0より後（公開機能・Requests）の実装順序は、
 `singfolio-publishing-backend.md` §9 を参照。
 
-**現在地**：6. リリース準備（6.1・6.4・6.5が残り。6.2・6.3・6.6は完了。6.1は、Androidの見た目と操作は確認済みで、読み上げとiOS実機が残り）
+**現在地**：6. リリース準備（6.1・6.4・6.5が残り。6.2・6.3・6.6は完了。6.1は、Androidの見た目と操作は確認済みで、iOS実機が残り）
 
 ## 0. 企画・設計
 
@@ -70,15 +70,13 @@ v1.0より後（公開機能・Requests）の実装順序は、
     確認した（Song Detail のヘッダーと削除のダイアログ、Practice のボタンの縦位置・切れ、
     Show Mode の `×`・戻るキーでの閉じ方と連打、Tags のダイアログとキーボードの重なり・全選択、
     Open source licenses の日本語・ダーク表示、About の Privacy Policy の行が公開したページを
-    ブラウザで開くこと）。残りは次のとおり。
-    VoiceOver・TalkBack の読み上げ: Song Detail のヘッダー（画面名を付けていない状態）、Practice の
-    ボタン（曲名が添わっていること。アクセシビリティツリーでは確認済み）、Show Mode の見出し
-    （「名前、N曲」になっていること。ツリーでは確認済み）と曲の行、Settings のスイッチ・Tags・About、
-    Open source licenses（名前と「版 · ライセンスの種類」、展開の状態）。
-    Practice の失敗のダイアログ（実機）。
-    Android の Tags のダイアログは、開いた直後にソフトキーボードが出ない（入力欄を押すと出るが、
-    全選択が外れる）。対応を決める。
-    iOS 実機（iPhone 8。TestFlight 経由。VoiceOver を含む）。
+    ブラウザで開くこと）。
+    Tags のダイアログは、Androidで開いた直後にソフトキーボードが出ない（入力欄を押すと出るが、
+    全選択が外れる）。許容する（直さない）。
+    VoiceOver・TalkBack の読み上げは、実施せずに進める（アクセシビリティツリーでは、Practice の
+    ボタンに曲名が添うことと、Show Mode の見出しが「名前、N曲」になることを確認した）。
+    残りは、iOS実機（iPhone 8。TestFlight経由なので、6.4のビルドの後）と、Practice の失敗の
+    ダイアログ（実機）。
 -   [x] 6.2 アイコン・スプラッシュ（1024×1024への縮小、Androidの前景画像、
     Play Store用512×512、favicon）
 -   [x] 6.3 プライバシーポリシー・ストア掲載情報（`docs/privacy-policy.md`・`docs/singfolio-store-listing.md`・

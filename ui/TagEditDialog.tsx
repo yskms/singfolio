@@ -38,6 +38,8 @@ export function TagEditDialog({
   // iOSでは `autoFocus` と組み合わせると効かない（カーソルが末尾に置かれる。iOSシミュレータで確認。
   // Androidは効く）ので、`selection` で指定する。`selection` を渡し続けると、利用者が動かした
   // カーソルが、次の再描画で戻されるため、選択が変わったら（入力・カーソルの移動）手放す。
+  // Androidは、Modalの中の `autoFocus` では、開いた直後にソフトキーボードが出ない（Pixel 11で確認。
+  // 入力欄を押すと出るが、全選択が外れる）。許容すると決めたので、直さない（WBS 6.1）。
   const [selection, setSelection] = useState<{ start: number; end: number } | undefined>({
     start: 0,
     end: tag.name.length,
