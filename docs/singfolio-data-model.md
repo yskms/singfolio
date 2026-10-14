@@ -19,14 +19,14 @@ UIの表示名「My Key」は、モデル・DBでは `keyOffset` / `key_offset` 
 |---|---|---|
 | `id` | TEXT PK | UUID（生成はRepository側） |
 | `title` | TEXT NOT NULL | 曲名（必須） |
-| `artist` | TEXT NOT NULL | アーティスト（必須） |
+| `artist_id` | TEXT NOT NULL | アーティスト（必須）。`artists.id` を指す（外部キー。`ON DELETE` は付けない＝曲があるアーティストは消せない） |
 | `status` | TEXT NOT NULL | `ready` / `practice` / `want`（CHECK制約） |
 | `key_offset` | INTEGER NOT NULL DEFAULT 0 | My Key。原曲からの半音差。`0` = Original |
 | `private_note` | TEXT NOT NULL DEFAULT `''` | 非公開メモ。空文字 = メモなし |
 | `created_at` | INTEGER NOT NULL | 登録日時（Unixエポックのミリ秒） |
 | `updated_at` | INTEGER NOT NULL | 最終更新日時（同上）。Practiceの「Last updated」に使う |
 
--   タイトル・アーティストの空文字チェック（前後の空白の除去を含む）は
+-   タイトル・アーティスト名の空文字チェック（前後の空白の除去を含む）は
     DBではなくService層で行う。
 -   日時は端末のタイムゾーンに依存しないよう、エポックミリ秒で保存する。
     表示用の整形はUI側（Practiceの「Last updated」は `src/i18n/formatDay.ts`。
@@ -37,12 +37,43 @@ UIの表示名「My Key」は、モデル・DBでは `keyOffset` / `key_offset` 
     のように、曲を直接編集していない操作では更新しない。
     内容が変わらない保存（編集画面を開いて何も変えずに保存、同じStatusへの変更）も、
     編集ではないため更新しない（Practiceの「Last updated」が実態とずれないように）。
--   並び替えは既存のカラム（曲名・アーティスト・登録日・更新日）から行う。
+-   並び替えは既存のカラム（曲名・アーティストの読み・登録日・更新日）から行う。
     v1.0では手動の並び順を持たないため、そのためのカラムは置かない
     （必要になった時点で、マイグレーションとして追加する）。
-    日本語の曲名・アーティストの読み順は、SQLiteの照合順序では正しく並ばない。
-    v1.0では読み順に並べず、曲名・アーティストを `COLLATE NOCASE`（英字の
-    大文字小文字を区別しない、他は文字コード順）で並べる（「曲の一覧」参照）。
+    曲名・アーティストの五十音順は、SQLiteの照合順序ではできないため、DBではなくService層が
+    `sortKey` で並べる（「曲の一覧」参照）。
+-   `artist_id` に索引がある（`idx_songs_artist_id`）。
+
+### artists
+
+アーティスト。曲は1つのアーティストを持つ（`songs.artist_id`）。名前と読みは、同じアーティストの
+全曲で共有する（読みを曲ごとに持たない。食い違わないように）。
+
+| カラム | 型 | 内容 |
+|---|---|---|
+| `id` | TEXT PK | UUID（生成はRepository側） |
+| `name` | TEXT NOT NULL UNIQUE | 表示する名前。`COLLATE NOCASE` で一意（ASCIIの大文字小文字だけ。同じアーティストの判定はService層） |
+| `reading` | TEXT NOT NULL | 読み（並び替え用の名前）。空にしない（`CHECK (reading <> '')`）。日本語は、かな。英語は、`The` を除いた名前など、自由 |
+| `created_at` | INTEGER NOT NULL | 作成日時（エポックミリ秒） |
+
+-   **同じアーティストの判定**は、DBに任せず、Serviceが `artistNameKey`（`text.ts`。全角半角・互換文字・
+    大文字小文字を区別しない。ひらがなとカタカナは別）で行う。`Mr.Children` と `MR.CHILDREN`、
+    `Ｍｒ．Ｃｈｉｌｄｒｅｎ` は、同じアーティスト（名前は、最初に登録した表記）。DBの一意制約は最後の砦。
+-   **読み**: 保存する形は `normalizeReading`（全角の英数字を半角に、半角カナを全角カナにし、空白を整える。
+    ひらがな・カタカナは入力のまま）。空は `artist-reading-required`。言語ごとの規則（日本語の設定では
+    漢字・英字を含められない）は、データの不変条件ではなく入力の規則なので、画面が
+    `readingProblem`（`src/services/readingRules.ts`）で、保存の前に確認する（「読みを変えたときだけ」。
+    開いただけで、保存済みの読みを咎めない）。Serviceは、空にしないことだけを守る。
+-   **作成と読みの変更は、曲の保存と一緒に行う**（`createSong` / `updateSong` の `artist` と `artistReading`）。
+    名前に対応するアーティストがあればそれに付け、なければ作る。`artistReading` を渡すと、そのアーティスト
+    の読みを書き換える（全曲に効く）。省略すると、既存の読みはそのまま、新しく作るときは名前が読みになる。
+    曲の保存が失敗したら、作ったアーティストも残らない（同じトランザクション。タグと同じ）。
+-   **曲が1つも無くなったアーティストは、自動で消える**（曲の削除・付け替えと同じトランザクション。
+    読みだけを残さない）。そのため `songCount` は1以上で、Artists 画面に「削除」は無い。
+-   アーティストの名前・読みの変更（Artists 画面。`artists.updateArtist`）は、曲を直接編集していないので、
+    曲の `updated_at` を更新しない（タグ名の変更と同じ）。
+-   既存の曲の移行（マイグレーション3）: アーティスト名ごと（ASCIIの大文字小文字を区別せず、最初に
+    登録された表記）にアーティストを作り、読みは名前そのままにする。
 
 ### tags
 
@@ -69,7 +100,7 @@ UIの表示名「My Key」は、モデル・DBでは `keyOffset` / `key_offset` 
 
 ### settings
 
-端末の設定（Appearance・Languageなど）のキーと値。曲・タグとは独立で、公開用データにも含めない。
+端末の設定（Appearance・Languageなど）のキーと値。曲・アーティスト・タグとは独立で、公開用データにも含めない。
 
 | カラム | 型 | 内容 |
 |---|---|---|
@@ -92,13 +123,13 @@ UIの表示名「My Key」は、モデル・DBでは `keyOffset` / `key_offset` 
 
 UI → Service → Repository → SQLite の一方向。UIはRepositoryとDBに触れず、Service
 （`src/services/index.ts` の `getServices()`）だけを使う。例外は、DBに触れない純粋な関数
-（`text.ts` の正規化・`tagInput.ts`・`suggestionRules.ts`）と `ServiceError`・入力の型で、
+（`text.ts` の正規化・`readingRules.ts`・`tagInput.ts`・`suggestionRules.ts`）と `ServiceError`・入力の型で、
 画面が、保存前の入力の確認や候補の結合を、Serviceと同じ判定にそろえるために直接importしてよい。公開機能などの将来の
 同期処理も、このService境界の内側に追加する（`singfolio-publishing-backend.md` §10）。
 
 | 層 | 場所 | 役割 |
 |---|---|---|
-| モデル | `src/domain/types.ts` | `Song` / `Tag` / ステータス。各層が共有する。`Song` は `tags` を持つ |
+| モデル | `src/domain/types.ts` | `Song` / `Artist` / `Tag` / ステータス。各層が共有する。`Song` は `tags` と、アーティストの名前・読み（`artist` / `artistId` / `artistReading`）を持つ |
 | Repository | `src/repositories/` | SQLだけを持つ。IDと時刻の生成もここ（`RepositoryEnv`。テストで差し替える）。検証・正規化はしない。例外は `songCatalogRepository`（外部の楽曲検索のHTTP。「候補検索」） |
 | Service | `src/services/` | 入力の検証・正規化、トランザクション、`updated_at` の規則。失敗は `ServiceError`（`code` で区別） |
 | DB | `src/db/appDatabase.ts` | Repositoryが使うDBのインターフェース（expo-sqliteを包む） |
@@ -134,26 +165,35 @@ expo-sqliteの `withTransactionAsync` は排他ではなく、トランザクシ
     `getSuggestionsEnabled` / `setSuggestionsEnabled`（候補の外部検索のオン / オフ。既定はオン）
 -   `suggestions`: `available`（外部の検索が組み込まれているか）/ `localArtists` /
     `catalogArtists` / `catalogSongs`（「候補検索」。外部の検索は、探せなかったとき `null`）
+-   `artists`: `listArtists`（全アーティストを、読みの五十音順に、曲数つきで）/ `updateArtist`
+    （名前と読みの変更。Artists 画面。重複する名前は `artist-name-duplicate`）。アーティストを作るのは
+    曲の保存（`songs`。「artists」テーブル）。
 -   `tags`: `listTags` / `getOrCreateTag`（同じ名前のタグがあればそれを返し、なければ作る。
     タグだけを作る操作で、曲の編集画面は使わない。「曲の入力」の `newTagNames`）/
     `renameTag` / `deleteTag`
 -   不正な入力・存在しない対象は、`ServiceError` で reject する。`code` は
-    `title-required` / `artist-required` / `invalid-status` / `invalid-key-offset` /
+    `title-required` / `artist-required` / `artist-reading-required` / `artist-name-required` /
+    `artist-name-duplicate` / `artist-not-found` / `invalid-status` / `invalid-key-offset` /
     `song-not-found` / `tag-not-found` / `tag-name-required` / `tag-name-duplicate` /
     `invalid-appearance` / `invalid-language`。
     利用者向けの文言は、UI側で多言語化の仕組みを通して `code` から作る
     （`src/i18n/errors.ts`。コードを足すと、文言の対応を足すまで型エラーになる）。
 -   曲・タグの削除は、既に無い対象でも何もせず成功する（二重タップで失敗にしない）。
-    タグの削除は、付いていた曲から外すだけで曲は残る。曲の削除でタグは残る。
+    タグの削除は、付いていた曲から外すだけで曲は残る。曲の削除でタグは残る（アーティストは、
+    その曲が最後の1曲なら消える）。
 
 ### 曲の入力
 
--   Title・Artist: 前後の空白（全角空白を含む）を除き、濁点などが分解された形（NFD。
+-   Title・Artist（アーティスト名）: 前後の空白（全角空白を含む）を除き、濁点などが分解された形（NFD。
     macOSのファイル名からの貼り付けなど）を、普通に入力した形（NFC）にそろえる。
     見た目は変わらない。分解形のままだと、検索・並び替えで同じ文字が別の
     文字になる。データが入ってからでは、そろえ直すのにマイグレーションが必要になる
     ため、最初から行う。空は `title-required` / `artist-required`。それ以外の加工は
     しない（全角半角の統一はしない。`Ｔ.Ｍ.Revolution` は入力どおりに保存する）。
+-   Artistの読み（`artistReading`。省略は、既存のアーティストならその読みのまま、新しいアーティストなら
+    名前）: `normalizeReading` で正規化し、空は `artist-reading-required`。渡すと、そのアーティストの
+    読みを書き換える（「artists」）。曲の `updatedAt` は、曲の内容が変わったときだけ更新する（読みだけを
+    変えた保存では更新しない）。
 -   Status: 追加でも省略できない（既定値はUI側で決める）。
 -   My Key: 整数（範囲の制限はしない。編集画面の `−` / `+` が選べるのは上下12半音までで、
     これは画面の範囲）。省略は `0`。
@@ -194,7 +234,7 @@ expo-sqliteの `withTransactionAsync` は排他ではなく、トランザクシ
 `listSongs` の条件はすべて満たす曲だけを返す（AND）。
 
 -   絞り込み: `status`、`tagId`（1つだけ。複数タグの絞り込みは未対応）、`search`
-    （曲名またはアーティストの部分一致）。
+    （曲名・アーティスト名・アーティストの読みの部分一致）。
 -   検索は、SQLの `LIKE` ではなく、Serviceが、`status`・`tagId` で絞った曲を読んでから
     `searchKey`（`src/services/text.ts`）で絞り込む。`LIKE` が同一視するのはASCIIの大文字
     小文字だけで、`ちぇりー` で `チェリー` が見つからないなど、日本語の利用で困るため。
@@ -203,22 +243,27 @@ expo-sqliteの `withTransactionAsync` は排他ではなく、トランザクシ
     -   `searchKey` が同一視するもの: 大文字小文字（ASCII以外も）、全角半角（半角カナを含む。
         互換文字も変換する）、ひらがなとカタカナ、空白の量（全角空白を含む）。
         `normalize('NFKD').normalize('NFC')` で行う（タグ名と同じ理由。「タグ名」参照）。
-    -   同一視できないもの: 漢字の読み（`桜` と `さくら`。読みのデータが無い）、長音と
-        ひらがなの母音（`ちぇりー` と `ちぇりい`）。
+    -   アーティストは、名前だけでなく**読み**でも一致する（`よねづ` で `米津玄師`、`えるれ` で
+        `ELLEGARDEN`）。曲名の漢字は読みを持たないので、読みでは探せない（`桜` と `さくら`）。
+    -   同一視できないもの: 曲名の漢字の読み、長音とひらがなの母音（`ちぇりー` と `ちぇりい`）。
     -   検索語の前後の空白は無視し、空（空白だけを含む）の検索は絞り込まない。
         `% _ \` も普通の文字として一致する。
 -   並び替え: `title` / `artist` / `createdAt` / `updatedAt` と昇順・降順。既定は
     `updatedAt` の降順。一覧にないキー・方向（型の外から来た値）は、エラーにせず既定にする。
-    同順位の曲は、曲名・アーティスト・IDの昇順で、毎回同じ並びになる。
-    -   曲名・アーティストは、英字の大文字小文字を区別せず、他は文字コード順。日本語は読み順に
-        ならない（おおむね、記号・英字 → ひらがな → カタカナ → 漢字の順で、ひらがなとカタカナは
-        混ざらない。漢字は読みではなく文字コード順。半角カナ・全角英数字は漢字より後ろ）。読み順で並べるには、読み（ふりがな）の項目を
-        曲に持たせて入力させる必要があり、v1.0では行わない。必要になったら、`songs` に
-        読みの列を足すマイグレーションと、編集画面の入力欄を加える（検索の `searchKey` も、
-        読みを対象に足せる）。
+    同順位の曲は、曲名・アーティストの読み・IDの昇順で、毎回同じ並びになる。
+    -   **曲名・アーティストは、五十音順**。SQLの照合順序ではできないため、Serviceが、読んだ曲を
+        `sortKey`（`src/services/text.ts`）で並べる（Repositoryは、毎回同じになる仮の順で返すだけ）。
+        `ORDER BY ... COLLATE NOCASE` に「簡略化」しない。アーティストは、**読み**（`artistReading`）で
+        並べる（名前ではない）。曲名は曲名で並べる（曲名の読みは持たないので、漢字の曲名は読み順に
+        ならず、かなの後ろに文字コード順で並ぶ）。
+    -   `sortKey`: 検索と同じ同一視（大文字小文字・全角半角・ひらがな/カタカナ）に加え、第1のキーで、濁点・
+        半濁点・アクセントを除き、小さいかな（`っ` `ゃ` など）を大きいかなに、長音（ー）を直前のかなの
+        母音にする（`らーめん` は `らあめん`）。第2のキーで、同じなら、濁点なし → あり、大きいかな →
+        小さいかな、母音 → 長音の順。並びは、記号・数字・英字 → かな（五十音順）→ 漢字（文字コード順）。
+        ひらがなとカタカナは混ざる。`normalize('NFD')` を使う（NFDはiOSのHermesでも正しい）。
     -   画面の選択肢は、更新が新しい順（既定）・追加が新しい順・曲名順・アーティスト順の4つで、
         向きはそれぞれ固定（`singfolio-screen-flow.md`「Songs」）。
--   曲とタグは1回のクエリで取る（別々のクエリだと、間の書き込みで食い違いうるため）。
+-   曲・アーティスト・タグは1回のクエリで取る（別々のクエリだと、間の書き込みで食い違いうるため）。
 
 ## 候補検索
 

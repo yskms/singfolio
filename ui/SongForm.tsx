@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   SONG_STATUSES,
+  type ArtistSummary,
   type Song,
   type SongStatus,
   type SongSuggestion,
@@ -14,9 +15,10 @@ import {
 } from '../src/domain/types';
 import { errorMessageKey } from '../src/i18n';
 import { getServices, ServiceError, type SongInput } from '../src/services';
+import { defaultReading, readingProblem } from '../src/services/readingRules';
 import { MIN_CATALOG_TERM_LENGTH, mergeArtistSuggestions } from '../src/services/suggestionRules';
 import { resolveTagInput } from '../src/services/tagInput';
-import { normalizeText, searchKey } from '../src/services/text';
+import { artistNameKey, normalizeReading, normalizeText, searchKey } from '../src/services/text';
 import { ChoiceRow } from './ChoiceRow';
 import { FormField } from './FormField';
 import { FormInput } from './FormInput';
@@ -60,6 +62,11 @@ function sameIds(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
  *
  * - 曲名・アーティストが空なら、保存せずに両方の欄にエラーを出す（Serviceの検証と同じ
  *   `normalizeText` で判定し、Serviceのエラーは念のため受ける）。
+ * - アーティストの「読み」（並び替え用の名前）は必須。名前を入れる・候補から選ぶと、登録済みの
+ *   アーティストならその読み、そうでなければ名前から決めた初期値が入る（`defaultReading`。日本語の
+ *   設定で、漢字・英字を含む名前は空）。自分で書き換えたあとは、名前を変えても上書きしない。
+ *   日本語の設定では、かなだけ（`readingProblem`）。読みを**変えたとき**だけ確認する（編集画面を
+ *   開いただけで、保存済みの読みを咎めない）。読みは、そのアーティストの全曲に効く。
  * - 新しいタグは、保存するときに、曲と同じトランザクションで作る（保存せずに戻ったときも、
  *   保存に失敗したときも、使われないタグが残らない）。「新規タグ」欄に書いたまま保存した名前も、
  *   追加したものとして扱う。
@@ -80,6 +87,7 @@ export function SongForm({ song, tags }: { song?: Song; tags: readonly Tag[] }) 
   const [initial] = useState(() => ({
     title: song?.title ?? '',
     artist: song?.artist ?? '',
+    reading: song?.artistReading ?? '',
     status: song?.status ?? DEFAULT_STATUS,
     keyOffset: song?.keyOffset ?? 0,
     privateNote: song?.privateNote ?? '',
@@ -88,6 +96,13 @@ export function SongForm({ song, tags }: { song?: Song; tags: readonly Tag[] }) 
 
   const [title, setTitle] = useState(initial.title);
   const [artist, setArtist] = useState(initial.artist);
+  // アーティストの読み。自分で書き換えた（`readingTouched`）あとは、名前を変えても上書きしない。
+  const [reading, setReading] = useState(initial.reading);
+  const [readingTouched, setReadingTouched] = useState(false);
+  const [readingError, setReadingError] = useState<string | undefined>(undefined);
+  // 登録済みのアーティスト（名前から、読みの初期値を引く）。読み込めなかったときは空（初期値は
+  // 名前から決める）。
+  const [knownArtists, setKnownArtists] = useState<readonly ArtistSummary[] | null>(null);
   const [status, setStatus] = useState<SongStatus>(initial.status);
   const [keyOffset, setKeyOffset] = useState(initial.keyOffset);
   const [selectedTagIds, setSelectedTagIds] = useState<ReadonlySet<string>>(initial.tagIds);
@@ -135,6 +150,34 @@ export function SongForm({ song, tags }: { song?: Song; tags: readonly Tag[] }) 
     };
   }, []);
 
+  useEffect(() => {
+    let current = true;
+    getServices()
+      .then(({ artists }) => artists.listArtists())
+      .then(
+        (list) => {
+          if (current) setKnownArtists(list);
+        },
+        () => {
+          if (current) setKnownArtists([]);
+        },
+      );
+    return () => {
+      current = false;
+    };
+  }, []);
+
+  // 名前（と言語）から、読みの初期値を決める。自分で書き換えたあとは決めない。
+  const knownArtist = useMemo(() => {
+    const key = artistNameKey(artist);
+    return knownArtists?.find((candidate) => artistNameKey(candidate.name) === key);
+  }, [artist, knownArtists]);
+  useEffect(() => {
+    if (readingTouched || knownArtists === null) return;
+    const name = normalizeText(artist);
+    setReading(name === '' ? '' : (knownArtist?.reading ?? defaultReading(name, language)));
+  }, [artist, language, knownArtist, knownArtists, readingTouched]);
+
   const titleActive = titleFocused && titleEdited && title !== pickedTitle;
   const artistActive = artistFocused && artistEdited && artist !== pickedArtist;
   const searchArtist = artistTouched ? artist : '';
@@ -174,6 +217,7 @@ export function SongForm({ song, tags }: { song?: Song; tags: readonly Tag[] }) 
     setPickedTitle(suggestion.title);
     setPickedArtist(suggestion.artist);
     setArtistTouched(true);
+    setReadingTouched(false);
     setTitleError(undefined);
     setArtistError(undefined);
     setTitleFocused(false);
@@ -188,6 +232,7 @@ export function SongForm({ song, tags }: { song?: Song; tags: readonly Tag[] }) 
     setArtist(name);
     setPickedArtist(name);
     setArtistTouched(true);
+    setReadingTouched(false);
     setArtistError(undefined);
     setArtistFocused(false);
     setArtistEdited(false);
@@ -197,6 +242,7 @@ export function SongForm({ song, tags }: { song?: Song; tags: readonly Tag[] }) 
 
   const titleRef = useRef<NativeTextInput>(null);
   const artistRef = useRef<NativeTextInput>(null);
+  const readingRef = useRef<NativeTextInput>(null);
   // 二重タップで二重に保存しない（state は再描画まで古い）。
   const savingRef = useRef(false);
 
@@ -231,6 +277,7 @@ export function SongForm({ song, tags }: { song?: Song; tags: readonly Tag[] }) 
   const isDirty =
     title !== initial.title ||
     artist !== initial.artist ||
+    reading !== initial.reading ||
     status !== initial.status ||
     keyOffset !== initial.keyOffset ||
     privateNote !== initial.privateNote ||
@@ -276,8 +323,19 @@ export function SongForm({ song, tags }: { song?: Song; tags: readonly Tag[] }) 
     const artistMissing = normalizeText(artist) === '';
     setTitleError(titleMissing ? t('error.titleRequired') : undefined);
     setArtistError(artistMissing ? t('error.artistRequired') : undefined);
-    if (titleMissing || artistMissing) {
-      (titleMissing ? titleRef : artistRef).current?.focus();
+    // 読み: 空はいつも不可。日本語の設定の「かなだけ」は、読みを変えたとき（新しいアーティストを
+    // 含む）だけ。登録済みのアーティストの、変えていない読みは、咎めない。
+    const problem = readingProblem(reading, language);
+    const readingChanged = knownArtist === undefined || normalizeReading(reading) !== knownArtist.reading;
+    const readingMessage =
+      problem === 'required'
+        ? t('error.artistReadingRequired')
+        : problem === 'kana-only' && readingChanged
+          ? t('error.readingKanaOnly')
+          : undefined;
+    setReadingError(artistMissing ? undefined : readingMessage);
+    if (titleMissing || artistMissing || readingMessage !== undefined) {
+      (titleMissing ? titleRef : artistMissing ? artistRef : readingRef).current?.focus();
       return;
     }
 
@@ -296,6 +354,7 @@ export function SongForm({ song, tags }: { song?: Song; tags: readonly Tag[] }) 
       const input: SongInput = {
         title,
         artist,
+        artistReading: reading,
         status,
         keyOffset,
         privateNote,
@@ -315,6 +374,8 @@ export function SongForm({ song, tags }: { song?: Song; tags: readonly Tag[] }) 
         setTitleError(t('error.titleRequired'));
       } else if (error instanceof ServiceError && error.code === 'artist-required') {
         setArtistError(t('error.artistRequired'));
+      } else if (error instanceof ServiceError && error.code === 'artist-reading-required') {
+        setReadingError(t('error.artistReadingRequired'));
       } else {
         Alert.alert(t('songForm.saveFailedTitle'), t(errorMessageKey(error)), [{ text: t('common.ok') }]);
       }
@@ -456,6 +517,30 @@ export function SongForm({ song, tags }: { song?: Song; tags: readonly Tag[] }) 
             provider={
               providerShown && artistActive && sendable(artist) ? t('songForm.suggestionsProvider') : undefined
             }
+          />
+        </FormField>
+
+        <FormField
+          label={t('songForm.reading')}
+          required
+          note={t('songForm.readingNote')}
+          error={readingError}
+        >
+          <FormInput
+            ref={readingRef}
+            value={reading}
+            onChangeText={(text) => {
+              setReading(text);
+              setReadingTouched(true);
+              setReadingError(undefined);
+            }}
+            accessibilityLabel={t('songForm.reading')}
+            accessibilityHint={t('songForm.requiredHint')}
+            invalid={readingError !== undefined}
+            onFocus={focusTopField}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="done"
           />
         </FormField>
 

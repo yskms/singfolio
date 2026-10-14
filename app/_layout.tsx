@@ -82,8 +82,9 @@ export default function RootLayout() {
           <Stack.Screen name="song/[id]/edit" dangerouslySingular />
           {/* Show Mode も、素早い連打で重ねて開かないようにする（重なると、`×` で1枚しか閉じない）。 */}
           <Stack.Screen name="show" dangerouslySingular />
-          {/* Tags・About・Open source licenses も同じ（Profile・About の行の連打で、同じ画面が重なる）。 */}
+          {/* Tags・Artists・About・Open source licenses も同じ（Profile・About の行の連打で、同じ画面が重なる）。 */}
           <Stack.Screen name="tags" dangerouslySingular />
+          <Stack.Screen name="artists" dangerouslySingular />
           <Stack.Screen name="about" dangerouslySingular />
           <Stack.Screen name="licenses" dangerouslySingular />
         </Stack>

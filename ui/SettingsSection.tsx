@@ -142,6 +142,7 @@ export function SettingsSection() {
       )}
 
       <SettingsRow label={t('settings.tags')} onPress={() => router.push('/tags')} />
+      <SettingsRow label={t('settings.artists')} onPress={() => router.push('/artists')} />
       <SettingsRow label={t('settings.about')} onPress={() => router.push('/about')} />
 
       <OptionSheet
