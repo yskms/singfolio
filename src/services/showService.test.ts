@@ -69,7 +69,7 @@ describe('getShowView: 対象と並び', () => {
 
   it('曲が無ければ、空を返す', async () => {
     const { services } = await setup();
-    assert.deepEqual(await services.show.getShowView(), { readyCount: 0, tags: [], groups: [] });
+    assert.deepEqual(await services.show.getShowView(), { readyCount: 0, tags: [], sort: 'artist', groups: [] });
   });
 });
 
@@ -129,7 +129,8 @@ describe('getShowView: 絞り込み', () => {
     await add('チェリー', 'スピッツ', 'ready');
     await add('練習中', 'スピッツ', 'practice');
 
-    const query = { status: 'practice' } as unknown as Parameters<typeof services.show.getShowView>[0];
+    // 並びを指定しない呼び出しの型（アーティスト別）に合わせる。
+    const query = { status: 'practice' } as unknown as { search?: string };
     const view = await services.show.getShowView(query);
     assert.deepEqual(shape(view.groups), [['スピッツ', ['チェリー']]]);
   });
@@ -164,6 +165,107 @@ describe('getShowView: タグの一覧', () => {
   });
 });
 
+describe('getShowView: 曲名順', () => {
+  // 曲名順の一覧は、見出しが無いので、行がアーティストを持つ。
+  const listed = (songs: { title: string; artist: string }[]) => songs.map((song) => [song.title, song.artist]);
+
+  it('曲名順の一覧を返す（見出しは無く、行がアーティストを持つ）。英字は大文字小文字を区別しない', async () => {
+    const { services, add } = await setup();
+    await add('Sign', 'Mr.Children');
+    await add('楓', 'スピッツ');
+    await add('HANABI', 'Mr.Children');
+    await add('チェリー', 'スピッツ');
+    await add('alive', 'AAA');
+
+    const view = await services.show.getShowView({ sort: 'title' });
+    assert.equal(view.sort, 'title');
+    assert.deepEqual(listed(view.songs), [
+      ['alive', 'AAA'],
+      ['HANABI', 'Mr.Children'],
+      ['Sign', 'Mr.Children'],
+      ['チェリー', 'スピッツ'],
+      ['楓', 'スピッツ'],
+    ]);
+    assert.equal('groups' in view, false);
+  });
+
+  it('同じ曲名は、アーティストの昇順に並ぶ', async () => {
+    const { services, add } = await setup();
+    await add('Home', 'ZZ Top');
+    await add('Home', 'Aimer');
+    await add('Home', 'Mr.Children');
+
+    const view = await services.show.getShowView({ sort: 'title' });
+    assert.deepEqual(listed(view.songs), [
+      ['Home', 'Aimer'],
+      ['Home', 'Mr.Children'],
+      ['Home', 'ZZ Top'],
+    ]);
+  });
+
+  it('Readyの曲だけ。検索・タグで絞れて、件数とタグの一覧は変わらない', async () => {
+    const { services, add } = await setup();
+    const rock = await services.tags.getOrCreateTag('Rock');
+    await add('ロビンソン', 'スピッツ', 'ready', { tagIds: [rock.id] });
+    await add('チェリー', 'スピッツ');
+    await add('練習中のロック', 'スピッツ', 'practice', { tagIds: [rock.id] });
+    await add('歌いたい曲', 'どこか', 'want');
+
+    const all = await services.show.getShowView({ sort: 'title' });
+    assert.deepEqual(listed(all.songs), [
+      ['チェリー', 'スピッツ'],
+      ['ロビンソン', 'スピッツ'],
+    ]);
+
+    const byTag = await services.show.getShowView({ sort: 'title', tagId: rock.id });
+    assert.deepEqual(listed(byTag.songs), [['ロビンソン', 'スピッツ']]);
+
+    const bySearch = await services.show.getShowView({ sort: 'title', search: 'ちぇりー' });
+    assert.deepEqual(listed(bySearch.songs), [['チェリー', 'スピッツ']]);
+    assert.equal(bySearch.readyCount, 2);
+    assert.deepEqual(bySearch.tags, [showTag(rock)]);
+
+    const none = await services.show.getShowView({ sort: 'title', search: 'zzz' });
+    assert.deepEqual(none.songs, []);
+    assert.equal(none.readyCount, 2);
+  });
+
+  it('曲名順でもアーティスト別でも、件数とタグの一覧は同じ', async () => {
+    const { services, add } = await setup();
+    const rock = await services.tags.getOrCreateTag('Rock');
+    await add('ロビンソン', 'スピッツ', 'ready', { tagIds: [rock.id] });
+    await add('Sign', 'Mr.Children');
+
+    const byArtist = await services.show.getShowView();
+    const byTitle = await services.show.getShowView({ sort: 'title' });
+    assert.equal(byTitle.readyCount, byArtist.readyCount);
+    assert.deepEqual(byTitle.tags, byArtist.tags);
+  });
+
+  it('型の外から来た sort は、アーティスト別にする', async () => {
+    const { services, add } = await setup();
+    await add('チェリー', 'スピッツ');
+
+    const query = { sort: 'updatedAt' } as unknown as Parameters<typeof services.show.getShowView>[0];
+    const view = await services.show.getShowView(query);
+    assert.equal(view.sort, 'artist');
+    assert.deepEqual(shape((view as { groups: { artist: string; songs: { title: string }[] }[] }).groups), [
+      ['スピッツ', ['チェリー']],
+    ]);
+  });
+
+  it('型の外から status を渡されても、Ready以外は返さない', async () => {
+    const { services, add } = await setup();
+    await add('チェリー', 'スピッツ', 'ready');
+    await add('練習中', 'スピッツ', 'practice');
+
+    const query = { sort: 'title', status: 'practice' } as unknown as Parameters<typeof services.show.getShowView>[0];
+    const view = await services.show.getShowView(query);
+    assert.equal(view.sort, 'title');
+    assert.deepEqual(listed((view as { songs: { title: string; artist: string }[] }).songs), [['チェリー', 'スピッツ']]);
+  });
+});
+
 describe('getShowView: 人に見せない情報', () => {
   it('曲は id / title / tags だけを持つ（My Key・Private Note・ステータスを含まない）', async () => {
     const { services, add } = await setup();
@@ -173,11 +275,23 @@ describe('getShowView: 人に見せない情報', () => {
     const view = await services.show.getShowView();
     const song = view.groups[0]?.songs[0];
     assert.deepEqual(Object.keys(song ?? {}).sort(), ['id', 'tags', 'title']);
-    assert.deepEqual(Object.keys(view).sort(), ['groups', 'readyCount', 'tags']);
+    assert.deepEqual(Object.keys(view).sort(), ['groups', 'readyCount', 'sort', 'tags']);
     assert.deepEqual(Object.keys(view.groups[0] ?? {}).sort(), ['artist', 'songs']);
     // タグも、id と name だけ（`Tag` に項目が増えても、Show Mode には届かない）。
     assert.deepEqual(Object.keys(song?.tags[0] ?? {}).sort(), ['id', 'name']);
     assert.deepEqual(Object.keys(view.tags[0] ?? {}).sort(), ['id', 'name']);
+    assert.equal(JSON.stringify(view).includes('2番が不安'), false);
+  });
+
+  it('曲名順の行は id / title / artist / tags だけを持つ（管理情報を含まない）', async () => {
+    const { services, add } = await setup();
+    const rock = await services.tags.getOrCreateTag('Rock');
+    await add('チェリー', 'スピッツ', 'ready', { keyOffset: -3, privateNote: '2番が不安', tagIds: [rock.id] });
+
+    const view = await services.show.getShowView({ sort: 'title' });
+    assert.deepEqual(Object.keys(view).sort(), ['readyCount', 'songs', 'sort', 'tags']);
+    assert.deepEqual(Object.keys(view.songs[0] ?? {}).sort(), ['artist', 'id', 'tags', 'title']);
+    assert.deepEqual(Object.keys(view.songs[0]?.tags[0] ?? {}).sort(), ['id', 'name']);
     assert.equal(JSON.stringify(view).includes('2番が不安'), false);
   });
 });

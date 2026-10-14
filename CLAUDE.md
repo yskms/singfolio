@@ -132,6 +132,9 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     触れない（タグも `id` と `name` だけ）。`ShowSong` に項目を足したり、`Song` や `Tag` を
     そのまま渡す形に「簡略化」しない。行は押せるようにしない（Song Detail は管理情報を出す）。
     タグのチップは、Songs と違い、Readyの曲に付いたものだけ（理由は screen-flow「Show Mode」）。
+    並び替えは Artist / Title の2つだけ。曲名順の行は、`ShowSong` に `artist` だけを足した別の型
+    （`ShowListedSong`）で、`ShowSong` 自体に `artist` を足さない。更新日・追加日の順は Show Mode に
+    持ち込まない（人に見せる画面に、管理の情報を持ち込まない）。
 -   ボトムタブはSongs / Practice / Profileの3つ。Wantは独立タブにせず
     Songs内のステータスとして扱う（Practiceのみ独立タブ）。
 -   ログインを要求しない（v1.0）。

@@ -6,7 +6,7 @@ import { createServices, type Services } from './createServices.ts';
 
 export type { Services } from './createServices.ts';
 export { DatabaseTooNewError, ServiceError, type ServiceErrorCode } from './errors.ts';
-export type { ShowQuery, ShowView } from './showService.ts';
+export type { ArtistShowView, ShowQuery, ShowView, TitleShowView } from './showService.ts';
 export type { NewSongInput, SongInput } from './songService.ts';
 
 let servicesPromise: Promise<Services> | null = null;

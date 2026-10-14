@@ -85,6 +85,18 @@ export interface ArtistGroup {
   songs: ShowSong[];
 }
 
+/** Show Mode の並び。`artist` はアーティスト別（既定）、`title` は曲名順の一覧。 */
+export type ShowSort = 'artist' | 'title';
+
+/**
+ * Show Mode の曲名順の一覧の行。アーティストの見出し（`ArtistGroup`）が無いので、行にアーティスト
+ * を持つ。`ShowSong` に `artist` を足さないのは、アーティスト別のときの行に要らないため。管理用の
+ * 情報は、`ShowSong` と同じく持たない。
+ */
+export interface ShowListedSong extends ShowSong {
+  artist: string;
+}
+
 export type SongSortKey = 'title' | 'artist' | 'createdAt' | 'updatedAt';
 export type SortDirection = 'asc' | 'desc';
 

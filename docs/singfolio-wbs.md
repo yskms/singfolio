@@ -57,6 +57,7 @@ v1.0より後（公開機能・Requests）の実装順序は、
     開く入口は Profile の Show My Songs（5.1）。リンク `singfolio://show` でも開く）
 -   [x] 4.2 非表示項目の確認（My Key / Private Note / Want を出さない。`show` Service が管理情報を
     持たない形で返すので、画面は出せない。Serviceのテストと、iOS・Androidの画面で確認した）
+-   [x] 4.3 並び替え（Artist / Title。ヘッダーのチップの下の右端のボタン。更新日・追加日の順は持たない）
 
 ## 5. Profile / Settings
 
