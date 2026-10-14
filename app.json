@@ -92,6 +92,12 @@
           }
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "ad6ec2b9-8835-46d7-a454-1d3a5e4386a8"
+      }
+    },
+    "owner": "yskms"
   }
 }

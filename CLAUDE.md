@@ -334,6 +334,11 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     （未対応だと起動直後にクラッシュする）への対応で、削除しない。Expo SDK 58 の
     テンプレートが同じ配線を持つので、SDK 58 へ上げるときにこのプラグインと
     app.json の登録を撤去する。
+-   ビルド番号（iOSの buildNumber・AndroidのversionCode）は、EAS が持つ（`eas.json` の
+    `appVersionSource: "remote"`、`production` の `autoIncrement`）。`app.json` に書かない
+    （書いても無視される）。`app.json` の `version`（ストアの表示版）は手で上げる。`eas init` は
+    `app.json` に、プラグインの展開結果（`CFBundleLocalizations` など）まで書き込むので、
+    やり直すときは `projectId` と `owner` 以外の差分を戻す。
 -   `react-native-reanimated` / `react-native-gesture-handler` /
     `react-native-worklets` は画面から直接使っていないが、消さない。Expo Routerの
     依存（`react-native-drawer-layout`）がgesture-handlerとreanimatedをpeerに
