@@ -6,7 +6,7 @@ import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FONT_LICENSES, type FontLicense } from '../src/legal/fontLicenses';
-import { PRIVACY_POLICY_URL } from '../src/legal/legalUrls';
+import { MUSICBRAINZ_URL, PRIVACY_POLICY_URL } from '../src/legal/legalUrls';
 import { reflowLicense } from '../src/legal/reflowLicense';
 import { decorative } from '../ui/decorative';
 import { useI18n } from '../ui/i18n';
@@ -24,7 +24,8 @@ const SCREEN_OPTIONS = {
 // About。Profile の Settings から開く。アプリの名前とバージョン、プライバシーポリシーへのリンク、自前で同梱したフォント（`assets/fonts/`）
 // のライセンス（SIL Open Font License は、再配布するときに、著作権表示とライセンス全文を付けることを
 // 求める）。アイコンフォント（Ionicons など）と npm の依存のライセンスは、ここには載せず、
-// 「Open source licenses」（app/licenses.tsx）に出す。
+// 「Open source licenses」（app/licenses.tsx）に出す。データの出どころ（アーティストの読みの辞書の
+// MusicBrainz）も載せる（CC0 で、表記は義務ではないが、出どころを示す）。
 export default function AboutScreen() {
   const { colors } = useTheme();
   const { t } = useI18n();
@@ -64,6 +65,21 @@ export default function AboutScreen() {
         {FONT_LICENSES.map((license) => (
           <FontLicenseItem key={license.name} license={license} />
         ))}
+
+        <Text role="heading" style={[styles.section, styles.fonts, { color: colors.textSecondary }]}>
+          {t('about.data')}
+        </Text>
+        <View style={[styles.font, { borderBottomColor: colors.border }]}>
+          <Text style={[styles.fontName, { color: colors.textPrimary }]}>MusicBrainz</Text>
+          <Text style={[styles.fontNote, { color: colors.textSecondary }]}>{t('about.musicBrainzNote')}</Text>
+        </View>
+        <SettingsRow
+          label={t('about.musicBrainzLink')}
+          accessibilityHint={t('about.privacyPolicyHint')}
+          external
+          // ブラウザで開く（アプリの通信ではない）。開けなくても、アプリの動作には影響しない。
+          onPress={() => void Linking.openURL(MUSICBRAINZ_URL).catch(() => undefined)}
+        />
       </ScrollView>
     </>
   );

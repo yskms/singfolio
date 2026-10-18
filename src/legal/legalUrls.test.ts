@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
-import { PRIVACY_POLICY_URL } from './legalUrls.ts';
+import { MUSICBRAINZ_URL, PRIVACY_POLICY_URL } from './legalUrls.ts';
 
 const docs = new URL('../../docs/', import.meta.url);
 
@@ -21,5 +21,13 @@ describe('PRIVACY_POLICY_URL', () => {
   it('ストア掲載情報（docs/singfolio-store-listing.md）に書いたURLと同じ', () => {
     const listing = readFileSync(new URL('singfolio-store-listing.md', docs), 'utf8');
     assert.ok(listing.includes(PRIVACY_POLICY_URL));
+  });
+});
+
+describe('MUSICBRAINZ_URL', () => {
+  it('https で、musicbrainz.org を指す', () => {
+    const url = new URL(MUSICBRAINZ_URL);
+    assert.equal(url.protocol, 'https:');
+    assert.equal(url.hostname, 'musicbrainz.org');
   });
 });

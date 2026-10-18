@@ -4,3 +4,7 @@
 // と同じにする（`legalUrls.test.ts` が、`docs/privacy-policy.md` との対応を確認する）。
 
 export const PRIVACY_POLICY_URL = 'https://yskms.github.io/singfolio/privacy-policy.html';
+
+// アーティストの読みの辞書の出どころ（MusicBrainz）。About に載せ、ブラウザで開く行にする。
+// 辞書はコアデータ（CC0）から作っていて、帰属表示は求められないが、出どころを示す。
+export const MUSICBRAINZ_URL = 'https://musicbrainz.org/';

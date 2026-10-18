@@ -104,6 +104,10 @@ export const ja: Record<MessageKey, Message> = {
 
   'about.version': 'バージョン {version}',
   'about.fonts': 'フォント',
+  'about.data': 'データ',
+  'about.musicBrainzNote':
+    'アーティストの読みの辞書は、MusicBrainz のコアデータ（CC0。パブリックドメイン）から作っています。',
+  'about.musicBrainzLink': 'MusicBrainz のサイトを開く',
   'about.fontLicense': 'SIL Open Font License 1.1',
   'about.showLicense': 'ライセンスを表示',
   'about.hideLicense': 'ライセンスを隠す',

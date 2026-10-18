@@ -132,6 +132,11 @@ export const en = {
   'about.version': 'Version {version}',
   'about.fonts': 'Fonts',
   'about.fontLicense': 'SIL Open Font License 1.1',
+  // 出どころの表記（アーティストの読みの辞書）。
+  'about.data': 'Data',
+  'about.musicBrainzNote':
+    'The artist reading dictionary is built from MusicBrainz core data (CC0, public domain).',
+  'about.musicBrainzLink': 'Visit MusicBrainz',
   'about.showLicense': 'Show license',
   'about.hideLicense': 'Hide license',
   'about.privacyPolicy': 'Privacy Policy',

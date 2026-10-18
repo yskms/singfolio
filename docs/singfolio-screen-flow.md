@@ -657,7 +657,8 @@ Profile（§7）の下半分に、`Appearance` / `Language` / `Suggestions` / `T
 ### About
 
 アプリの名前、バージョン（app.json の `version`）、プライバシーポリシーと Open source licenses への
-行、自前で同梱したフォントのライセンス（Profile の `About` から開く画面）。
+行、自前で同梱したフォントのライセンス、データ（アーティストの読みの辞書）の出どころ
+（Profile の `About` から開く画面）。
 
 -   「Privacy Policy」の行は、バージョンの下に置き、押すとブラウザで公開ページ（`src/legal/legalUrls.ts`。
     `docs/privacy-policy.md` をGitHub Pagesで公開したもの）を開く。App Store の審査は、ストア掲載情報と
@@ -671,8 +672,12 @@ Profile（§7）の下半分に、`Appearance` / `Language` / `Suggestions` / `T
     残らないように）。字は変えない（`src/legal/reflowLicense.ts`）。
 -   全文は `assets/fonts/OFL-*.txt` と同じ内容を、`src/legal/fontLicenses.ts` に写している。食い違いは
     `npm test` が検出する。フォントを入れ替えたら直す。
--   **ここに載せるのは、`assets/fonts/` に自前で同梱した書体（Inter・Noto Sans JP）だけ**。アイコン
+-   **「Fonts」に載せるのは、`assets/fonts/` に自前で同梱した書体（Inter・Noto Sans JP）だけ**。アイコン
     フォントや npm の依存は、Open source licenses に載せる。
+-   **「Data」**（フォントの下）: アーティストの読みの辞書の出どころ。「MusicBrainz」の名前と、「アーティストの
+    読みの辞書は、MusicBrainz のコアデータ（CC0。パブリックドメイン）から作っています」の説明、
+    musicbrainz.org をブラウザで開く行（外へ出る印。`MUSICBRAINZ_URL`）。CC0 は帰属表示を求めないので、
+    表記は義務ではない（出どころを示すため）。
 
 ### Open source licenses
 
