@@ -56,6 +56,14 @@ export const en = {
   'songs.noMatch.message':
     'Nothing in “{section}” matches. Try changing the search, tag, or status.',
   'songs.noMatch.clear': 'Clear search and tag',
+  // 行の右のボタン（Practice で絞ると「Ready」へ、Want で絞ると「Practice」へ）。見える文字は
+  // ステータスの名前（status.*）。以下は読み上げ用で、行ごとに同じ名前のボタンが並ぶので、どの曲かを
+  // 添える（見えている文字を含める。WCAG 2.5.3 Label in Name）。音声コントロールで呼べるかは、確認
+  // していない（RN には `accessibilityUserInputLabels` が無く、ラベルを別に渡せない）。
+  'songs.action.toReadyLabel': 'Mark as Ready, {title}',
+  'songs.action.toPracticeLabel': 'Mark as Practice, {title}',
+  'songs.action.toReadyFailedTitle': 'Couldn’t mark as Ready',
+  'songs.action.toPracticeFailedTitle': 'Couldn’t mark as Practice',
 
   // Practice（app/(tabs)/practice.tsx）。検索欄・「一致する曲がありません」の題・検索のクリアは、
   // Songs の文言（songs.*）を使う。

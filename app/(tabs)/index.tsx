@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { FlatList, ScrollView, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, FlatList, ScrollView, StyleSheet, View } from 'react-native';
 
 import {
   SONG_STATUSES,
@@ -11,8 +11,8 @@ import {
   type SortDirection,
   type Tag,
 } from '../../src/domain/types';
-import type { MessageKey } from '../../src/i18n';
-import { getServices } from '../../src/services';
+import { errorMessageKey, type MessageKey } from '../../src/i18n';
+import { getServices, ServiceError } from '../../src/services';
 import { EmptyState } from '../../ui/EmptyState';
 import { FilterChip } from '../../ui/FilterChip';
 import { useI18n } from '../../ui/i18n';
@@ -62,16 +62,47 @@ export default function SongsScreen() {
   const [sort, setSort] = useState<SortName>('updated');
   const [sortSheetOpen, setSortSheetOpen] = useState(false);
 
-  // 行の `memo` が効くよう、行へ渡す関数は毎回作り直さない。
-  const openSong = useCallback((song: Song) => router.push(`/song/${song.id}`), [router]);
-  const renderSong = useCallback(
-    ({ item }: { item: Song }) => <SongRow song={item} onPress={openSong} />,
-    [openSong],
+  const [loaded, setLoaded] = useState<Loaded | null>(null);
+  // 行のボタンでステータスを変えたあとに、一覧を読み直す合図。他の画面で変わったときの
+  // `refreshKey` とは別（こちらは、この画面の中で変えたときに増やす）。増えると、読み込み中の
+  // 古い結果は捨てられる。
+  const [reloadKey, setReloadKey] = useState(0);
+  // ステータスを変えている最中の曲。同じ曲のボタンを続けて押しても、2回は変えない。曲ごとに分けるのは、
+  // 別の曲のボタンは、続けて押せるようにするため（書き込みは直列になる）。
+  const changingIds = useRef(new Set<string>());
+
+  // 行の右のボタン。押すとすぐ変え（確認は無い。Song Detail のステータス変更と同じ `setStatus`。
+  // `updatedAt` も更新する）、一覧を読み直す。絞り込んでいるステータスから外れるので、行が消えて、
+  // 件数が動く。取り消しの操作は無い（戻すときは Song Detail でステータスを変える）。
+  // 失敗したらダイアログで伝え、行は残す。曲が既に無かったときは、何も伝えずに一覧から消す。
+  const changeStatus = useCallback(
+    async (song: Song, target: SongStatus) => {
+      if (changingIds.current.has(song.id)) return;
+      changingIds.current.add(song.id);
+      let changed = false;
+      try {
+        const { songs } = await getServices();
+        await songs.setStatus(song.id, target);
+        changed = true;
+      } catch (error) {
+        if (error instanceof ServiceError && error.code === 'song-not-found') {
+          changed = true;
+        } else {
+          Alert.alert(
+            t(target === 'ready' ? 'songs.action.toReadyFailedTitle' : 'songs.action.toPracticeFailedTitle'),
+            t(errorMessageKey(error)),
+            [{ text: t('common.ok') }],
+          );
+        }
+      } finally {
+        changingIds.current.delete(song.id);
+      }
+      if (changed) setReloadKey((key) => key + 1);
+    },
+    [t],
   );
 
-  const [loaded, setLoaded] = useState<Loaded | null>(null);
-  // 他の画面で曲・タグが変わったあと（Song Detail・Practice・Settingsなど）に戻ってきたら、
-  // 読み直す。
+  // 他の画面で曲・タグが変わったあと（Song Detail・Settingsなど）に戻ってきたら、読み直す。
   const refreshKey = useFocusRefreshKey();
   // reject の値が undefined などでも失敗を検知できるよう、包んで保持する。
   const [failure, setFailure] = useState<{ error: unknown } | null>(null);
@@ -102,7 +133,24 @@ export default function SongsScreen() {
     return () => {
       cancelled = true;
     };
-  }, [status, tagId, search, sortBy, direction, refreshKey]);
+  }, [status, tagId, search, sortBy, direction, refreshKey, reloadKey]);
+
+  // 行のボタン。Practice で絞っているあいだは「Ready」へ、Want で絞っているあいだは「Practice」へ
+  // 進める（ステータスの順 `Want → Practice → Ready`）。Ready・すべての曲には出さない。
+  // 条件は、現在の state ではなく、表示中の一覧のもの（`loaded.filter`）で決める（見出し・件数と同じ。
+  // 食い違うと、新しい条件の一覧が出る前に、前の一覧の行のボタンが変わってしまう）。
+  const listedStatus = loaded === null ? status : loaded.filter.status;
+  const actionTarget: SongStatus | undefined =
+    listedStatus === 'practice' ? 'ready' : listedStatus === 'want' ? 'practice' : undefined;
+
+  // 行の `memo` が効くよう、行へ渡す関数は毎回作り直さない。
+  const openSong = useCallback((song: Song) => router.push(`/song/${song.id}`), [router]);
+  const renderSong = useCallback(
+    ({ item }: { item: Song }) => (
+      <SongRow song={item} onPress={openSong} actionTarget={actionTarget} onAction={changeStatus} />
+    ),
+    [openSong, actionTarget, changeStatus],
+  );
 
   // 読み込みの失敗は、画面の描画の失敗と同じく、ルートのErrorBoundary（エラー画面）に任せる。
   // Errorでない値は包む（`app/_layout.tsx` と同じ理由）。

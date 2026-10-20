@@ -47,6 +47,10 @@ export const ja: Record<MessageKey, Message> = {
   'songs.noMatch.message':
     '「{section}」に一致する曲はありません。検索語・タグ・ステータスを変えてみてください。',
   'songs.noMatch.clear': '検索とタグをクリア',
+  'songs.action.toReadyLabel': '「歌える」にする、{title}',
+  'songs.action.toPracticeLabel': '「練習中」にする、{title}',
+  'songs.action.toReadyFailedTitle': '「歌える」にできませんでした',
+  'songs.action.toPracticeFailedTitle': '「練習中」にできませんでした',
 
   'practice.count': { other: '{count}曲' },
   'practice.updatedToday': '最終更新：今日',
