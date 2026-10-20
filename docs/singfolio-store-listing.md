@@ -149,14 +149,15 @@ Apple へ送る検索語があるため、次の1項目を申告する。他は�
 
 ### English
 
--   **App name**: `Singfolio: Song Repertoire`
+-   **App name**: `Singfolio`（App Store と同じ。補足の語は付けない。検索への効きは、公開後の実際の
+    検索を見てから、必要なら変える）
 -   **Short description**: `Manage the songs you can sing, are practicing, and want to sing.`
 -   **Full description**: App Store の Description（§2）と同じ文（見出しの大文字は、そのまま使ってよい）。
 -   **Release notes (1.0.0)**: `First release.`
 
 ### 日本語
 
--   **アプリ名**: `Singfolio: 持ち歌レパートリー管理`
+-   **アプリ名**: `Singfolio`
 -   **簡単な説明**: `歌える曲・練習中の曲・歌いたい曲を、ひとつの場所で管理するアプリ。`
 -   **詳細な説明**: App Store の説明（§2）と同じ文。
 -   **リリースノート（1.0.0）**: `初回リリース。`
