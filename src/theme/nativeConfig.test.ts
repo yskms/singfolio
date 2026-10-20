@@ -1,6 +1,9 @@
-// ネイティブ設定（app.json、config plugin）に手で写した色が、src/theme/colors.ts と
-// 一致していることのテスト。これらはJSから色を読めない（ビルド時・起動直後の、JSが動く
-// 前の色）ため、定数と別に持っている。`npm test` で実行する。
+// ネイティブ設定（app.json、config plugin）のテスト。
+// - 手で写した色が、src/theme/colors.ts と一致していること。これらはJSから色を読めない
+//   （ビルド時・起動直後の、JSが動く前の色）ため、定数と別に持っている。
+// - 外してはいけない設定（使っていないAndroid権限のblockedPermissions、R8のpluginの登録）が
+//   残っていること。
+// `npm test` で実行する。
 /// <reference types="node" />
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
