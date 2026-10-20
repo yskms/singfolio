@@ -97,7 +97,9 @@ v1.0より後（公開機能・Requests）の実装順序は、
     開けないことも確認した。フィーチャーグラフィックと、スクリーンショット（English・日本語。
     架空の曲で撮影）は `assets/` に作成済み）
 -   [ ] 6.4 ビルド・ストア提出（`eas.json`・EASのプロジェクトは作成済み。ビルド番号はEASが持つ。AndroidはR8を有効にした
-    （`plugins/withAndroidR8.js`。Google Playが2027年2月から求める難読化・最適化・縮小の率のため）。提出の前に、`node scripts/generate-licenses.mjs --check --apk <release の
+    （`plugins/withAndroidR8.js`。Google Playが2027年2月から求める難読化・最適化・縮小の率のため）。
+    Androidは、`eas build --local --platform android --profile production` で、全アーキテクチャのAABを作れることを
+    確認した（署名鍵（upload key）は、EASが初回のビルドで自動作成して保管する。versionCodeは2から始まる）。提出の前に、`node scripts/generate-licenses.mjs --check --apk <release の
     APK・AAB>` で、第三者ライセンスの一覧が今の依存と同じことと、把握していない `.so` が入っていない
     ことを確かめる）
 -   [ ] 6.5 候補検索の提供元の利用条件の確認（問い合わせ済み。返事を待たずに、v1.0を iOS・Android の
