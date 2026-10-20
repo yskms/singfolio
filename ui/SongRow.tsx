@@ -7,9 +7,12 @@ import { useI18n } from './i18n';
 import { Text } from './Text';
 import { useTheme } from './theme';
 
+/** 原曲のまま（`0`）のMy Keyの、一覧での表記。行ごとに「Original」と並べると賑やかなので、ハイフンにする。 */
+const ORIGINAL_MARK = '-';
+
 /**
  * 曲の一覧の1行（曲名・アーティスト・タグ、右にMy Key）。押すと `onPress`（Song Detailを開く）。
- * My Keyは、歌う前に見たい情報なので、一覧に出す（`0` は「Original」。Song Detailと同じ表記）。
+ * My Keyは、歌う前に見たい情報なので、一覧に出す（`0` は `-`。Song Detail・入力画面は「Original」）。
  * Private Noteは出さない。人に見せる画面（Show Mode）は、この行を使わない（`ShowSongRow`）。
  * 数百曲でも軽いよう、`song` と `onPress` が変わらない限り再描画しない（`onPress` は、
  * 呼び出し側で安定した関数にする）。
@@ -53,7 +56,9 @@ export const SongRow = memo(function SongRow({
         </Text>
         <Text
           numberOfLines={1}
-          // Originalは控えめに、原曲からずらしている曲だけを目立たせる（Regular / Bold だけを使う）。
+          // 原曲のままは控えめに、ずらしている曲だけを目立たせる（Regular / Bold だけを使う）。
+          // `-` は読み上げに向かないので、原曲のままのときは「Original」と読ませる。
+          accessibilityLabel={original ? t('songForm.keyOriginal') : undefined}
           style={[
             styles.keyValue,
             original
@@ -61,7 +66,7 @@ export const SongRow = memo(function SongRow({
               : { color: colors.textPrimary, fontWeight: '700' },
           ]}
         >
-          {original ? t('songForm.keyOriginal') : formatSemitones(song.keyOffset)}
+          {original ? ORIGINAL_MARK : formatSemitones(song.keyOffset)}
         </Text>
       </View>
     </Pressable>
