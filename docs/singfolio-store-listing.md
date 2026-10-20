@@ -238,8 +238,11 @@ Apple へ送る検索語があるため、次の1項目を申告する。他は�
         一致した候補（`灯火の庭`）を選ぶ（読みの検索の機能も写る）。
     -   **撮り直す画面**は、見た目が変わった画面だけでよい（残りは、`raw/`・`raw-android/` の画像を、そのまま
         使う。`compose.sh` は、同じ入力から同じ画像を作る）。読みの欄・並び替えのボタン・Artists の行が増えたとき、
-        Add Song・Show Mode・Profile を撮り直した。English の Add Song は iOS・Android とも、Private Note
-        が画面の下にはみ出す（欄が増えたため）。そのまま撮り、Private Note は写さない。
+        Add Song・Show Mode・Profile を撮り直した。**Add Song は、読みの欄が増えて画面が長くなり、English・
+        日本語とも、Private Note が写らない**（iOS はタグまで。Android の撮影画像は、Private Note の見出し
+        の手前まで）。Google Play 用（9:16。下を切る）は、**My Key までで、タグも写らない**。そのまま撮り、
+        見出しの補足文（`Title, artist, key, tags, and notes.` など）は、写っていない項目（タグ・メモ）も
+        挙げる。補足文は、アプリでできることの説明で、画面に写るものとは一致しない（許容している）。
     -   **撮影の手順**（再現できるよう、使ったコマンドを残す）:
         -   Release ビルドで撮る（debug は、LogBox が写り、ダーク表示の配色も変わる）。撮影用のデータは、アプリを止めて、
             DB を `seed.py` で入れ替える（`seed.py <en|ja> <DB> [light|dark] [on|off]`）。
