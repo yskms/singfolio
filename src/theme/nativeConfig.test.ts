@@ -49,3 +49,13 @@ describe('plugins/withAndroidNightColors.js', () => {
     assert.ok((expo.plugins as PluginEntry[]).includes('./plugins/withAndroidNightColors.js'));
   });
 });
+
+describe('plugins/withAndroidR8.js', () => {
+  it('app.json から読み込まれている（外すと、Google Playの2027年2月からの要件を満たせない）', () => {
+    assert.ok((expo.plugins as PluginEntry[]).includes('./plugins/withAndroidR8.js'));
+  });
+
+  it('keepルールのファイルがある', () => {
+    readFileSync(new URL('plugins/android-r8-rules.pro', root), 'utf8');
+  });
+});

@@ -40,6 +40,7 @@
       "expo-sqlite",
       "./plugins/withIosSceneDelegate.js",
       "./plugins/withAndroidNightColors.js",
+      "./plugins/withAndroidR8.js",
       "expo-router",
       [
         "expo-font",

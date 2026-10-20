@@ -334,6 +334,13 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     （未対応だと起動直後にクラッシュする）への対応で、削除しない。Expo SDK 58 の
     テンプレートが同じ配線を持つので、SDK 58 へ上げるときにこのプラグインと
     app.json の登録を撤去する。
+-   `plugins/withAndroidR8.js`・`plugins/android-r8-rules.pro` は、AndroidのR8（難読化・最適化・縮小）を
+    有効にする。Google Playが2027年2月から、DEX 10MB超のアプリ（このアプリは約46MB）に3つの率を各25%以上
+    求めるため。外さない。pluginの中の4つ（optimize版のproguardファイルとkeepルールはセット、
+    `shrinkResources`は無効のまま、AGPを最新パッチに指定、`org.gradle.jvmargs`を4GBに）も「簡略化」しない。
+    理由はpluginのコメント。R8の不具合は**リリースの実行時にしか出ない**（debugと`tsc`では出ない）ので、
+    pluginやRN・Expoの版を変えたら、R8入りのreleaseをエミュレータで起動して確かめる。
+    AGPは、RN・Expoの更新や8.12.4以降の登場のとき、`AGP_VERSION`を見直す。
 -   ビルド番号（iOSの buildNumber・AndroidのversionCode）は、EAS が持つ（`eas.json` の
     `appVersionSource: "remote"`、`production` の `autoIncrement`）。`app.json` に書かない
     （書いても無視される）。`app.json` の `version`（ストアの表示版）は手で上げる。`eas init` は
