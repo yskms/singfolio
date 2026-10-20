@@ -7,9 +7,10 @@ import { useI18n } from '../../ui/i18n';
 import { useTheme } from '../../ui/theme';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
-type TabTitleKey = 'tabs.songs' | 'tabs.practice' | 'tabs.profile';
+type TabTitleKey = 'tabs.songs' | 'tabs.profile' | 'tabs.settings';
 
-// ボトムタブはSongs / Practice / Profileの3つ（Wantは独立タブにしない）。
+// ボトムタブはSongs / Profile / Settingsの3つ（PracticeとWantは独立タブにせず、Songs内のステータスとして
+// 扱う。Practiceを独立タブにしていたが、Songsの絞り込みと重複するのでやめた）。
 // 並び順がそのままタブの並びで、先頭のSongsがメイン導線。
 // ヘッダーの題は、既定ではタブのラベルと同じ。Songsだけは、ホーム画面としてブランド名を出し、
 // 右に曲を追加する `＋` を置く。
@@ -29,8 +30,8 @@ const TABS: {
     icon: 'musical-notes-outline',
     iconFocused: 'musical-notes',
   },
-  { name: 'practice', titleKey: 'tabs.practice', icon: 'repeat-outline', iconFocused: 'repeat' },
   { name: 'profile', titleKey: 'tabs.profile', icon: 'person-outline', iconFocused: 'person' },
+  { name: 'settings', titleKey: 'tabs.settings', icon: 'settings-outline', iconFocused: 'settings' },
 ];
 
 export default function TabsLayout() {
@@ -51,7 +52,7 @@ export default function TabsLayout() {
         headerTitleAlign: 'left',
         // キーボードが出ているあいだ、タブバーを隠す（iOS・Androidとも。React Navigationが
         // キーボードの表示を見て切り替える）。Androidでは、隠さないと、タブバーがキーボードの
-        // 上に残って、Songsの検索中の一覧を狭める。全タブに効く（Practiceの検索欄も同じ）。
+        // 上に残って、Songsの検索中の一覧を狭める。全タブに効く。
         tabBarHideOnKeyboard: true,
       }}
     >

@@ -4,11 +4,15 @@
 
 ボトムタブは3つ。
 
--   **Songs** --- レパートリー管理
--   **Practice** --- 練習中の曲
--   **Profile** --- 見せる・設定
+-   **Songs** --- レパートリー管理（Ready / Practice / Want。ステータスで絞り込み、行のボタンで進める）
+-   **Profile** --- 見せる（歌える曲の数と、Show Mode の入口）
+-   **Settings** --- 設定
 
 メイン導線は `Songs` とする。
+
+`Practice` と `Want` は、独立したタブにしない（Songs 内のステータス）。`Practice` は、以前は独立した
+タブだったが、Songs の「Practice」タイルでの絞り込みと重複するのでやめた（§6）。`Profile` と設定も、
+以前は1つの画面に同居していたが、別のタブにした（自分の Singfolio を見せる画面と、設定は別のもの）。
 
 ## 2. 画面遷移
 
@@ -17,17 +21,17 @@
                          │
           ┌──────────────┼──────────────┐
           │              │              │
-        Songs         Practice        Profile
+        Songs          Profile        Settings
           │              │              │
-          │              │         ┌────┴────┐
-          │              │         │         │
-      Song Detail    Song Detail  Show Mode  Tags / About
+          │              │        ┌─────┼──────┐
+          │              │        │     │      │
+      Song Detail     Show Mode  Tags Artists About
           │                                      │
        Add / Edit                          Open source licenses
 ```
 
-設定（Appearance・Language・Suggestions）は、Profile 自身に並ぶ（§9）。Tags・Artists・About は、
-Profile から開く別の画面。Open source licenses は、About から開く画面。
+設定（Appearance・Language・Suggestions）は、Settings 自身に並ぶ（§9）。Tags・Artists・About は、
+Settings から開く別の画面。Open source licenses は、About から開く画面。
 
 v1.0ではログインを必須にしない。
 
@@ -132,10 +136,10 @@ Rock · Anime
 起動すると、Ready・タグなし・検索なし・Recently updated に戻る）。条件はすべて満たす曲だけを
 出す（AND）。見出しの数字は、表示中の曲の数。
 
-他の画面で曲やタグが変わったあと（Song Detail・Practice・Settingsなど）にタブへ戻ると、
+他の画面で曲やタグが変わったあと（Song Detail・Settings から開く Tags など）にタブへ戻ると、
 読み直す。リンクで Song Detail を直接開いた場合も、Songs は一度もフォーカスされないまま
 読み込むので、Song Detail から戻った最初のフォーカスで読み直す（起動で最初に出たとき
-だけ、最初のフォーカスは読み込みと重なるので読み直さない）。Practice の一覧も同じ。
+だけ、最初のフォーカスは読み込みと重なるので読み直さない）。
 
 行には、曲名・アーティスト・タグ（` · ` 区切りの1行）を左に、**My Key** を右に出す（見出し `My Key` と、
 `+2` / `-2`。歌う前に見たい情報なので、一覧に出す）。原曲のまま（`0`）の曲は、`-` を控えめな色で出し
@@ -353,7 +357,7 @@ Delete song
     （Edit Song には置かない）。消す曲のキー・メモ・タグをその場で見て判断でき、削除のあとに
     畳む画面が1枚で済み、Edit Song の「変更を破棄しますか？」の確認と重ならないため。
     押すと確認のダイアログ（「曲を削除しますか？」。曲名を添え、元に戻せないと伝える。
-    キャンセル / 削除）を出し、削除を選ぶと曲を消して、前の画面（SongsやPractice）へ戻る。
+    キャンセル / 削除）を出し、削除を選ぶと曲を消して、前の画面（Songs）へ戻る。
     取り消し（Undo）は無い。付いていたタグは残る（`singfolio-data-model.md`）。
     削除に失敗したらダイアログで伝え、この画面に残る。削除できたあと戻るまでの間は、
     ステータスの変更・Edit・もう一度の削除を受け付けない（戻る操作が重ならないように）。
@@ -371,78 +375,13 @@ Delete song
 
 ## 6. Practice
 
-現在練習している曲に集中する画面。
+`Practice`（練習中）は、独立した画面・タブを持たない。Songs（§3）の件数タイル `Practice` で絞り込み、
+行の右のボタン（`→ Ready`）で Ready に進める。`Want` も同じ（`→ Practice` で進める）。
 
-``` text
-Practice
-
-12 songs
-
-Search...
-
-怪獣
-サカナクション
-
-Last updated: Today
-
-[ Mark as Ready ]
-
-
-晩餐歌
-tuki.
-
-Last updated: Sep 28
-
-[ Mark as Ready ]
-```
-
-### 操作
-
--   練習中の曲を一覧表示
--   曲をタップ → Song Detail
--   `Mark as Ready`
--   検索
-
-練習履歴などの高度な管理はv1.0では行わない。
-
-実装は `app/(tabs)/practice.tsx`（一覧の行は `ui/PracticeRow.tsx`）。
-
--   **一覧**: ステータスが Practice の曲だけ。更新が新しい順（`updatedAt` の降順）で固定し、
-    並び替え・タグの絞り込み・ステータスのタイルは置かない（練習中の曲に集中する画面のため）。
-    行には、曲名・アーティスト・最終更新を出す（Songs の行と違い、タグは出さない。
-    My Key・Private Note も出さない）。ヘッダーの `N songs` / `N曲` は、表示中の曲の数
-    （検索で絞ると減る。Songs の見出しの数字と同じ）。
--   **最終更新**: 今日なら `Last updated: Today` / `最終更新：今日`。それ以外は日付
-    （`Last updated: Sep 28` / `最終更新：9月28日`。今年でなければ年も出す: `Sep 28, 2025` /
-    `2025年9月28日`）。「昨日」などの言い換えはしない。日の区切りは端末のタイムゾーンで、
-    日付の書き方は `src/i18n/formatDay.ts`（`Intl` は使わない）。「今日」は、一覧を読み込んだ時刻と、
-    アプリがバックグラウンドから戻った時刻（一覧は読み直さず、日付の文字列だけを更新する）で
-    決める。昨夜開いたまま閉じて翌朝開いたときも、昨日の曲が「今日」のままにならない。画面を
-    見ている最中に日付をまたいだ場合だけは、読み直す（タブの切り替え・検索の変更）まで変わらない。
--   **検索**: Songs と同じ（曲名・アーティスト名・アーティストの読み。大文字小文字・全角半角・
-    ひらがな/カタカナを区別しない。§3）。検索語は、アプリを開いている間だけ保持する。検索欄は、件数と一緒に一覧の
-    先頭にあり、一覧と一緒にスクロールする。
--   **Mark as Ready**: 各行の、曲の情報の下のボタン。押すとすぐ Ready にし（確認は無い。
-    Song Detail のステータス変更と同じ `setStatus`。`updatedAt` も更新する）、一覧を読み直す。
-    Ready の曲は Practice の一覧に出ないので、行が消え、件数が減る（検索中も同じ。0件になれば
-    空の状態）。取り消しの操作は無い（戻すときは Song Detail でステータスを変える）。同じ曲の
-    ボタンの連打は1回にまとめる（別の曲のボタンは続けて押せる）。失敗したらダイアログで伝え、
-    行は残す。曲が既に無かったときは、何も伝えずに一覧から消す。
-    曲の情報（押すと Song Detail）とボタンは、兄弟の要素にする（`ui/PracticeRow.tsx` のコメント）。
-    そのため、行を押せるのは曲の情報の部分とボタンだけで、ボタンの右側と行の下の余白は押しても
-    何も起きない（Songs の行は、行のどこを押しても開く）。
-    ボタンの読み上げには、どの曲かを添える（`Mark as Ready, 怪獣`。行ごとに同じ名前のボタンが並ぶため）。
--   他の画面で曲が変わったあと（Song Detail でステータスを変えた・削除したなど）に戻ると、
-    読み直す（§3の読み直しと同じ `ui/useFocusRefreshKey.ts`）。
-
-### 空の状態
-
-| 状況 | 表示 |
-|---|---|
-| 練習中の曲が1つも無い | 「練習中の曲はありません」と、Practice にした曲が並ぶという案内 |
-| 検索して0件（練習中の曲はある） | 「一致する曲がありません」と「検索をクリア」ボタン |
-
-練習中の曲が無いときは、検索語が残っていても、検索のせいではないので、前者を出す。
+以前は、練習中の曲だけを一覧する Practice タブ（検索欄・曲ごとの最終更新・`Mark as Ready` のボタン）が
+あったが、Songs の絞り込みと重複するのでやめた（Songs は、更新が新しい順が既定で、検索も、絞り込んだまま
+使える）。やめて無くなったのは、曲ごとの最終更新の表示と、Practice の一覧だけの検索語の保持。
+練習中の曲が1つも無いときの案内は、Songs の空の状態（§3。`No songs in practice.`）。
 
 ## 7. Profile
 
@@ -454,29 +393,20 @@ Profile
 84 songs ready to sing
 
 [ Show My Songs ]
-
-────────────────
-
-Appearance
-Language
-Suggestions
-Tags
-About
 ```
 
-v1.0では公開プロフィールではなく、端末内のプロフィール・設定画面として扱う。
+v1.0では公開プロフィールではなく、端末内のプロフィールとして扱う。設定は、別のタブ（§9）。
 
 -   **件数**（「84 songs ready to sing」）は、Readyの曲の総数（Show Mode の件数と同じ）。
-    タブはマウントしたままなので、他の画面で曲が変わったあと（Practice の Mark as Ready、
+    タブはマウントしたままなので、他の画面で曲が変わったあと（Songs の行のボタン、
     Song Detail など）、このタブへ戻ったときに読み直す（§3の読み直しと同じ
     `ui/useFocusRefreshKey.ts`）。読み直すあいだは前の件数を出し続ける。
 -   **`Show My Songs`** は、Show Mode（§8）を開くボタン。Readyの曲が0件でも押せる（Show Mode が
     案内を出す）。連打で重ねて開かない。
 -   **表示名は持たない**。ブランド資料のモックアップの `YSKMS` のような名前は、v1.0には保存先も
     入力する画面も無い（公開用のハンドル名は、公開機能の設定。`singfolio-publishing-backend.md` §6）。
--   **設定の項目**（`Appearance`・`Language`・`Suggestions`・`Tags`・`Artists`・`About`）は、`Show My Songs` の
-    下に、区切り線を挟んで並べる（§9）。別の「Settings」画面は作らない。v1.0で実装しない `Data` は
-    出さない。
+-   **設定は持たない**（`Appearance`・`Language`・`Suggestions`・`Tags`・`Artists`・`About` は、Settings タブ。
+    §9）。以前は、`Show My Songs` の下に区切り線を挟んで並べていたが、別のタブにした。
 
 ## 8. Show Mode
 
@@ -560,12 +490,14 @@ iOSの、画面の端からのスワイプでは閉じない（人に渡して�
 -   空の状態: Readyの曲が1つも無いときは案内だけ（検索欄・タグは出さない。読み込みの前は検索欄を
     出しておくので、このときだけ、読み込みが終わったところで検索欄が消える）。絞り込みに
     一致する曲が無いときは、案内と、検索とタグのクリアのボタン。
--   開く入口は、Profile の `Show My Songs`（7. Profile）。リンク `singfolio://show` でも開く。
+-   開く入口は、Profile の `Show My Songs`（§7）。リンク `singfolio://show` でも開く。
     タブバーを隠した全画面で、下から出入りする。連打で重ねて開かない。
 
 ## 9. Settings
 
-Profile（§7）の下半分に、`Appearance` / `Language` / `Suggestions` / `Tags` / `Artists` / `About` の順に並ぶ。
+Settings タブに、`Appearance` / `Language` / `Suggestions` / `Tags` / `Artists` / `About` の順に並ぶ
+（以前は Profile の下半分に並んでいた。Profile は「自分の Singfolio」で、設定とは別のため、タブを分けた）。
+タブの先頭から並べる（区切り線は無い）。
 
 -   `Appearance`・`Language` は、右に今の設定を出し（`System`・`日本語` など）、押すと、下から出るシート
     （Songs の並び替えと同じ部品）で選ぶ。選ぶと、保存してから反映し、保存に失敗したときは、
@@ -779,11 +711,11 @@ Profile
 
 v1.0
 
-`Songs / Practice / Profile`
+`Songs / Profile / Settings`
 
 Requests実装後
 
-`Songs / Practice / Requests / Profile`
+`Songs / Requests / Profile / Settings`（4つ。実装するときに、並びを見直す）
 
 ## 11. UI原則
 
@@ -811,8 +743,8 @@ Requests実装後
 
 `Want → Practice → Ready` を基本的な曲の成長フローとする。
 
-`Want` は Songs 内のステータスとして扱い、`Practice`
-は「今練習する曲」に集中するため独立タブとする。
+`Want` と `Practice` は Songs 内のステータスとして扱い、Songs を絞り込んだ一覧の、行のボタンで進める
+（独立タブにしない）。
 
 v1.0で最も重要な体験は以下。
 

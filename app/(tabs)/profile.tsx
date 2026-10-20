@@ -4,13 +4,12 @@ import { Pressable, ScrollView, StyleSheet } from 'react-native';
 
 import { getServices } from '../../src/services';
 import { useI18n } from '../../ui/i18n';
-import { SettingsSection } from '../../ui/SettingsSection';
 import { Text } from '../../ui/Text';
 import { useTheme } from '../../ui/theme';
 import { useFocusRefreshKey } from '../../ui/useFocusRefreshKey';
 
 // Profile。端末内の、自分のSingfolioの画面（公開プロフィールではない）。
-// 歌える（Ready）曲の数と、Show Mode を開く入口、その下に設定（`SettingsSection`）を置く。
+// 歌える（Ready）曲の数と、Show Mode を開く入口。設定は、別のタブ（Settings。`app/(tabs)/settings.tsx`）。
 export default function ProfileScreen() {
   const { colors } = useTheme();
   const { t } = useI18n();
@@ -19,7 +18,7 @@ export default function ProfileScreen() {
   // 歌える（Ready）曲の数。読み込み前は undefined。再読み込みのあいだは前の値を出し続ける
   // （タブを切り替えるたびに、件数が一瞬消えないように）。
   const [readyCount, setReadyCount] = useState<number | undefined>(undefined);
-  // 他の画面で曲が変わったあと（Practice の Mark as Ready、Song Detail など）にこのタブへ
+  // 他の画面で曲が変わったあと（Songs の行のボタン、Song Detail など）にこのタブへ
   // 戻ってきたら、読み直す。
   const refreshKey = useFocusRefreshKey();
   // reject の値が undefined などでも失敗を検知できるよう、包んで保持する。
@@ -66,8 +65,6 @@ export default function ProfileScreen() {
       >
         <Text style={[styles.buttonLabel, { color: colors.onPrimary }]}>{t('profile.showMySongs')}</Text>
       </Pressable>
-
-      <SettingsSection />
     </ScrollView>
   );
 }

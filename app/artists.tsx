@@ -21,7 +21,7 @@ const SCREEN_OPTIONS = {
   headerTitleAlign: 'left',
 } as const;
 
-// Artists。Profile の Settings から開く。アーティストの名前と読みの変更（アーティストを作るのは、
+// Artists。Settings タブから開く。アーティストの名前と読みの変更（アーティストを作るのは、
 // 曲の追加・編集。ここでは作らない。曲が1つも無くなったアーティストは、自動で消える）。変更は、
 // そのアーティストの全曲に効く。曲の最終更新は変わらない。一覧は、読みの五十音順。
 export default function ArtistsScreen() {

@@ -21,7 +21,7 @@ const SCREEN_OPTIONS = {
   headerTitleAlign: 'left',
 } as const;
 
-// Tags。Profile の Settings から開く。作成済みのタグの名前の変更と削除（タグを作るのは、曲の
+// Tags。Settings タブから開く。作成済みのタグの名前の変更と削除（タグを作るのは、曲の
 // 追加・編集。ここでは作らない）。名前を変えても、曲の最終更新は変わらない。削除すると、付いて
 // いた曲から外れる（曲は残る）。
 export default function TagsScreen() {

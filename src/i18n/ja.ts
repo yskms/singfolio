@@ -3,11 +3,10 @@ import type { Message } from './types.ts';
 
 // キーは en.ts と同じ。足りないキーも、余分なキーも、型エラーになる。
 export const ja: Record<MessageKey, Message> = {
-  // タブのラベルは短くするため、ステータスの表示名（練習中。要件定義 §4）とは揃えない
-  // （一覧の見出しは「練習中の曲」）。
+  // タブのラベルは短くする（Songs は「曲」）。
   'tabs.songs': '曲',
-  'tabs.practice': '練習',
   'tabs.profile': 'プロフィール',
+  'tabs.settings': '設定',
 
   'app.name': 'Singfolio',
 
@@ -15,7 +14,7 @@ export const ja: Record<MessageKey, Message> = {
   'common.ok': 'OK',
   'common.cancel': 'キャンセル',
 
-  // ステータスの名前は、songs.* ・practice.* の文言にも書いている（差し込みにしていない）。
+  // ステータスの名前は、songs.* の文言（songs.action.* など）にも書いている（差し込みにしていない）。
   // 名前を変えるときは、それらも直す。
   'status.ready': '歌える',
   'status.practice': '練習中',
@@ -51,16 +50,6 @@ export const ja: Record<MessageKey, Message> = {
   'songs.action.toPracticeLabel': '「練習中」にする、{title}',
   'songs.action.toReadyFailedTitle': '「歌える」にできませんでした',
   'songs.action.toPracticeFailedTitle': '「練習中」にできませんでした',
-
-  'practice.count': { other: '{count}曲' },
-  'practice.updatedToday': '最終更新：今日',
-  'practice.updated': '最終更新：{date}',
-  'practice.empty.title': '練習中の曲はありません',
-  'practice.empty.message': 'ステータスを「練習中」にした曲がここに並びます。',
-  'practice.noMatch.message': '検索語に一致する練習中の曲はありません。',
-  'practice.markReady': '「歌える」にする',
-  'practice.markReadyLabel': '「歌える」にする、{title}',
-  'practice.markReadyFailedTitle': '「歌える」にできませんでした',
 
   'profile.count': { other: '歌える曲は{count}曲' },
   'profile.showMySongs': '歌える曲を見せる',

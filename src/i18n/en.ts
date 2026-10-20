@@ -8,8 +8,8 @@ import type { Message } from './types.ts';
 // - 新しい画面の文言は、画面を作るときにここと ja.ts の両方へ足す。
 export const en = {
   'tabs.songs': 'Songs',
-  'tabs.practice': 'Practice',
   'tabs.profile': 'Profile',
+  'tabs.settings': 'Settings',
 
   // ブランド名。翻訳しないが、画面の文言は直書きしないため、ここを通す。
   'app.name': 'Singfolio',
@@ -18,10 +18,9 @@ export const en = {
   'common.ok': 'OK',
   'common.cancel': 'Cancel',
 
-  // ステータスの表示名（件数タイル）。一覧の見出しは songs.section.*。ステータスの名前は、
-  // songs.* ・practice.* の文言にも書いている（差し込みにしていない）。名前を変えるときは、
-  // それらも直す（ja.ts も同じ）。タブの名前（tabs.practice）は別の文言で、English では今、
-  // ステータスの名前と同じ字になっているだけ（ja では揃えていない）。
+  // ステータスの表示名（件数タイル・行のボタンの見える文字）。一覧の見出しは songs.section.*。
+  // ステータスの名前は、songs.* の文言（songs.action.* など）にも書いている（差し込みにしていない）。
+  // 名前を変えるときは、それらも直す（ja.ts も同じ）。
   'status.ready': 'Ready',
   'status.practice': 'Practice',
   'status.want': 'Want',
@@ -64,24 +63,6 @@ export const en = {
   'songs.action.toPracticeLabel': 'Mark as Practice, {title}',
   'songs.action.toReadyFailedTitle': 'Couldn’t mark as Ready',
   'songs.action.toPracticeFailedTitle': 'Couldn’t mark as Practice',
-
-  // Practice（app/(tabs)/practice.tsx）。検索欄・「一致する曲がありません」の題・検索のクリアは、
-  // Songs の文言（songs.*）を使う。
-  'practice.count': {
-    one: '{count} song',
-    other: '{count} songs',
-  },
-  'practice.updatedToday': 'Last updated: Today',
-  'practice.updated': 'Last updated: {date}',
-  'practice.empty.title': 'No songs in practice',
-  'practice.empty.message': 'Songs you set to Practice will appear here.',
-  'practice.noMatch.message': 'No songs in practice match your search.',
-  'practice.markReady': 'Mark as Ready',
-  // 読み上げ用。行ごとに同じ名前のボタンが並ぶので、どの曲かを添える。先頭は見えている文字と
-  // 同じにする（WCAG 2.5.3 Label in Name）。音声コントロールで呼べるかは、確認していない
-  // （RN には `accessibilityUserInputLabels` が無く、ラベルを別に渡せない）。
-  'practice.markReadyLabel': 'Mark as Ready, {title}',
-  'practice.markReadyFailedTitle': 'Couldn’t mark as Ready',
 
   // Profile（app/(tabs)/profile.tsx）。ボタンの名前は、機能の名前「Show Mode」を開く入口。
   'profile.count': {

@@ -269,7 +269,7 @@ export function createSongService({ db, songs, tags, artists }: SongServiceDeps)
       return edit(id, () => input);
     },
 
-    /** ステータスだけを変える（Song Detail・Practiceの「Mark as Ready」）。 */
+    /** ステータスだけを変える（Song Detail、Songs の行のボタン）。 */
     setStatus(id: string, status: SongStatus): Promise<Song> {
       return edit(id, (current) => ({ ...toInput(current), status }));
     },

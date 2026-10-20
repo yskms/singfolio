@@ -29,8 +29,8 @@ UIの表示名「My Key」は、モデル・DBでは `keyOffset` / `key_offset` 
 -   タイトル・アーティスト名の空文字チェック（前後の空白の除去を含む）は
     DBではなくService層で行う。
 -   日時は端末のタイムゾーンに依存しないよう、エポックミリ秒で保存する。
-    表示用の整形はUI側（Practiceの「Last updated」は `src/i18n/formatDay.ts`。
-    `singfolio-screen-flow.md` §6）。
+    表示用の整形はUI側（今、日時を画面に出す箇所は無い。Practice タブの「Last updated」は、タブと一緒に
+    やめた）。
 -   My Keyの「未入力」と「Original」は区別しない（どちらも `0`）。
 -   `updated_at` は、ユーザーが曲に対して行った編集（Statusの変更、タグの付け外し、
     メモ・My Keyの変更を含む）で更新する。Tags管理でのタグ名の変更・タグの削除

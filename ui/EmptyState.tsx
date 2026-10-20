@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './Text';
 import { useTheme } from './theme';
 
-/** 一覧が空のときの案内（題・説明・ボタン）。SongsとPracticeで使う。題とボタンは省略できる。 */
+/** 一覧が空のときの案内（題・説明・ボタン）。Songsで使う。題とボタンは省略できる。 */
 export function EmptyState({
   title,
   message,

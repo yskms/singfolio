@@ -54,9 +54,9 @@ v1.0より後（公開機能・Requests）の実装順序は、
 
 ## 3. Practice
 
--   [x] 3.1 練習中の曲の一覧・検索（他の画面から戻ったときの読み直しは、Songs と同じ
-    `ui/useFocusRefreshKey.ts` を使う。行には最終更新を出す）
--   [x] 3.2 Mark as Ready（Practice の各行のボタン。押すとすぐ Ready にして、一覧から外れる）
+-   [x] 3.1 練習中の曲の一覧・検索（Practice タブ。のちに 6.8 でやめた）
+-   [x] 3.2 Mark as Ready（Practice の各行のボタン。のちに 6.8 で、Songs を Practice で絞ったときの
+    行のボタン（→ Ready）に移した。Want で絞ったときの「→ Practice」も同じ）
 
 ## 4. Show Mode
 
@@ -69,8 +69,9 @@ v1.0より後（公開機能・Requests）の実装順序は、
 ## 5. Profile / Settings
 
 -   [x] 5.1 Profile（曲数の表示、Show My Songs。件数は、他の画面から戻ったときに読み直す）
--   [x] 5.2 Settings（Appearance / Language / Suggestions / Tags管理 / About。Profileの下半分に並べる。
-    Aboutには、同梱フォントのライセンス表記を含む（`assets/fonts/OFL-*.txt`））
+-   [x] 5.2 Settings（Appearance / Language / Suggestions / Tags管理 / About。以前は Profile の下半分に
+    並べていたが、6.8 で Settings タブに分けた。Aboutには、同梱フォントのライセンス表記を含む
+    （`assets/fonts/OFL-*.txt`））
 -   [x] 5.3 言語の設定を English / 日本語の2つにする（`System` を外し、初回起動で端末の言語から決めて
     保存する。切り替える前に確認のダイアログを出す）
 -   [x] 5.4 Artists（Settings。アーティストの名前と読みの変更。一覧は読みの五十音順）
@@ -110,9 +111,11 @@ v1.0より後（公開機能・Requests）の実装順序は、
     Artists の行が増えた Profile。English・日本語、iOS・Android の12枚。ほかの3画面は、見た目が変わらないので、
     そのまま。`scripts/store-screenshots/seed.py` はアーティストの読みに対応済み）
 -   [ ] 6.8 実機で触って出た違和感の反映。Add Song の入力順を Artist → 読み → Title にした（済み）。Songs の
-    行の右に My Key を出した（済み）。ボトムタブの見直し（Practice タブをやめる・Profile と設定を分ける）は、
-    案を出して確認待ち。入力順と My Key で、ストア用スクリーンショットの Add Song・Songs が変わる
-    （タブの見直しの結果と合わせて、撮り直す。6.7 と同じ手順）
+    行の右に My Key を出した（済み。原曲のままは `-`）。Songs を Practice で絞ると「→ Ready」、Want で
+    絞ると「→ Practice」のボタンを行の右に出した（済み）。ボトムタブを Songs / Profile / Settings にして、
+    Practice タブをやめ、Profile と設定を分けた（済み）。残りは、ストア用スクリーンショットとストアの
+    説明文の直し（Add Song・Songs・Profile が変わり、Practice の画面が無くなり、Settings の画面が
+    増える。「Practice タブ」の記述は、`docs/singfolio-store-listing.md`）
 -   [x] 6.6 第三者ライセンス表記（npmの依存・npmの中に取り込まれたコード・アイコンフォント・ネイティブの
     ライブラリ（React Native が同梱する C++ のライブラリ、Android の Maven の依存、Maven の成果物が
     `.so` に埋め込んでいるライブラリ）のライセンスを、依存関係から生成した一覧にして、About から開く

@@ -6,7 +6,7 @@ import { Text } from './Text';
 import { useTheme } from './theme';
 
 /**
- * 設定の項目（Profile の Appearance・Language・Tags・About）。押すと、選択肢のシートや別の画面を
+ * 設定の項目（Settings の Appearance・Language・Tags・Artists・About）。押すと、選択肢のシートや別の画面を
  * 開く。`value` は、今の設定（右端に控えめに出す）。読み上げは、名前と値が続けて読まれる。
  * `external` は、アプリの外（ブラウザ）が開く項目。右端を、画面へ進む矢印ではなく、外へ出る印にする
  * （読み上げには、`accessibilityHint` で伝える）。

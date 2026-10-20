@@ -75,9 +75,10 @@ Singfolioが管理するのは「歌の点数」ではなく、**自分が何を
 
 ### Practice
 
-練習中の曲を一覧表示する。
+練習中の曲は、Songs を `Practice` で絞り込んで一覧する（独立した画面・タブは持たない）。
 
-練習が完了した曲を `Ready` に変更できる。
+練習が完了した曲を `Ready` に変更できる（絞り込んだ一覧の、行のボタン。Song Detail でも変えられる）。
+`Want` の曲も同じように、`Practice` へ進められる。
 
 ### Show Mode
 
@@ -163,9 +164,9 @@ v1.0：
 
 1. Songs
 2. Song Detail / Edit
-3. Practice
-4. Show Mode
-5. Profile / Settings
+3. Show Mode
+4. Profile
+5. Settings
 
 将来：
 

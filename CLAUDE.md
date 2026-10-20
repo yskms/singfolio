@@ -157,8 +157,11 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     （`ShowListedSong`）で、`ShowSong` 自体に `artist` を足さない。更新日・追加日の順は Show Mode に
     持ち込まない（人に見せる画面に、管理の情報を持ち込まない）。アーティストの読みも、行には持ち込まない
     （並びにだけ使う）。
--   ボトムタブはSongs / Practice / Profileの3つ。Wantは独立タブにせず
-    Songs内のステータスとして扱う（Practiceのみ独立タブ）。
+-   ボトムタブはSongs / Profile / Settingsの3つ。PracticeとWantは独立タブにせず、
+    Songs内のステータスとして扱う（Practiceは以前、独立タブだったが、Songsの絞り込みと重複するので
+    やめた。蒸し返さない）。Songsを Practice で絞ると「→ Ready」、Want で絞ると「→ Practice」のボタンが
+    行の右に出る。ProfileとSettingsも、以前は1つの画面に同居していたが、分けた（Profileは「自分の
+    Singfolio」＝件数とShow Modeの入口、Settingsは設定）。
 -   ログインを要求しない（v1.0）。
 -   画面（ルート）は `app/`（Expo Router）に置く。`src/` はNodeのテストから直接
     実行するため、画面（RN・Expoのimport）を置かない。
@@ -166,8 +169,8 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     `dangerouslySingular` にしている。外さない。`router.push` は同じ画面でも毎回積むので、行や
     ボタンの素早い連打で同じ画面が重なる。Edit Songが重なると、下の画面は開いた時点の内容のまま
     で、上で保存した内容を、下で保存して上書きする（iOSシミュレータで確認）。曲の画面を
-    足すときも同じ指定を足す。Show Mode・Tags・About も同じ指定（Profile の行の連打で重なる。
-    6連打して、戻る1回でProfileへ戻ることをiOSシミュレータで確認）。Open source licenses
+    足すときも同じ指定を足す。Show Mode・Tags・About も同じ指定（Profile・Settings の行の連打で重なる。
+    6連打して、戻る1回で元のタブへ戻ることをiOSシミュレータで確認）。Open source licenses
     （Aboutの行の連打）も同じ。
 -   言語の選択肢の名前（English / 日本語）は、文言のカタログ（`en.ts`・`ja.ts`）に入れず、
     `languageNames`（`src/i18n`）から出す（表示言語に依らず、その言語自身の名前）。
@@ -199,7 +202,7 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
 -   Androidはエッジ・ツー・エッジで、キーボードが出ても画面（ScrollView）が縮まず、下にある入力欄が
     キーボードに隠れる（`adjustResize` は効かない。エミュレータで確認）。入力欄が下にある画面は、
     `SongForm` のように、キーボードの高さの分の余白を足してスクロールする。
--   タブの画面（SongsとPracticeの一覧、Profileの件数）は、他の画面から戻ったときの読み直しを
+-   タブの画面（Songsの一覧、Profileの件数）は、他の画面から戻ったときの読み直しを
     `ui/useFocusRefreshKey.ts` で行う。「最初のフォーカスは読み直さない」と決め打ちしない。
     リンクで Song Detail を直接開くと、下のタブは一度もフォーカスされないままマウントして読み込み、
     戻っても一覧が古いまま残る（iOSシミュレータで確認）。フォーカスされていない状態から

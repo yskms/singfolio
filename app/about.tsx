@@ -21,7 +21,7 @@ const SCREEN_OPTIONS = {
   headerTitleAlign: 'left',
 } as const;
 
-// About。Profile の Settings から開く。アプリの名前とバージョン、プライバシーポリシーへのリンク、自前で同梱したフォント（`assets/fonts/`）
+// About。Settings タブから開く。アプリの名前とバージョン、プライバシーポリシーへのリンク、自前で同梱したフォント（`assets/fonts/`）
 // のライセンス（SIL Open Font License は、再配布するときに、著作権表示とライセンス全文を付けることを
 // 求める）。アイコンフォント（Ionicons など）と npm の依存のライセンスは、ここには載せず、
 // 「Open source licenses」（app/licenses.tsx）に出す。データの出どころ（アーティストの読みの辞書の

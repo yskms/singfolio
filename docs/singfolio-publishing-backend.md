@@ -269,8 +269,7 @@ Webは公開情報のみを取得して表示する。
 
 -   React Native / Expo
 -   SQLite
--   Songs
--   Practice
+-   Songs（Practice・Want はそのステータス）
 -   Show Mode
 -   Profile / Settings
 -   Light / Dark Mode

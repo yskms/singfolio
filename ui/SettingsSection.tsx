@@ -24,7 +24,7 @@ const appearanceKeys = {
 } as const satisfies Record<Appearance, MessageKey>;
 
 /**
- * Profile の、Show My Songs の下に並ぶ設定（Appearance・Language・Suggestions・Tags・About）。
+ * Settings タブ（`app/(tabs)/settings.tsx`）の中身（Appearance・Language・Suggestions・Tags・Artists・About）。
  * Appearance・Language は、下から出るシートで選ぶ。選ぶと保存してから反映し、保存に失敗したら、
  * 表示は変えずに伝える。Tags・About は、別の画面を開く。
  *
@@ -98,8 +98,6 @@ export function SettingsSection() {
 
   return (
     <View>
-      <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
       <SettingsRow
         label={t('settings.appearance')}
         value={t(appearanceKeys[appearance])}
@@ -166,7 +164,6 @@ export function SettingsSection() {
 }
 
 const styles = StyleSheet.create({
-  divider: { height: StyleSheet.hairlineWidth, marginBottom: 4 },
   suggestions: { paddingBottom: 8 },
   switchRow: {
     minHeight: 52,

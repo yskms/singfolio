@@ -53,11 +53,11 @@ THREE LISTS, ONE PLACE
 
 EVERYTHING A SINGER NEEDS
 • Add songs with a title and an artist. Suggestions appear as you type (optional)
-• Note your own key for each song
+• Note your own key for each song, and see it right in the list
 • Add tags like "Ballad" or "Duet", and filter by them
 • Keep private notes that only you can see
 • Search by title or artist, and sort the list your way
-• The Practice tab shows the songs you're working on. Mark one Ready when you've got it
+• Filter by Practice to see the songs you're working on, and move one to Ready with a tap when you've got it
 
 SHOW MODE
 Hand your phone to a friend and let them see what you can sing. Show Mode lists your Ready songs by artist, with search and tag filters. It shows nothing private: no keys, no notes, no editing.
@@ -90,11 +90,11 @@ Singfolioは、歌う人のためのレパートリー管理アプリです。�
 
 歌う人に必要なものを
 • 曲名とアーティストで曲を追加。入力中に候補が出ます（オフにもできます）
-• 曲ごとに、自分のキーをメモ
+• 曲ごとに、自分のキーをメモ。一覧でもひと目で確認
 • 「バラード」「デュエット」などのタグを付けて、絞り込み
 • 自分だけが見られる非公開メモ
 • 曲名・アーティストで検索、好きな順に並び替え
-• 「練習」タブに、練習中の曲を一覧。歌えるようになったら「歌える」へ
+• 「練習中」で絞り込んで、練習中の曲を一覧。歌えるようになったら、ワンタップで「歌える」へ
 
 SHOW MODE
 スマートフォンを友だちに見せて、歌える曲を伝えられます。Show Modeは「歌える」曲をアーティストごとに並べ、検索とタグの絞り込みができます。キーも非公開メモも出ず、編集もできません。
@@ -202,7 +202,11 @@ Apple へ送る検索語があるため、次の1項目を申告する。他は�
     テンプレートの寸法に従う）、どの素材にどの寸法かは、提出時にテンプレートで確認する。
 -   **スクリーンショット**: Songs・Song Detail・Add Song・Practice・Show Mode・Profile（ダーク表示）の6枚を、
     English と日本語で用意した。見出し・補足つきで、
-    `assets/store-screenshots/` にある。ブランドの色と書体（Inter / Noto Sans JP。`assets/fonts/`）を使い、
+    `assets/store-screenshots/` にある。**ただし、6.8 のアプリの変更（Add Song の入力順・Songs の行の
+    My Key・Practice タブの廃止・Profile と Settings の分離）の前の画像で、撮り直しが要る**。撮り直すときは、
+    Practice の画面を「Songs を Practice で絞った画面（行の `→ Ready` のボタン付き）」に、Profile
+    （件数と Show My Songs だけになった）を Settings（ダーク表示。外観・言語・候補・Tags・Artists・About が並ぶ）に
+    差し替える（`seed.py`・`compose.sh` の画面の一覧も、同じに直す）。ブランドの色と書体（Inter / Noto Sans JP。`assets/fonts/`）を使い、
     採点や順位を連想させる表現は使わない。
     -   **撮影画像**は、App Store 用が `raw/{en,ja}/`（iOS シミュレータ。iPhone 18 Pro、1206×2622）、
         Google Play 用が `raw-android/{en,ja}/`（Android エミュレータ。1080×2424）。`scripts/store-screenshots/compose.sh`
@@ -265,7 +269,6 @@ Apple へ送る検索語があるため、次の1項目を申告する。他は�
             React Native 側の設定で、debuggable でも有効にならない）。撮影のあとは、この行を消し、
             `grep debuggable android/app/build.gradle` が何も出さないことを確かめる（消し忘れた debuggable な AAB は、
             Play Console が受け付けない）。ストア提出用のビルドの前にも、もう一度確かめる。
-        -   Practice の「Last updated」の日付は、撮った日で変わる。English・日本語の6枚は、同じ日に撮る。
 -   App Store は、1枚から10枚。JPEG・PNG、透過なし。サイズの仕様は、提出のとき、App Store Connect で最新の
     ものを確認する（上の「App Store 用」）。
 -   Google Play は、スマートフォン用に2〜8枚（JPEG または 24ビットPNG。辺は320〜3840px。長辺は短辺の2倍まで）。
