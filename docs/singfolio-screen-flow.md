@@ -74,16 +74,16 @@ Search songs or artists
 
 Ready to sing  84         ⇅ Recently updated
 
-チェリー
-スピッツ
+チェリー                                 My Key
+スピッツ                                +2
 J-Pop · Acoustic
 
-HANABI
-Mr.Children
+HANABI                                   My Key
+Mr.Children                           Original
 J-Pop · Ballad
 
-天体観測
-BUMP OF CHICKEN
+天体観測                                 My Key
+BUMP OF CHICKEN                          -1
 Rock · Anime
 ```
 
@@ -123,7 +123,10 @@ Rock · Anime
 読み込むので、Song Detail から戻った最初のフォーカスで読み直す（起動で最初に出たとき
 だけ、最初のフォーカスは読み込みと重なるので読み直さない）。Practice の一覧も同じ。
 
-行には、曲名・アーティスト・タグ（` · ` 区切りの1行）を出す。My Key・Private Note は出さない。
+行には、曲名・アーティスト・タグ（` · ` 区切りの1行）を左に、**My Key** を右に出す（見出し `My Key` と、
+`Original` / `+2` / `-2`。Song Detail・Add / Edit Song と同じ表記）。歌う前に見たい情報なので、
+一覧に出す。原曲のまま（`0`）の曲は、`Original` を控えめな色で、ずらしている曲だけを濃い色の太字で出す。
+Private Note は出さない（人に見せる画面 Show Mode の行は、My Key を出さない別の行）。
 タグが付いていない曲は、タグの行を出さない。
 
 ### 空の状態
