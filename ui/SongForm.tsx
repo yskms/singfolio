@@ -1,7 +1,7 @@
 import { Stack, useNavigation, useRouter } from 'expo-router';
 import { usePreventRemove } from 'expo-router/react-navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Keyboard, Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { Alert, Keyboard, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import type { TextInput as NativeTextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -62,8 +62,12 @@ function sameIds(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
  * 曲の追加・編集の入力画面。`song` を渡すと編集、渡さないと追加。保存すると前の画面へ戻る。
  * 保存のボタンはヘッダーの右（キーボードを出したまま押せる）。
  *
- * - 曲名・アーティストが空なら、保存せずに両方の欄にエラーを出す（Serviceの検証と同じ
- *   `normalizeText` で判定し、Serviceのエラーは念のため受ける）。
+ * - 入力の順は、アーティスト → 読み → 曲名。アーティストが決まると読みが入り、曲名の候補も、
+ *   入力したアーティストで絞れるため。追加は、アーティストにフォーカスして開く。Enterは、
+ *   アーティスト → （読みが空のときだけ読み）→ 曲名と移る。曲名は、候補がキーボードに隠れない
+ *   よう、フォーカスが入ったら欄が上に来るまでスクロールする。
+ * - 曲名・アーティストが空なら、保存せずに両方の欄にエラーを出し、画面の順で最初の問題の欄に
+ *   フォーカスする（Serviceの検証と同じ`normalizeText` で判定し、Serviceのエラーは念のため受ける）。
  * - アーティストの「読み」（並び替え用の名前）は必須。名前を入れる・候補から選ぶと、読みの初期値が入る。
  *   登録済みのアーティストならその読み、日本語の設定では、そうでなければ辞書（MusicBrainz のデータ。
  *   端末内だけ）の読み、それも無ければ名前から決めた値（`defaultReading`。日本語の設定で、漢字・英字を
@@ -268,10 +272,24 @@ export function SongForm({ song, tags }: { song?: Song; tags: readonly Tag[] }) 
   const revealBottom = useRef(false);
   const focusTopField = () => {
     revealBottom.current = false;
+    revealTitle.current = false;
   };
   const focusBottomField = () => {
     revealBottom.current = true;
+    revealTitle.current = false;
     scrollRef.current?.scrollToEnd({ animated: true });
+  };
+  // 曲名は、アーティスト・読みの下（3番目）にある。曲名の候補（最大5行）が、キーボードに隠れて
+  // スクロールもできない（スクロールすると、キーボードが閉じて欄が外れ、候補が消える）ことの
+  // ないよう、曲名の欄にフォーカスが入ったら、欄が上に来るまでスクロールする。キーボードの余白が
+  // 入って内容の高さが変わった後（Android）にも、もう一度行う。
+  const titleY = useRef(0);
+  const revealTitle = useRef(false);
+  const scrollToTitle = () => scrollRef.current?.scrollTo({ y: Math.max(0, titleY.current - 8), animated: true });
+  const focusTitleField = () => {
+    revealBottom.current = false;
+    revealTitle.current = true;
+    scrollToTitle();
   };
   useEffect(() => {
     if (Platform.OS !== 'android') return;
@@ -346,7 +364,7 @@ export function SongForm({ song, tags }: { song?: Song; tags: readonly Tag[] }) 
           : undefined;
     setReadingError(artistMissing ? undefined : readingMessage);
     if (titleMissing || artistMissing || readingMessage !== undefined) {
-      (titleMissing ? titleRef : artistMissing ? artistRef : readingRef).current?.focus();
+      (artistMissing ? artistRef : readingMessage !== undefined ? readingRef : titleRef).current?.focus();
       return;
     }
 
@@ -433,62 +451,12 @@ export function SongForm({ song, tags }: { song?: Song; tags: readonly Tag[] }) 
         ]}
         onContentSizeChange={() => {
           if (keyboardHeight > 0 && revealBottom.current) scrollRef.current?.scrollToEnd({ animated: true });
+          if (keyboardHeight > 0 && revealTitle.current) scrollToTitle();
         }}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         automaticallyAdjustKeyboardInsets
       >
-        <FormField label={t('songForm.title')} required error={titleError}>
-          <FormInput
-            key={`title-${titleEpoch}`}
-            ref={titleRef}
-            value={title}
-            onChangeText={(text) => {
-              setTitle(text);
-              setTitleEdited(true);
-              setPickedTitle(null);
-              setTitleError(undefined);
-            }}
-            accessibilityLabel={t('songForm.title')}
-            accessibilityHint={t('songForm.requiredHint')}
-            invalid={titleError !== undefined}
-            onFocus={() => {
-              focusTopField();
-              setTitleFocused(true);
-            }}
-            onBlur={() => {
-              setTitleFocused(false);
-              setTitleEdited(false);
-            }}
-            // 追加は、開いてすぐ入力できるようにする（素早く登録できることを優先）。欄を作り直した
-            // とき（候補を選んだ後）は、フォーカスしない。
-            autoFocus={!song && titleEpoch === 0}
-            returnKeyType="next"
-            onSubmitEditing={() => artistRef.current?.focus()}
-            submitBehavior="submit"
-          />
-          <SuggestionList
-            rows={songSuggestions.map((suggestion) => ({
-              key: `${suggestion.title}\u0000${suggestion.artist}`,
-              primary: suggestion.title,
-              secondary: suggestion.artist,
-              registered: suggestion.registered,
-              accessibilityLabel: t(
-                suggestion.registered ? 'songForm.suggestionA11yRegistered' : 'songForm.suggestionA11y',
-                { title: suggestion.title, artist: suggestion.artist },
-              ),
-            }))}
-            hint={t('songForm.suggestionSongHint')}
-            onPick={(index) => {
-              const suggestion = songSuggestions[index];
-              if (suggestion) pickSong(suggestion);
-            }}
-            provider={
-              providerShown && titleActive && sendable(title) ? t('songForm.suggestionsProvider') : undefined
-            }
-          />
-        </FormField>
-
         <FormField label={t('songForm.artist')} required error={artistError}>
           <FormInput
             key={`artist-${artistEpoch}`}
@@ -512,7 +480,13 @@ export function SongForm({ song, tags }: { song?: Song; tags: readonly Tag[] }) 
               setArtistFocused(false);
               setArtistEdited(false);
             }}
-            returnKeyType="done"
+            // 追加は、開いてすぐ入力できるようにする（素早く登録できることを優先）。欄を作り直した
+            // とき（候補を選んだ後）は、フォーカスしない。
+            autoFocus={!song && artistEpoch === 0}
+            returnKeyType="next"
+            // 読みは、ほとんどの場合、名前から自動で入る。空のときだけ、先に読みへ移る。
+            onSubmitEditing={() => (normalizeText(reading) === '' ? readingRef : titleRef).current?.focus()}
+            submitBehavior="submit"
           />
           <SuggestionList
             rows={artistSuggestions.map((name) => ({
@@ -551,9 +525,59 @@ export function SongForm({ song, tags }: { song?: Song; tags: readonly Tag[] }) 
             onFocus={focusTopField}
             autoCapitalize="none"
             autoCorrect={false}
-            returnKeyType="done"
+            returnKeyType="next"
+            onSubmitEditing={() => titleRef.current?.focus()}
+            submitBehavior="submit"
           />
         </FormField>
+
+        <View onLayout={(event) => (titleY.current = event.nativeEvent.layout.y)}>
+          <FormField label={t('songForm.title')} required error={titleError}>
+            <FormInput
+              key={`title-${titleEpoch}`}
+              ref={titleRef}
+              value={title}
+              onChangeText={(text) => {
+                setTitle(text);
+                setTitleEdited(true);
+                setPickedTitle(null);
+                setTitleError(undefined);
+              }}
+              accessibilityLabel={t('songForm.title')}
+              accessibilityHint={t('songForm.requiredHint')}
+              invalid={titleError !== undefined}
+              onFocus={() => {
+                focusTitleField();
+                setTitleFocused(true);
+              }}
+              onBlur={() => {
+                setTitleFocused(false);
+                setTitleEdited(false);
+              }}
+              returnKeyType="done"
+            />
+            <SuggestionList
+              rows={songSuggestions.map((suggestion) => ({
+                key: `${suggestion.title}\u0000${suggestion.artist}`,
+                primary: suggestion.title,
+                secondary: suggestion.artist,
+                registered: suggestion.registered,
+                accessibilityLabel: t(
+                  suggestion.registered ? 'songForm.suggestionA11yRegistered' : 'songForm.suggestionA11y',
+                  { title: suggestion.title, artist: suggestion.artist },
+                ),
+              }))}
+              hint={t('songForm.suggestionSongHint')}
+              onPick={(index) => {
+                const suggestion = songSuggestions[index];
+                if (suggestion) pickSong(suggestion);
+              }}
+              provider={
+                providerShown && titleActive && sendable(title) ? t('songForm.suggestionsProvider') : undefined
+              }
+            />
+          </FormField>
+        </View>
 
         <FormField label={t('songForm.status')}>
           <ChoiceRow
