@@ -335,12 +335,19 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     テンプレートが同じ配線を持つので、SDK 58 へ上げるときにこのプラグインと
     app.json の登録を撤去する。
 -   `plugins/withAndroidR8.js`・`plugins/android-r8-rules.pro` は、AndroidのR8（難読化・最適化・縮小）を
-    有効にする。Google Playが2027年2月から、DEX 10MB超のアプリ（このアプリは約46MB）に3つの率を各25%以上
-    求めるため。外さない。pluginの中の4つ（optimize版のproguardファイルとkeepルールはセット、
+    有効にする。Google Playが2027年2月から、DEX 10MB超のアプリに3つの率を各25%以上求めるため。
+    R8無しのDEXは約46MBで該当する。pluginを入れると約9MBで10MBを下回るが、それはpluginの結果で、
+    外すと46MBに戻る（「10MB未満だから対象外」とは読まない）。外さない。pluginの中の4つ（optimize版のproguardファイルとkeepルールはセット、
     `shrinkResources`は無効のまま、AGPを最新パッチに指定、`org.gradle.jvmargs`を4GBに）も「簡略化」しない。
     理由はpluginのコメント。R8の不具合は**リリースの実行時にしか出ない**（debugと`tsc`では出ない）ので、
     pluginやRN・Expoの版を変えたら、R8入りのreleaseをエミュレータで起動して確かめる。
     AGPは、RN・Expoの更新や8.12.4以降の登場のとき、`AGP_VERSION`を見直す。
+    難読化の対応表（AABの`proguard.map`）は、Playへアップロードすれば取り込まれる。アップロードしていない
+    AAB・検証用APKは、消すと対応表が二度と手に入らない（クラッシュログを`retrace`で戻せない）。
+    AABを消すのは、Playへ上げて対応表が登録されたことを確かめてから。
+-   `app.json` の `android.blockedPermissions` は、Expoの prebuild が既定で入れる、使っていない権限
+    （`SYSTEM_ALERT_WINDOW`・外部ストレージの読み書き）を外す。戻さない。保存は端末内で完結し、
+    プライバシーポリシーもストアの申告も、それを前提にしている。
 -   ビルド番号（iOSの buildNumber・AndroidのversionCode）は、EAS が持つ（`eas.json` の
     `appVersionSource: "remote"`、`production` の `autoIncrement`）。`app.json` に書かない
     （書いても無視される）。`app.json` の `version`（ストアの表示版）は手で上げる。`eas init` は

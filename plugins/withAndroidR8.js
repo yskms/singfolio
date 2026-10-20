@@ -11,8 +11,9 @@ const path = require('path');
 //
 // 2027年2月から、Google Playは「DEXが10MBを超えるアプリ」に、アップロードごとに
 // 難読化・最適化・縮小の3つの率をそれぞれ25%以上にすることを求める
-// （Play Console ヘルプ「technical quality requirements」）。このアプリのDEXは約46MBで
-// 該当する（Expo / React Nativeのテンプレートは、R8を使わない）。
+// （Play Console ヘルプ「technical quality requirements」）。R8を使わないと、このアプリのDEXは
+// 約46MBで該当する（Expo / React Nativeのテンプレートは、R8を使わない）。このpluginを入れると
+// DEXは約9MBで10MBを下回るが、それはこのpluginの結果で、外すと46MBに戻る。
 //
 // `android/`は`expo prebuild`の生成物で、`build.gradle`・`gradle.properties`を
 // 手で直しても次のprebuildで消える。そのため、設定はこのpluginで入れる。

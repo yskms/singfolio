@@ -37,6 +37,17 @@ describe('app.json', () => {
   it('Androidのアダプティブアイコンの背景は、Mint', () => {
     assert.equal(expo.android.adaptiveIcon.backgroundColor, brand.mint);
   });
+
+  it('使っていないAndroidの権限（他のアプリの上への表示・外部ストレージ）を外している', () => {
+    assert.deepEqual(
+      [...expo.android.blockedPermissions].sort(),
+      [
+        'android.permission.READ_EXTERNAL_STORAGE',
+        'android.permission.SYSTEM_ALERT_WINDOW',
+        'android.permission.WRITE_EXTERNAL_STORAGE',
+      ],
+    );
+  });
 });
 
 describe('plugins/withAndroidNightColors.js', () => {
