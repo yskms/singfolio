@@ -140,7 +140,7 @@ export const en = {
   'about.showLicense': 'Show license',
   'about.hideLicense': 'Hide license',
   'about.privacyPolicy': 'Privacy Policy',
-  'about.privacyPolicyHint': 'Opens in your browser',
+  'about.opensInBrowserHint': 'Opens in your browser',
   'about.licenses': 'Open source licenses',
   'licenses.intro':
     'This app uses the open source software and icon fonts below. Tap an item to see its license.',

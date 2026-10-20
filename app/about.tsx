@@ -52,7 +52,7 @@ export default function AboutScreen() {
 
         <SettingsRow
           label={t('about.privacyPolicy')}
-          accessibilityHint={t('about.privacyPolicyHint')}
+          accessibilityHint={t('about.opensInBrowserHint')}
           external
           // ブラウザで開く。開けなくても（ブラウザが無い端末は、まず無い）、アプリの動作には影響しない。
           onPress={() => void Linking.openURL(PRIVACY_POLICY_URL).catch(() => undefined)}
@@ -75,7 +75,7 @@ export default function AboutScreen() {
         </View>
         <SettingsRow
           label={t('about.musicBrainzLink')}
-          accessibilityHint={t('about.privacyPolicyHint')}
+          accessibilityHint={t('about.opensInBrowserHint')}
           external
           // ブラウザで開く（アプリの通信ではない）。開けなくても、アプリの動作には影響しない。
           onPress={() => void Linking.openURL(MUSICBRAINZ_URL).catch(() => undefined)}
