@@ -109,6 +109,10 @@ v1.0より後（公開機能・Requests）の実装順序は、
 -   [x] 6.7 スクリーンショットの撮り直し（読みの欄が増えた Add Song、並び替えのボタンが増えた Show Mode、
     Artists の行が増えた Profile。English・日本語、iOS・Android の12枚。ほかの3画面は、見た目が変わらないので、
     そのまま。`scripts/store-screenshots/seed.py` はアーティストの読みに対応済み）
+-   [ ] 6.8 実機で触って出た違和感の反映。Add Song の入力順を Artist → 読み → Title にした（済み）。Songs の
+    行の右に My Key を出した（済み）。ボトムタブの見直し（Practice タブをやめる・Profile と設定を分ける）は、
+    案を出して確認待ち。入力順と My Key で、ストア用スクリーンショットの Add Song・Songs が変わる
+    （タブの見直しの結果と合わせて、撮り直す。6.7 と同じ手順）
 -   [x] 6.6 第三者ライセンス表記（npmの依存・npmの中に取り込まれたコード・アイコンフォント・ネイティブの
     ライブラリ（React Native が同梱する C++ のライブラリ、Android の Maven の依存、Maven の成果物が
     `.so` に埋め込んでいるライブラリ）のライセンスを、依存関係から生成した一覧にして、About から開く
