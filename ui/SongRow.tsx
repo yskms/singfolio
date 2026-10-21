@@ -13,6 +13,13 @@ import { useTheme } from './theme';
 const ORIGINAL_MARK = '-';
 
 /**
+ * 行の右側（My Key・ボタン）の文字の拡大の上限。文字を最大に大きくした端末（2倍）で、右側が幅を
+ * 取りすぎて、曲名の欄が1語ほどの幅になるのを防ぐ。曲名・アーティスト・タグは、制限しない
+ * （ボタンの高さは固定せず、ラベルは切れない）。
+ */
+const SIDE_MAX_FONT_SCALE = 1.3;
+
+/**
  * 曲の一覧の1行（曲名・アーティスト・タグ、右にMy Key）。押すと `onPress`（Song Detailを開く）。
  * My Keyは、歌う前に見たい情報なので、一覧に出す（`0` は `-`。Song Detail・入力画面は「Original」）。
  * Private Noteは出さない。人に見せる画面（Show Mode）は、この行を使わない（`ShowSongRow`）。
@@ -67,11 +74,16 @@ export const SongRow = memo(function SongRow({
           )}
         </View>
         <View style={styles.key}>
-          <Text numberOfLines={1} style={[styles.keyLabel, { color: colors.textSecondary }]}>
+          <Text
+            numberOfLines={1}
+            maxFontSizeMultiplier={SIDE_MAX_FONT_SCALE}
+            style={[styles.keyLabel, { color: colors.textSecondary }]}
+          >
             {t('songForm.myKey')}
           </Text>
           <Text
             numberOfLines={1}
+            maxFontSizeMultiplier={SIDE_MAX_FONT_SCALE}
             // 原曲のままは控えめに、ずらしている曲だけを目立たせる（Regular / Bold だけを使う）。
             // `-` は読み上げに向かないので、原曲のままのときは「Original」と読ませる。
             accessibilityLabel={original ? t('songForm.keyOriginal') : undefined}
@@ -103,7 +115,11 @@ export const SongRow = memo(function SongRow({
           ]}
         >
           <Ionicons name="arrow-forward" size={16} color={colors.primary} {...decorative} />
-          <Text numberOfLines={1} style={[styles.buttonLabel, { color: colors.textPrimary }]}>
+          <Text
+            numberOfLines={1}
+            maxFontSizeMultiplier={SIDE_MAX_FONT_SCALE}
+            style={[styles.buttonLabel, { color: colors.textPrimary }]}
+          >
             {t(`status.${actionTarget}`)}
           </Text>
         </Pressable>
@@ -138,9 +154,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    height: 36,
+    // 高さは固定しない（文字を大きくした端末で、ラベルが切れないように）。
+    minHeight: 36,
     marginRight: 16,
     paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: 18,
     borderWidth: StyleSheet.hairlineWidth,
   },

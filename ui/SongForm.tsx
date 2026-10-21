@@ -64,8 +64,9 @@ function sameIds(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
  *
  * - 入力の順は、アーティスト → 読み → 曲名。アーティストが決まると読みが入り、曲名の候補も、
  *   入力したアーティストで絞れるため。追加は、アーティストにフォーカスして開く。Enterは、
- *   アーティスト → （読みが空のときだけ読み）→ 曲名と移る。曲名は、候補がキーボードに隠れない
- *   よう、フォーカスが入ったら欄が上に来るまでスクロールする。
+ *   アーティスト → （読みが空のときだけ読み）→ 曲名と移る。アーティストの候補を選んだときも、
+ *   曲名が空なら曲名へ移る。曲名は、候補がキーボードに隠れないよう、フォーカスが入ったら欄が上に
+ *   来るまでスクロールする。曲名の候補を選んでも、読みは動かさない（`pickSong`）。
  * - 曲名・アーティストが空なら、保存せずに両方の欄にエラーを出し、画面の順で最初の問題の欄に
  *   フォーカスする（Serviceの検証と同じ`normalizeText` で判定し、Serviceのエラーは念のため受ける）。
  * - アーティストの「読み」（並び替え用の名前）は必須。名前を入れる・候補から選ぶと、読みの初期値が入る。
@@ -226,13 +227,16 @@ export function SongForm({ song, tags }: { song?: Song; tags: readonly Tag[] }) 
   const sendable = (text: string) => searchKey(text).length >= MIN_CATALOG_TERM_LENGTH;
   // 欄を作り直す（上の `titleEpoch` の説明）と、フォーカスの外れ（`onBlur`）が来ないことが
   // あるので、フォーカスと編集の状態も、ここで戻す。
+  // 曲名の候補を選んでも、**読みは動かさない**（`readingTouched` を戻さない）。入力の順が
+  // アーティスト → 読み → 曲名なので、読みを手で直したあとに曲名の候補を選ぶのは普通の操作で、
+  // 戻すと、直した読みが何も知らせずに消える。読みを手で直していなければ、これまでどおり、
+  // アーティストに従って自動で入る（候補のアーティストが入力と同じなら、変わらない）。
   const pickSong = (suggestion: SongSuggestion) => {
     setTitle(suggestion.title);
     setArtist(suggestion.artist);
     setPickedTitle(suggestion.title);
     setPickedArtist(suggestion.artist);
     setArtistTouched(true);
-    setReadingTouched(false);
     setTitleError(undefined);
     setArtistError(undefined);
     setTitleFocused(false);
@@ -252,7 +256,10 @@ export function SongForm({ song, tags }: { song?: Song; tags: readonly Tag[] }) 
     setArtistFocused(false);
     setArtistEdited(false);
     setArtistEpoch((epoch) => epoch + 1);
-    Keyboard.dismiss();
+    // 追加で、曲名がまだ空なら、続けて曲名を入れられるよう、曲名へ移る（キーボードは出したまま）。
+    // 曲名が入っている（編集で、アーティストだけ変える）ときは、閉じる。
+    if (normalizeText(title) === '') titleRef.current?.focus();
+    else Keyboard.dismiss();
   };
 
   const titleRef = useRef<NativeTextInput>(null);

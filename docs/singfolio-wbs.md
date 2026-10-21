@@ -6,7 +6,7 @@ v1.0の作業（保存・管理は端末内で完結し、外部通信は候補�
 v1.0より後（公開機能・Requests）の実装順序は、
 `singfolio-publishing-backend.md` §9 を参照。
 
-**現在地**：6. リリース準備（6.1・6.4・6.5が残り。6.2・6.3・6.6は完了。6.1は、Androidの見た目と操作は確認済みで、iOS実機が残り）
+**現在地**：6. リリース準備（6.1・6.4・6.5・6.8が残り。6.2・6.3・6.6・6.7は完了。6.1は、Androidの見た目と操作は確認済みで、iOS実機が残り。6.8は、アプリの変更は済んで、ストア用スクリーンショットの撮り直しとストアの説明文の反映が残り）
 
 ## 0. 企画・設計
 
@@ -110,13 +110,16 @@ v1.0より後（公開機能・Requests）の実装順序は、
 -   [x] 6.7 スクリーンショットの撮り直し（読みの欄が増えた Add Song、並び替えのボタンが増えた Show Mode、
     Artists の行が増えた Profile。English・日本語、iOS・Android の12枚。ほかの3画面は、見た目が変わらないので、
     そのまま。`scripts/store-screenshots/seed.py` はアーティストの読みに対応済み）
+-   [x] 6.6 第三者ライセンス表記（npmの依存・npmの中に取り込まれたコード・アイコンフォント・ネイティブの
+    ライブラリ（React Native が同梱する C++ のライブラリ、Android の Maven の依存、Maven の成果物が
+    `.so` に埋め込んでいるライブラリ）のライセンスを、依存関係から生成した一覧にして、About から開く
+    Open source licenses に出す。About の「Fonts」は、自前で同梱した書体だけで、この一覧とは別）
 -   [ ] 6.8 実機で触って出た違和感の反映。Add Song の入力順を Artist → 読み → Title にした（済み）。Songs の
     行の右に My Key を出した（済み。原曲のままは `-`）。Songs を Practice で絞ると「→ Ready」、Want で
     絞ると「→ Practice」のボタンを行の右に出した（済み）。ボトムタブを Songs / Profile / Settings にして、
     Practice タブをやめ、Profile と設定を分けた（済み）。残りは、ストア用スクリーンショットとストアの
     説明文の直し（Add Song・Songs・Profile が変わり、Practice の画面が無くなり、Settings の画面が
-    増える。「Practice タブ」の記述は、`docs/singfolio-store-listing.md`）
--   [x] 6.6 第三者ライセンス表記（npmの依存・npmの中に取り込まれたコード・アイコンフォント・ネイティブの
-    ライブラリ（React Native が同梱する C++ のライブラリ、Android の Maven の依存、Maven の成果物が
-    `.so` に埋め込んでいるライブラリ）のライセンスを、依存関係から生成した一覧にして、About から開く
-    Open source licenses に出す。About の「Fonts」は、自前で同梱した書体だけで、この一覧とは別）
+    増える。「Practice タブ」の記述は、`docs/singfolio-store-listing.md`）。
+    iOS（TestFlight のビルド）で確かめること: Add Song で、曲名の候補（最大5件）がキーボードに隠れない
+    （曲名の欄へのスクロール）、アーティストの候補を選んだあと曲名へ移る、日本語入力中の欄の挙動、
+    Songs の行のボタン（Practice・Want で絞ったとき）

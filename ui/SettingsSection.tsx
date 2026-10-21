@@ -26,7 +26,7 @@ const appearanceKeys = {
 /**
  * Settings タブ（`app/(tabs)/settings.tsx`）の中身（Appearance・Language・Suggestions・Tags・Artists・About）。
  * Appearance・Language は、下から出るシートで選ぶ。選ぶと保存してから反映し、保存に失敗したら、
- * 表示は変えずに伝える。Tags・About は、別の画面を開く。
+ * 表示は変えずに伝える。Tags・Artists・About は、別の画面を開く。
  *
  * 「Suggestions」（外部の楽曲検索から候補を出すか）は、外部の検索が使えないビルドでは、項目ごと出さない。
  */

@@ -73,7 +73,7 @@ export const en = {
   // 読み上げ用。ボタンの名前と、開く画面（Show Mode）の名前が違うので、行き先を添える。
   'profile.showMySongsHint': 'Opens Show Mode',
 
-  // Profile の設定の項目（ui/SettingsSection.tsx）。Language の English / 日本語 は、その言語自身の
+  // Settings の項目（ui/SettingsSection.tsx）。Language の English / 日本語 は、その言語自身の
   // 名前で出すので、文言ではなく `languageNames`（src/i18n）。System だけは、表示中の言語の文言。
   'settings.appearance': 'Appearance',
   'settings.appearance.system': 'System',
