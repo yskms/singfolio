@@ -66,7 +66,7 @@ function sameIds(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
  *   入力したアーティストで絞れるため。追加は、アーティストにフォーカスして開く。Enterは、
  *   アーティスト → （読みが空のときだけ読み）→ 曲名と移る。アーティストの候補を選んだときも、
  *   曲名が空なら曲名へ移る。曲名は、候補がキーボードに隠れないよう、フォーカスが入ったら欄が上に
- *   来るまでスクロールする。曲名の候補を選んでも、読みは動かさない（`pickSong`）。
+ *   来るまでスクロールする。
  * - 曲名・アーティストが空なら、保存せずに両方の欄にエラーを出し、画面の順で最初の問題の欄に
  *   フォーカスする（Serviceの検証と同じ`normalizeText` で判定し、Serviceのエラーは念のため受ける）。
  * - アーティストの「読み」（並び替え用の名前）は必須。名前を入れる・候補から選ぶと、読みの初期値が入る。
@@ -81,8 +81,8 @@ function sameIds(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
  * - 変更があるまま戻る（戻るボタン・iOSのスワイプ・Androidの戻る操作）と、破棄の確認を出す。
  * - 曲名・アーティストの欄の直下に、候補を出す（`singfolio-screen-flow.md`「候補（サジェスト）」）。
  *   欄を**編集した**ときだけ探す（フォーカスしただけ・開いたときの既存の値では、外部へ送らない）。
- *   曲の候補を選ぶと曲名とアーティストの両方、アーティストの候補を選ぶとアーティストだけを
- *   置き換える。選んで欄が書き換わっても、探し直さない。
+ *   曲の候補を選ぶと曲名だけ、アーティストの候補を選ぶとアーティストだけを置き換える（どちらも、
+ *   もう一方の欄・読みには触れない。候補は入力の補助）。選んで欄が書き換わっても、探し直さない。
  */
 export function SongForm({ song, tags }: { song?: Song; tags: readonly Tag[] }) {
   const { colors } = useTheme();
@@ -227,24 +227,16 @@ export function SongForm({ song, tags }: { song?: Song; tags: readonly Tag[] }) 
   const sendable = (text: string) => searchKey(text).length >= MIN_CATALOG_TERM_LENGTH;
   // 欄を作り直す（上の `titleEpoch` の説明）と、フォーカスの外れ（`onBlur`）が来ないことが
   // あるので、フォーカスと編集の状態も、ここで戻す。
-  // 曲名の候補を選んでも、**読みは動かさない**（`readingTouched` を戻さない）。入力の順が
-  // アーティスト → 読み → 曲名なので、読みを手で直したあとに曲名の候補を選ぶのは普通の操作で、
-  // 戻すと、直した読みが何も知らせずに消える。読みを手で直していなければ、これまでどおり、
-  // アーティストに従って自動で入る（候補のアーティストが入力と同じなら、変わらない）。
+  // 曲名の候補を選んで入るのは、**曲名だけ**。アーティスト・読みには触れない。候補は入力の補助で、
+  // アーティストと曲名は、ユーザーが入力して保存するもの（Apple Music やカラオケに無い組み合わせも
+  // 登録する）。候補の行にアーティストを添えるのは、同じ曲名の曲を見分けるため。
   const pickSong = (suggestion: SongSuggestion) => {
     setTitle(suggestion.title);
-    setArtist(suggestion.artist);
     setPickedTitle(suggestion.title);
-    setPickedArtist(suggestion.artist);
-    setArtistTouched(true);
     setTitleError(undefined);
-    setArtistError(undefined);
     setTitleFocused(false);
-    setArtistFocused(false);
     setTitleEdited(false);
-    setArtistEdited(false);
     setTitleEpoch((epoch) => epoch + 1);
-    setArtistEpoch((epoch) => epoch + 1);
     Keyboard.dismiss();
   };
   const pickArtist = (name: string) => {

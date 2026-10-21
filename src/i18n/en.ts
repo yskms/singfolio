@@ -197,7 +197,7 @@ export const en = {
   'songForm.suggestionRegistered': 'In your songs',
   'songForm.suggestionA11y': '{title} by {artist}',
   'songForm.suggestionA11yRegistered': '{title} by {artist}, already in your songs',
-  'songForm.suggestionSongHint': 'Fills in the title and artist',
+  'songForm.suggestionSongHint': 'Fills in the title',
   'songForm.suggestionArtistHint': 'Fills in the artist',
 
   // ServiceErrorCode → 文言の対応は errors.ts。

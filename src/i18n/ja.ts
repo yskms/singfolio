@@ -158,7 +158,7 @@ export const ja: Record<MessageKey, Message> = {
   'songForm.suggestionRegistered': '登録済み',
   'songForm.suggestionA11y': '{artist}の{title}',
   'songForm.suggestionA11yRegistered': '{artist}の{title}、登録済み',
-  'songForm.suggestionSongHint': '曲名とアーティストを入力します',
+  'songForm.suggestionSongHint': '曲名を入力します',
   'songForm.suggestionArtistHint': 'アーティストを入力します',
 
   'error.titleRequired': '曲名を入力してください。',
