@@ -6,7 +6,7 @@ v1.0の作業（保存・管理は端末内で完結し、外部通信は候補�
 v1.0より後（公開機能・Requests）の実装順序は、
 `singfolio-publishing-backend.md` §9 を参照。
 
-**現在地**：6. リリース準備（6.4・6.5・6.8が残り。6.1・6.2・6.3・6.6・6.7は完了。6.4は、iOS を TestFlight へ上げて実機確認まで済み、残りは、6.8 の変更を含む Android の AAB の作り直しと、ストアの申告・掲載の入力。6.8は、アプリの変更は済んで、ストア用スクリーンショットの撮り直しとストアの説明文の反映が残り）
+**現在地**：6. リリース準備（6.4・6.5・6.8が残り。6.1・6.2・6.3・6.6・6.7は完了。6.4は、iOS を TestFlight へ上げて実機確認まで済み、残りは、6.8 の変更を含む Android の AAB の作り直しと、ストアの申告・掲載の入力。6.8は、アプリの変更・スクリーンショットの撮り直し・ストアの文の修正まで済んで、ストアへの入力と、実機での確認が残り）
 
 ## 0. 企画・設計
 
@@ -124,9 +124,10 @@ v1.0より後（公開機能・Requests）の実装順序は、
 -   [ ] 6.8 実機で触って出た違和感の反映。Add Song の入力順を Artist → 読み → Title にした（済み）。Songs の
     行の右に My Key を出した（済み。原曲のままは `-`）。Songs を Practice で絞ると「→ Ready」、Want で
     絞ると「→ Practice」のボタンを行の右に出した（済み）。ボトムタブを Songs / Profile / Settings にして、
-    Practice タブをやめ、Profile と設定を分けた（済み）。残りは、ストア用スクリーンショットとストアの
-    説明文の直し（Add Song・Songs・Profile が変わり、Practice の画面が無くなり、Settings の画面が
-    増える。「Practice タブ」の記述は、`docs/singfolio-store-listing.md`）。
+    Practice タブをやめ、Profile と設定を分けた（済み）。ストア用スクリーンショット（Songs・Add Song・
+    Practice の画面・Settings。iOS・Android、English・日本語の16枚）は撮り直して、`compose.sh` で作り直した
+    （済み。`06-profile` は `06-settings` に改名）。ストアの説明文は、`docs/singfolio-store-listing.md` の
+    「Practice タブ」の記述を直した（済み。App Store Connect・Play Console への入力は、利用者の作業）。
     iOS シミュレータ（release、English）で確かめた: Add Song の入力順・Enter の移動・曲名の欄へのスクロール、
     曲名の候補を選んでも曲名だけが入ること、アーティストの候補を選んで曲名へ移ること（自動修正を切った）、
     行のボタン（Practice で絞って → Ready）、My Key の表示、3つのタブ。シミュレータはハードウェア

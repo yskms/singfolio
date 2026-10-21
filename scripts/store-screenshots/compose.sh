@@ -151,30 +151,30 @@ read_slides() {
     headline[02-detail]='Your key. Your notes.'
     subhead[02-detail]='Remember how you sing each song.'
     headline[03-add]='Add a song in seconds.'
-    subhead[03-add]='Title, artist, key, tags, and notes.'
+    subhead[03-add]='Artist, title, key, tags, and notes.'
     headline[04-practice]='From Practice to Ready.'
     subhead[04-practice]='Mark a song Ready when you’ve got it.'
     headline[05-show]='Show what you can sing.'
     subhead[05-show]='No keys. No notes. Just your songs.'
-    headline[06-profile]='Light or dark.'
-    subhead[06-profile]='English or Japanese. Your choice.'
+    headline[06-settings]='Light or dark.'
+    subhead[06-settings]='English or Japanese. Your choice.'
   else
     headline[01-songs]='歌える曲を、ひとつの場所に。'
     subhead[01-songs]='歌える・練習中・歌いたいを、まとめて管理。'
     headline[02-detail]='キーも、メモも、曲ごとに。'
     subhead[02-detail]='自分の歌い方を、そのまま残せます。'
     headline[03-add]='曲の追加は、かんたん。'
-    subhead[03-add]='曲名・アーティスト・キー・タグ・メモ。'
+    subhead[03-add]='アーティスト・曲名・キー・タグ・メモ。'
     headline[04-practice]='練習中から、歌える曲へ。'
     subhead[04-practice]='歌えるようになったら「歌える」へ。'
     headline[05-show]='歌える曲を、人に見せよう。'
     subhead[05-show]='キーも非公開メモも出ません。'
-    headline[06-profile]='ライトにも、ダークにも。'
-    subhead[06-profile]='日本語でも English でも使えます。'
+    headline[06-settings]='ライトにも、ダークにも。'
+    subhead[06-settings]='日本語でも English でも使えます。'
   fi
   background=(
     [01-songs]="$bg_mint" [02-detail]="$bg_lavender" [03-add]="$bg_mint"
-    [04-practice]="$bg_lavender" [05-show]="$bg_mint" [06-profile]="$bg_purple"
+    [04-practice]="$bg_lavender" [05-show]="$bg_mint" [06-settings]="$bg_purple"
   )
   # fit_size は本物の改行で行を分け、ImageMagick は \n を改行とみなす。両方で同じに見えるよう、先に直す。
   local key

@@ -200,13 +200,12 @@ Apple へ送る検索語があるため、次の1項目を申告する。他は�
     （`https://developer.apple.com/app-store/asset-best-practices/`）の素材に使う。このページには
     3840×1646 の記載が無く（Product page header・Search results asset などは、Apple が配る
     テンプレートの寸法に従う）、どの素材にどの寸法かは、提出時にテンプレートで確認する。
--   **スクリーンショット**: Songs・Song Detail・Add Song・Practice・Show Mode・Profile（ダーク表示）の6枚を、
-    English と日本語で用意した。見出し・補足つきで、
-    `assets/store-screenshots/` にある。**ただし、6.8 のアプリの変更（Add Song の入力順・Songs の行の
-    My Key・Practice タブの廃止・Profile と Settings の分離）の前の画像で、撮り直しが要る**。撮り直すときは、
-    Practice の画面を「Songs を Practice で絞った画面（行の `→ Ready` のボタン付き）」に、Profile
-    （件数と Show My Songs だけになった）を Settings（ダーク表示。外観・言語・候補・Tags・Artists・About が並ぶ）に
-    差し替える（`seed.py`・`compose.sh` の画面の一覧も、同じに直す）。ブランドの色と書体（Inter / Noto Sans JP。`assets/fonts/`）を使い、
+-   **スクリーンショット**: Songs・Song Detail・Add Song・Practice（Songs を Practice で絞った画面。行の `→ Ready`
+    のボタン付き）・Show Mode・Settings（ダーク表示。外観・言語・候補・Tags・Artists・About が並ぶ）の6枚を、
+    English と日本語で用意した。見出し・補足つきで、`assets/store-screenshots/` にある（ファイル名は
+    `01-songs`・`02-detail`・`03-add`・`04-practice`・`05-show`・`06-settings`）。Songs の行の My Key、Add Song の
+    入力順（Artist → 読み → Title）、タブ（Songs / Profile / Settings）は、現在のアプリの画面。Song Detail・Show Mode は、
+    見た目が変わっていないので、以前の撮影画像のまま。ブランドの色と書体（Inter / Noto Sans JP。`assets/fonts/`）を使い、
     採点や順位を連想させる表現は使わない。
     -   **撮影画像**は、App Store 用が `raw/{en,ja}/`（iOS シミュレータ。iPhone 18 Pro、1206×2622）、
         Google Play 用が `raw-android/{en,ja}/`（Android エミュレータ。1080×2424）。`scripts/store-screenshots/compose.sh`
@@ -240,17 +239,20 @@ Apple へ送る検索語があるため、次の1項目を申告する。他は�
     -   **候補（Suggestions）が出ている画面は、スクリーンショットにしない**。候補は Apple のカタログの実在の曲
         で、避けられない。Add Song は、候補をオフにして、`seed.py` の `ADD_SONG` の値を手で入力した画面にしている
         （入力した文字が、撮影中に Apple へ送られることも避ける）。候補があることは、掲載文で伝える。
-        アーティストは、登録済みの名前（`ADD_SONG` の `artist`。`seed.py` の曲にも出る）を、登録済みのアーティスト
-        の候補（端末内だけ）から選ぶ。**読み**の欄に、登録済みの読みが入った状態を写す（`seed.py` の `READINGS`）。
-        日本語の Add Song では、曲名はローマ字を打って変換し、アーティストは読み（`tomoshibi`）を打って、読みで
-        一致した候補（`灯火の庭`）を選ぶ（読みの検索の機能も写る）。
+        入力の順は、アプリと同じ（Artist → 読み → Title）。アーティストは、登録済みの名前（`ADD_SONG` の `artist`。
+        `seed.py` の曲にも出る）を、登録済みのアーティストの候補（端末内だけ）から選ぶ。**読み**の欄に、登録済みの
+        読みが入った状態を写す（`seed.py` の `READINGS`）。候補を選ぶと、曲名にフォーカスが移る。続けて、曲名・
+        キー（`半音を上げる` を2回）・タグ・メモを入れる。日本語の Add Song では、アーティストは読み（`tomoshibi`）を
+        打って、読みで一致した候補（`灯火の庭`）を選び（読みの検索の機能も写る）、曲名はローマ字を打って変換する。
     -   **撮り直す画面**は、見た目が変わった画面だけでよい（残りは、`raw/`・`raw-android/` の画像を、そのまま
-        使う。`compose.sh` は、同じ入力から同じ画像を作る）。読みの欄・並び替えのボタン・Artists の行が増えたとき、
-        Add Song・Show Mode・Profile を撮り直した。**Add Song は、読みの欄が増えて画面が長くなり、English・
-        日本語とも、Private Note が写らない**（iOS はタグまで。Android の撮影画像は、Private Note の見出し
-        の手前まで）。Google Play 用（9:16。下を切る）は、**My Key までで、タグも写らない**。そのまま撮り、
-        見出しの補足文（`Title, artist, key, tags, and notes.` など）は、写っていない項目（タグ・メモ）も
-        挙げる。補足文は、アプリでできることの説明で、画面に写るものとは一致しない（許容している）。
+        使う。`compose.sh` は、同じ入力から同じ画像を作る）。読みの欄・並び替えのボタン・Artists の行が増えたとき
+        （Add Song・Show Mode・Profile）と、入力順・My Key の列・Practice タブの廃止・Profile と Settings の分離
+        のとき（Songs・Add Song・Practice の画面・Settings。`06-profile` は `06-settings` に改名）に、撮り直した。
+        **Add Song は、読みの欄があって画面が長く、English・日本語とも、Private Note が写らない**（iOS はタグまで。
+        Android の撮影画像は、Private Note の見出しの手前まで）。Google Play 用（9:16。下を切る）は、**My Key までで、
+        タグも写らない**。そのまま撮り、見出しの補足文（`Artist, title, key, tags, and notes.` など）は、写っていない
+        項目（タグ・メモ）も挙げる。補足文は、アプリでできることの説明で、画面に写るものとは一致しない（許容している）。
+        Settings の画面は、下半分が空く（項目が6つだけ）が、見出しの目的（ライト/ダーク、言語）は、上半分で伝わる。
     -   **撮影の手順**（再現できるよう、使ったコマンドを残す）:
         -   Release ビルドで撮る（debug は、LogBox が写り、ダーク表示の配色も変わる）。撮影用のデータは、アプリを止めて、
             DB を `seed.py` で入れ替える（`seed.py <en|ja> <DB> [light|dark] [on|off]`）。
