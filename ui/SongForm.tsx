@@ -35,6 +35,14 @@ import { useSuggestions } from './useSuggestions';
 /** 追加画面の Status の既定。「曲を登録 → Readyにする」が中心の体験のため。 */
 const DEFAULT_STATUS: SongStatus = 'ready';
 
+/**
+ * アーティスト・曲名の入力欄の指定。名前（固有名詞）なので、自動修正とスペルチェックは切る
+ * （`Lyren` が `Lauren` になるなど、名前を勝手に書き換える）。切らないと、iOSでは、候補を選んだ
+ * 直後に、自動修正が、選んだ値を上書きする（アーティストの候補を選んで、曲名へフォーカスを移すと、
+ * 入力途中の語が自動修正された値に戻る。iOSシミュレータで確認）。外さない。
+ */
+const NAME_INPUT = { autoCorrect: false, spellCheck: false } as const;
+
 /** 外部の候補を探すまでの待ち時間。入力が止まってから送る（打つたびには送らない）。 */
 const SUGGEST_DELAY_MS = 500;
 
@@ -482,6 +490,8 @@ export function SongForm({ song, tags }: { song?: Song; tags: readonly Tag[] }) 
             // 追加は、開いてすぐ入力できるようにする（素早く登録できることを優先）。欄を作り直した
             // とき（候補を選んだ後）は、フォーカスしない。
             autoFocus={!song && artistEpoch === 0}
+            // 名前（固有名詞）なので、自動修正・スペルチェックは切る（`NAME_INPUT` の説明）。
+            {...NAME_INPUT}
             returnKeyType="next"
             // 読みは、ほとんどの場合、名前から自動で入る。空のときだけ、先に読みへ移る。
             onSubmitEditing={() => (normalizeText(reading) === '' ? readingRef : titleRef).current?.focus()}
@@ -553,6 +563,7 @@ export function SongForm({ song, tags }: { song?: Song; tags: readonly Tag[] }) 
                 setTitleFocused(false);
                 setTitleEdited(false);
               }}
+              {...NAME_INPUT}
               returnKeyType="done"
             />
             <SuggestionList

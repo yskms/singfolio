@@ -87,6 +87,10 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
 -   外部の検索に `explicit` は指定しない。実測（2026-10。米国・日本ストア）で、指定しなくても `explicit` の曲は
     返らず、`explicit=No` を足しても結果は変わらない（`docs/singfolio-store-listing.md` の年齢指定）。
 -   候補の欄には提供元（「Suggestions from Apple」）を表記する。外さない。
+-   Artist・Title の入力欄は、`autoCorrect` と `spellCheck` を切る（`SongForm` の `NAME_INPUT`）。外さない。
+    名前を自動修正が書き換える（`Lyren` → `Lauren`）うえ、iOS では、アーティストの候補を選んで曲名へ
+    フォーカスを移した直後に、自動修正が、選んだ値を上書きする（iOS シミュレータで確認。曲名が空でない
+    ときの、キーボードを閉じる経路では起きない）。
 -   候補を選んだとき、その候補を入れた入力欄（曲名の候補なら Title、アーティストの候補なら Artist）を
     `key` で作り直す（`SongForm` の `titleEpoch` / `artistEpoch`）。「簡略化」して `setTitle` だけにしない（iOSの日本語の変換中の欄は、JSからの
     書き換えを無視する。詳細は `SongForm` のコメント）。

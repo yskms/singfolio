@@ -120,6 +120,9 @@ v1.0より後（公開機能・Requests）の実装順序は、
     Practice タブをやめ、Profile と設定を分けた（済み）。残りは、ストア用スクリーンショットとストアの
     説明文の直し（Add Song・Songs・Profile が変わり、Practice の画面が無くなり、Settings の画面が
     増える。「Practice タブ」の記述は、`docs/singfolio-store-listing.md`）。
-    iOS（TestFlight のビルド）で確かめること: Add Song で、曲名の候補（最大5件）がキーボードに隠れない
-    （曲名の欄へのスクロール）、アーティストの候補を選んだあと曲名へ移る、日本語入力中の欄の挙動、
-    Songs の行のボタン（Practice・Want で絞ったとき）
+    iOS シミュレータ（release、English）で確かめた: Add Song の入力順・Enter の移動・曲名の欄へのスクロール、
+    曲名の候補を選んでも曲名だけが入ること、アーティストの候補を選んで曲名へ移ること（自動修正を切った）、
+    行のボタン（Practice で絞って → Ready）、My Key の表示、3つのタブ。シミュレータはハードウェア
+    キーボードが接続されていてソフトキーボードが出ないので、実機（TestFlight のビルド）で、曲名の候補
+    （最大5件）がキーボードに隠れないこと、日本語入力中の欄の挙動、Songs の行のボタン（Want で絞ったとき）を
+    確かめる
