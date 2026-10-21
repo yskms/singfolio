@@ -98,7 +98,10 @@ v1.0より後（公開機能・Requests）の実装順序は、
     開けないことも確認した。フィーチャーグラフィックと、スクリーンショット（English・日本語。
     架空の曲で撮影）は `assets/` に作成済み）
 -   [ ] 6.4 ビルド・ストア提出（`eas.json`・EASのプロジェクトは作成済み。ビルド番号はEASが持つ。App Store Connect のアプリは作成済み
-    （バンドルID `com.yskms.singfolio`。`eas submit` 用に、`eas.json` の `submit.production.ios.ascAppId` に Apple ID を入れた）。AndroidはR8を有効にした
+    （バンドルID `com.yskms.singfolio`。`eas submit` 用に、`eas.json` の `submit.production.ios.ascAppId` に Apple ID を入れた）。
+    iOS は、`eas build --platform ios --profile production --local` で `.ipa` を作り（Apple の配布証明書・プロファイルは EAS が
+    作成・保管する。Apple ID の対話ログインが要るので、手元の端末で実行）、`eas submit --path <.ipa>` で TestFlight へ
+    アップロードした（ビルド番号2。署名・バージョン・暗号化の申告は、`.ipa` の中身で確認した）。AndroidはR8を有効にした
     （`plugins/withAndroidR8.js`。Google Playが2027年2月から求める難読化・最適化・縮小の率のため）。
     Androidは、`eas build --local --platform android --profile production` で、全アーキテクチャのAABを作れることを
     確認した（署名鍵（upload key）は、EASが初回のビルドで自動作成して保管する）。
