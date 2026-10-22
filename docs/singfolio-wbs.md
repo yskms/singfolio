@@ -6,7 +6,7 @@ v1.0の作業（保存・管理は端末内で完結し、外部通信は候補�
 v1.0より後（公開機能・Requests）の実装順序は、
 `singfolio-publishing-backend.md` §9 を参照。
 
-**現在地**：6. リリース準備（6.4・6.5・6.8が残り。6.1・6.2・6.3・6.6・6.7は完了。6.4は、iOS を TestFlight へ上げて実機確認まで済み、残りは、6.8 の変更を含む Android の AAB の作り直しと、ストアの申告・掲載の入力。6.8は、アプリの変更・スクリーンショットの撮り直し・ストアの文の修正まで済んで、ストアへの入力と、実機での確認が残り）
+**現在地**：6. リリース準備（6.4・6.5・6.8が残り。6.1・6.2・6.3・6.6・6.7は完了。6.4は、iOS を審査に提出済み（結果待ち）、残りは、6.8 の変更を含む Android の AAB の作り直しと、Play Console の申告・掲載の入力・提出。6.8は、アプリの変更・スクリーンショットの撮り直し・ストアの文の修正・App Store への入力まで済んで、Google Play への入力と、Android の実機での確認が残り）
 
 ## 0. 企画・設計
 
@@ -104,7 +104,11 @@ v1.0より後（公開機能・Requests）の実装順序は、
     （バンドルID `com.yskms.singfolio`。`eas submit` 用に、`eas.json` の `submit.production.ios.ascAppId` に Apple ID を入れた）。
     iOS は、`eas build --platform ios --profile production --local` で `.ipa` を作り（Apple の配布証明書・プロファイルは EAS が
     作成・保管する。Apple ID の対話ログインが要るので、手元の端末で実行）、`eas submit --path <.ipa>` で TestFlight へ
-    アップロードした（ビルド番号2。署名・バージョン・暗号化の申告は、`.ipa` の中身で確認した）。AndroidはR8を有効にした
+    アップロードした（ビルド番号2。署名・バージョン・暗号化の申告は、`.ipa` の中身で確認した）。
+    App Store Connect に、アプリ情報（カテゴリ・年齢指定・コンテンツ配信権）・アプリのプライバシー（検索履歴
+    1項目）・価格（無料）・1.0のバージョン画面（English・日本語の掲載文、スクリーンショット、App Review のメモ。
+    内容は `docs/singfolio-store-listing.md`）を入れて、**iOS の 1.0（ビルド番号2）を審査に提出した**。
+    審査の結果を待つ。AndroidはR8を有効にした
     （`plugins/withAndroidR8.js`。Google Playが2027年2月から求める難読化・最適化・縮小の率のため）。
     Androidは、`eas build --local --platform android --profile production` で、全アーキテクチャのAABを作れることを
     確認した（署名鍵（upload key）は、EASが初回のビルドで自動作成して保管する）。
