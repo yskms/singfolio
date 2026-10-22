@@ -65,7 +65,7 @@ Hand your phone to a friend and let them see what you can sing. Show Mode lists 
 PRIVATE BY DESIGN
 • No account, no ads, no tracking
 • Your song list stays on your device
-• Suggestions are optional. They send only what you type in Title and Artist to Apple to find matches, and you can turn them off in Profile
+• Suggestions are optional. They send only what you type in Title and Artist to Apple to find matches, and you can turn them off in Settings
 
 Light and dark mode. English and Japanese.
 
@@ -102,7 +102,7 @@ SHOW MODE
 プライベートな設計
 • アカウント登録なし、広告なし、トラッキングなし
 • 曲のリストは、端末の中だけに保存
-• 候補は任意です。曲名・アーティストの入力欄に入力した文字だけを、候補を探すためにAppleへ送ります。プロフィールでオフにできます
+• 候補は任意です。曲名・アーティストの入力欄に入力した文字だけを、候補を探すためにAppleへ送ります。設定でオフにできます
 
 ライトモード・ダークモードに対応。日本語・英語で使えます。
 
@@ -130,6 +130,26 @@ SHOW MODE
 
 `app.json` の `ios.config.usesNonExemptEncryption: false`（通信は標準のHTTPSだけで、独自の暗号化は
 無い）。App Store Connect の質問にも、同じ答え（免除される暗号化のみ）で答える。
+
+### App Review のメモ
+
+App Store Connect の「App Review に関する情報」の「メモ」（4,000文字まで）に、次の英文を入れる。サインインは
+不要なので、「サインインが必要です」はオフ。連絡先は利用者のもの。審査する人に、ログインが無いこと、通信が
+候補だけであること、試し方を伝える。
+
+```text
+Singfolio is a repertoire manager for people who sing. No account or sign-in is required. All data is stored on the device.
+
+The only network use is the optional "Suggestions" feature (Settings tab > Suggestions, on by default). While the user types in the Artist or Title field, the typed text is sent to Apple's public iTunes Search API to show suggestions. Nothing else is sent, and nothing is sent when the switch is turned off. Suggestions are only an input aid: the user can always type any artist and title and save them.
+
+How to try the app:
+1. Songs tab > "+" > enter an artist and a title > Save.
+2. Songs tab > tap the Practice or Want tile to filter. Each row then has a button that moves the song to the next status.
+3. Profile tab > "Show My Songs" opens Show Mode, a read-only list of the Ready songs (it never shows keys or notes).
+4. Settings tab: appearance, language (English / Japanese), Suggestions, tags, artists, About.
+
+The app has no ads, no in-app purchases, and no tracking. Privacy policy: https://yskms.github.io/singfolio/privacy-policy.html
+```
 
 ### App プライバシー（App Privacy）
 
@@ -173,7 +193,7 @@ Apple へ送る検索語があるため、次の1項目を申告する。他は�
 
 | データの種類 | 収集 | 共有 | 目的 | 任意か |
 |---|---|---|---|---|
-| アプリのアクティビティ > アプリ内の検索履歴 | する | する（Apple） | アプリの機能 | 任意（プロフィールの「候補」で、オフにできる） |
+| アプリのアクティビティ > アプリ内の検索履歴 | する | する（Apple） | アプリの機能 | 任意（設定の「候補」で、オフにできる） |
 
 -   他のデータの種類は、収集も共有もしない。
 -   データは、転送中に暗号化される（HTTPS）。

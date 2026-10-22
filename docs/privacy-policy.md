@@ -25,7 +25,7 @@ While you type in the Title or Artist field of Add / Edit Song, the App can show
 - What is sent: the text you typed in the Title or Artist field of the screen you are on (when looking for songs, the artist you typed or chose on the same screen is sent together with the title), and a country code (Japan or the United States, chosen from the App’s display language). Nothing is sent when you only open the screen or focus a field; the App sends a request only after you edit the field and the text is at least two characters long.
 - What is not sent: your song list, your key, your private notes, your tags, and the text of any other field. The App does not send an account, device identifier, or advertising identifier.
 - As with any internet request, Apple’s servers can see technical connection information such as your IP address. How Apple handles requests is described in [Apple’s Privacy Policy](https://www.apple.com/legal/privacy/).
-- The Suggestions switch in Profile is on by default. When you turn it off, the App sends nothing to Apple, and suggestions of artists you have already saved are shown from your device only.
+- The Suggestions switch in Settings is on by default. When you turn it off, the App sends nothing to Apple, and suggestions of artists you have already saved are shown from your device only.
 - If the connection fails, the App simply shows no suggestions. You can always type and save a song freely. A suggestion you choose is saved as ordinary text on your device; the App does not keep which suggestion it came from.
 
 The App does not use Apple’s results for anything other than showing suggestions. The App shows “Suggestions from Apple” next to the suggestions while the feature is on.
@@ -73,7 +73,7 @@ Singfolio（以下「本アプリ」）は、歌う人のためのレパート�
 - 送るもの: 今の画面の「曲名」「アーティスト」の入力欄に入力した文字（曲を探すときは、同じ画面で入力した・選んだアーティストも、曲名と一緒に送ります）と、国コード（本アプリの表示言語から、日本または米国を選びます）。画面を開いた・欄にフォーカスしただけでは送りません。欄を編集して、文字が2文字以上になったときだけ送ります。
 - 送らないもの: 曲のリスト、自分のキー、非公開メモ、タグ、他の入力欄の文字。アカウント、端末の識別子、広告ID も送りません。
 - 通常のインターネット通信と同様に、Appleのサーバーは、IPアドレスなどの接続の技術的な情報を見ることができます。Appleでの扱いは、[Appleのプライバシーポリシー](https://www.apple.com/legal/privacy/)に記載されています。
-- プロフィールの「候補」スイッチは、初期状態でオンです。オフにすると、Appleへは何も送らず、登録済みのアーティストの候補だけを、端末内から表示します。
+- 設定の「候補」スイッチは、初期状態でオンです。オフにすると、Appleへは何も送らず、登録済みのアーティストの候補だけを、端末内から表示します。
 - 通信できないときは、候補が出ないだけで、入力と保存はいつでも自由にできます。選んだ候補は、普通の文字として端末に保存され、どの候補から選んだかは記録しません。
 
 Appleから受け取った結果は、候補の表示以外には使いません。この機能がオンの間、候補の欄に「候補の提供元: Apple」と表示します。
