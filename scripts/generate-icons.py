@@ -8,6 +8,9 @@
 
   play-store-icon-512.png        Google Playのストア掲載用（原画を512x512へ縮小しただけ）
   favicon.png                    公開Web用のfavicon（原画を48x48へ縮小しただけ。app.jsonからは参照しない）
+  ../docs/app-icon.png           紹介ページ（docs/index.md）に96pxで表示するアイコン（原画を192x192へ縮小しただけ。
+                                 出力先だけ docs/）。docs/_config.yml は *.png を除外しているので、
+                                 同ファイルの include で残している
   android-icon-foreground.png    アダプティブアイコンの前景（シンボルのみ、透過）
   android-icon-monochrome.png    テーマアイコン用（シンボルの形のみ。色はAndroidが付けるので黒でよい）
   splash-icon.png                スプラッシュ用（シンボルのみ、透過）
@@ -27,10 +30,12 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "assets"
+WEB_OUT = ROOT / "docs"
 SOURCE = OUT / "icon.png"
 CANVAS = 1024
 PLAY_STORE_ICON = 512
 FAVICON = 48
+WEB_ICON = 192  # 紹介ページでは96pxで表示する（2倍密度の画面向け）
 
 # アダプティブアイコンは108dpのキャンバスのうち、直径66dpの円の内側だけが
 # どのランチャーのマスクでも欠けずに見える。
@@ -121,6 +126,7 @@ def main() -> None:
     OUT.mkdir(exist_ok=True)
     src.resize((PLAY_STORE_ICON, PLAY_STORE_ICON), Image.LANCZOS).save(OUT / "play-store-icon-512.png")
     src.resize((FAVICON, FAVICON), Image.LANCZOS).save(OUT / "favicon.png")
+    src.resize((WEB_ICON, WEB_ICON), Image.LANCZOS).save(WEB_OUT / "app-icon.png")
     place_symbol(alpha, center, radius, fg, ANDROID_SAFE_RATIO).save(
         OUT / "android-icon-foreground.png"
     )

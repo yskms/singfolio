@@ -1,3 +1,9 @@
+---
+title: Singfolio
+---
+
+<img src="app-icon.png" width="96" height="96" alt="Singfolio app icon" style="box-sizing: border-box; border: 1px solid #d1d5da; border-radius: 22px;">
+
 # Singfolio
 
 **Your songs, ready to sing. / 歌える曲を、ひとつの場所に。**

@@ -14,9 +14,12 @@
     ただしMint・Purpleはアイコンの色が正。「ブランド」節参照）、
     モックアップ（参考イメージ）
 -   `assets/icon.png` --- アプリアイコンの原画（1024×1024、透過なし、iOS・ストア用）。
-    Play Storeアイコン（512×512）・公開Web用のfavicon（48×48）・Androidの前景・
+    Play Storeアイコン（512×512）・公開Web用のfavicon（48×48）・紹介ページ用の
+    `docs/app-icon.png`（192×192）・Androidの前景・
     テーマアイコン・スプラッシュ画像はここから `scripts/generate-icons.py` で生成する
     （生成物は手で編集しない。faviconは公開Webで使うもので、app.jsonからは参照しない）。
+    紹介ページ（`docs/index.md`）のtitleは、front matterと `docs/_config.yml` の `title` を
+    同じ文字にする（理由は `_config.yml` のコメント）。
     Androidの `adaptiveIcon.backgroundColor` はこの画像の背景色に合わせている
 
 **内部向けのメモは、公開リポジトリの外の `../singfolio-private`（非公開）に書く。** 詳細は「公開範囲」。

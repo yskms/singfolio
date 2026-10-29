@@ -3,8 +3,18 @@
 # 他の docs（仕様・設計・WBS・ストア掲載情報・ブランド資料）は、リポジトリでは読めるが、アプリの
 # 公式サイトのページとしては公開しない。
 # docs/ にファイルを足したときは、ここを見直す。`singfolio-` で始まらない文書（README.md など）は、
-# そのまま公開される。`*.png` は除いているので、ページ用の画像（favicon など）を置くときは、除外を
-# 絞る。公開後に、公開するページ以外が開けないことを確かめる（`docs/singfolio-store-listing.md`）。
+# そのまま公開される。`*.png` は除いているので、ページ用の画像を置くときは、`include` に名前を足して
+# 残す（`include` は `exclude` より優先される）。公開後に、公開するページ以外が開けないことを確かめる
+# （`docs/singfolio-store-listing.md`）。
+#
+# title は、index.md の front matter の `title:` と同じ文字にしておく。違うと、Primer テーマが
+# ページの先頭にサイト名（既定ではリポジトリ名の小文字 `singfolio`）のリンクを足し、<title> も
+# `Singfolio | singfolio` になる。アイコンをページの先頭に置くために、同じにしている。
+# index.md の先頭は画像なので、見出しからページのタイトルを取る Pages の既定が効かない（先頭が
+# 見出しのときだけ取る）。そのため、index.md の front matter にも `title:` を書いている。
+title: Singfolio
 exclude:
   - "singfolio-*.md"
   - "*.png"
+include:
+  - "app-icon.png"
