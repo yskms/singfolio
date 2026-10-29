@@ -18,9 +18,9 @@
     `docs/app-icon.png`（192×192）・Androidの前景・
     テーマアイコン・スプラッシュ画像はここから `scripts/generate-icons.py` で生成する
     （生成物は手で編集しない。faviconは公開Webで使うもので、app.jsonからは参照しない）。
-    紹介ページ（`docs/index.md`）のtitleは、front matterと `docs/_config.yml` の `title` を
-    同じ文字にする（理由は `_config.yml` のコメント）。
     Androidの `adaptiveIcon.backgroundColor` はこの画像の背景色に合わせている
+-   `docs/index.md`（紹介ページ）--- titleは、front matterと `docs/_config.yml` の `title` を
+    同じ文字にする（理由は `_config.yml` のコメント）
 
 **内部向けのメモは、公開リポジトリの外の `../singfolio-private`（非公開）に書く。** 詳細は「公開範囲」。
 
