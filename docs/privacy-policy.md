@@ -44,7 +44,7 @@ The App is not designed for children and does not knowingly collect personal inf
 
 ### Changes
 
-If the App changes how it handles information — for example, if a feature that sends your songs to the developer’s servers, such as an online profile, is added — this policy will be updated before that feature is released. The effective date above will change when this policy changes.
+If the App changes how it handles information - for example, if a feature that sends your songs to the developer’s servers, such as an online profile, is added - this policy will be updated before that feature is released. The effective date above will change when this policy changes.
 
 ### Contact
 
