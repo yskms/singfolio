@@ -1,0 +1,253 @@
+/*
+  紹介ページ（index.html・ja/index.html）の共通CSS。プライバシーポリシー（privacy-policy.md）は
+  Jekyll の既定テーマ（Primer）で描画されるので、このCSSは使わない。
+  色は src/theme/colors.ts（lightColors・darkColors）と CLAUDE.md「ブランド」節の値。変えるときは、そちらに合わせる。
+  Purple（#9C70FE）は白の上で約3.4:1なので、小さな文字の色には使わない（線・塗り・下線にだけ使う）。
+*/
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --surface: #f7f7f8;
+  --border: #e4e4e7;
+  --text: #17171a;
+  --muted: #71717a;
+  --purple: #9c70fe;
+  --mint: #c9fced;
+  --selected: #c9fced;
+  --on-selected: #17171a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111113;
+    --surface: #1c1c1f;
+    --border: #2e2e33;
+    --text: #f4f4f5;
+    --muted: #a1a1aa;
+    --selected: #1d3b34;
+    --on-selected: #c9fced;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
+  line-height: 1.7;
+}
+
+main {
+  width: min(880px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 20px 0 56px;
+}
+
+a {
+  color: inherit;
+  text-decoration-color: var(--purple);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+a:focus-visible,
+.shots:focus-visible {
+  outline: 3px solid var(--purple);
+  outline-offset: 3px;
+}
+
+h1, h2 { line-height: 1.3; text-wrap: balance; }
+h2 { margin: 0 0 16px; font-size: 1.4rem; }
+p { margin: 0 0 16px; text-wrap: pretty; }
+ul { margin: 0; padding: 0; }
+
+section { margin-top: 64px; }
+
+.lang-switch {
+  margin: 0 0 16px;
+  text-align: right;
+  font-size: 0.9rem;
+}
+
+/*
+  ヒーロー。背景はMintの単色（ライト・ダークとも。ブランドの色）で、logo.webpの背景と同じ色なので、
+  画像の継ぎ目が出ない。このパネルの中は、ダークでも文字色を固定する（Mintの上なので）。
+*/
+.hero {
+  padding: 56px 24px 48px;
+  border-radius: 28px;
+  background: var(--mint);
+  color: #17171a;
+  text-align: center;
+}
+
+.hero h1 { margin: 0; line-height: 0; }
+.hero h1 img {
+  width: min(376px, 86%);
+  height: auto;
+  aspect-ratio: 1128 / 207;
+}
+
+.tagline {
+  margin: 20px 0 0;
+  color: #52525b;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.lead {
+  max-width: 34em;
+  margin: 20px auto 0;
+}
+
+.store {
+  margin-top: 28px;
+}
+
+.store img { display: block; margin: 0 auto; }
+
+.store .note {
+  margin: 8px 0 0;
+  color: #52525b;
+  font-size: 0.9rem;
+}
+
+/* スクリーンショット（キャプション入りの画像。Google Playと同じもの）。狭い幅では横にスクロールする */
+.shots {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  list-style: none;
+}
+
+.shots img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 540 / 960;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+}
+
+@media (max-width: 699px) {
+  .shots {
+    display: flex;
+    gap: 14px;
+    margin-inline: -20px;
+    padding: 0 20px 4px;
+    overflow-x: auto;
+    scroll-padding-inline: 20px;
+    scroll-snap-type: x mandatory;
+  }
+  .shots li {
+    flex: 0 0 62%;
+    max-width: 300px;
+    scroll-snap-align: start;
+  }
+}
+
+/* 3つのリスト。アプリの件数タイルに合わせて、「Ready」を選択中の見た目（Mintの面とPurpleの縁）にする */
+.lists {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  list-style: none;
+}
+
+.lists li {
+  padding: 20px;
+  border: 2px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.lists li.ready {
+  border-color: var(--purple);
+  background: var(--selected);
+  color: var(--on-selected);
+}
+
+.lists strong { display: block; font-size: 1.3rem; line-height: 1.3; }
+.lists span { display: block; margin-top: 4px; }
+.lists li:not(.ready) span { color: var(--muted); }
+
+@media (max-width: 519px) {
+  .lists { grid-template-columns: 1fr; }
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.card {
+  padding: 28px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.card ul { padding-left: 1.25rem; }
+.card li + li { margin-top: 8px; }
+.card p:last-child { margin-bottom: 0; }
+.card h2 { font-size: 1.25rem; }
+
+/* 機能の一覧は、1段目に全幅で置く（広い幅では2列にして、縦に伸ばさない） */
+.card.wide { grid-column: 1 / -1; }
+.card.wide ul { column-gap: 40px; columns: 2; }
+.card.wide li { break-inside: avoid; }
+
+@media (max-width: 699px) {
+  .grid { grid-template-columns: 1fr; }
+  .card.wide ul { columns: 1; }
+}
+
+.also {
+  margin: 40px 0 0;
+  color: var(--muted);
+  text-align: center;
+}
+
+.closing {
+  margin-top: 24px;
+  font-size: 1.2rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+footer {
+  margin-top: 56px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+footer p { margin: 0 0 8px; }
+
+footer ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  margin-bottom: 12px;
+  list-style: none;
+}
+
+/* 日本語の本文は、文節で折り返す（auto-phrase。Chrome系だけで、Safariなど未対応のブラウザは、文字単位の既定の折り返しのまま。
+   iOS Safariでは効かないことを、ハブで実測している） */
+:lang(ja) p,
+:lang(ja) li {
+  word-break: auto-phrase;
+}
+
+/* 日本語の見出し・短い文は、文節の途中で折り返さない（keep-all）。長い語がはみ出さないよう、overflow-wrapで保険をかける */
+:lang(ja) h2,
+:lang(ja) .tagline,
+:lang(ja) .lists span,
+:lang(ja) .closing {
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}

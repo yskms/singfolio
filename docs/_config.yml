@@ -1,20 +1,23 @@
-# GitHub Pages（このリポジトリの docs/ を公開元にする）で公開するのは、index.md と privacy-policy.md。
+# GitHub Pages（このリポジトリの docs/ を公開元にする）で公開するのは、次のとおり。
+#   - index.html・ja/index.html（紹介ページ。自前のHTML・CSS。front matter が無いので、Jekyll はそのまま配信する）
+#   - site.css・images/（紹介ページが使う。images/ は scripts/generate-site-images.py の出力）
+#   - privacy-policy.md（Jekyll の既定テーマ Primer で描画する。_includes/head-custom.html でfaviconを足している）
+#   - favicon.png・app-icon.png・apple-touch-icon.png（scripts/generate-icons.py の出力。下の include で残している）
 # Jekyll には、公開するものを名前で指定する方法が無いので、公開しないものを名前で除く（`exclude`）。
 # 他の docs（仕様・設計・WBS・ストア掲載情報・ブランド資料）は、リポジトリでは読めるが、アプリの
 # 公式サイトのページとしては公開しない。
 # docs/ にファイルを足したときは、ここを見直す。`singfolio-` で始まらない文書（README.md など）は、
 # そのまま公開される。`*.png` は除いているので、ページ用の画像を置くときは、`include` に名前を足して
-# 残す（`include` は `exclude` より優先される）。公開後に、公開するページ以外が開けないことを確かめる
-# （`docs/singfolio-store-listing.md`）。
+# 残す（`include` は `exclude` より優先される）。紹介ページの画像は、`*.png` に当たらない WebP・JPEG で置いている。
+# 公開後に、公開するページ以外が開けないことを確かめる（`docs/singfolio-store-listing.md`）。
 #
-# title は、index.md の front matter の `title:` と同じ文字にしておく。違うと、Primer テーマが
-# ページの先頭にサイト名（既定ではリポジトリ名の小文字 `singfolio`）のリンクを足し、<title> も
-# `Singfolio | singfolio` になる。アイコンをページの先頭に置くために、同じにしている。
-# index.md の先頭は画像なので、見出しからページのタイトルを取る Pages の既定が効かない（先頭が
-# 見出しのときだけ取る）。そのため、index.md の front matter にも `title:` を書いている。
+# title は、privacy-policy.md のページの先頭に出るサイト名のリンク（`Singfolio`。紹介ページへ戻れる）と、
+# <title> の末尾に使われる。紹介ページ（index.html）は Jekyll を通らないので、title は関係しない。
 title: Singfolio
 exclude:
   - "singfolio-*.md"
   - "*.png"
 include:
   - "app-icon.png"
+  - "favicon.png"
+  - "apple-touch-icon.png"

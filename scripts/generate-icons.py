@@ -8,9 +8,12 @@
 
   play-store-icon-512.png        Google Playのストア掲載用（原画を512x512へ縮小しただけ）
   favicon.png                    公開Web用のfavicon（原画を48x48へ縮小しただけ。app.jsonからは参照しない）
-  ../docs/app-icon.png           紹介ページ（docs/index.md）に96pxで表示するアイコン（原画を192x192へ縮小しただけ。
-                                 出力先だけ docs/）。docs/_config.yml は *.png を除外しているので、
-                                 同ファイルの include で残している
+  ../docs/app-icon.png           紹介ページ（docs/index.html）の <link rel="icon">（192x192）と JSON-LD の image に使う
+                                 アイコン（原画を192x192へ縮小しただけ。出力先だけ docs/）。
+                                 docs/_config.yml は *.png を除外しているので、同ファイルの include で残している
+  ../docs/favicon.png            紹介ページ・プライバシーポリシーのfavicon（assets/favicon.png と同じ48x48。出力先だけ docs/。
+                                 同じく include で残している）
+  ../docs/apple-touch-icon.png   iOSのホーム画面用（原画を180x180へ縮小しただけ。同じく include で残している）
   android-icon-foreground.png    アダプティブアイコンの前景（シンボルのみ、透過）
   android-icon-monochrome.png    テーマアイコン用（シンボルの形のみ。色はAndroidが付けるので黒でよい）
   splash-icon.png                スプラッシュ用（シンボルのみ、透過）
@@ -35,7 +38,8 @@ SOURCE = OUT / "icon.png"
 CANVAS = 1024
 PLAY_STORE_ICON = 512
 FAVICON = 48
-WEB_ICON = 192  # 紹介ページでは96pxで表示する（2倍密度の画面向け）
+WEB_ICON = 192  # 紹介ページの <link rel="icon" sizes="192x192"> 用（Googleは48pxの倍数を推奨）
+TOUCH_ICON = 180  # iOSのホーム画面用（apple-touch-icon）
 
 # アダプティブアイコンは108dpのキャンバスのうち、直径66dpの円の内側だけが
 # どのランチャーのマスクでも欠けずに見える。
@@ -127,6 +131,8 @@ def main() -> None:
     src.resize((PLAY_STORE_ICON, PLAY_STORE_ICON), Image.LANCZOS).save(OUT / "play-store-icon-512.png")
     src.resize((FAVICON, FAVICON), Image.LANCZOS).save(OUT / "favicon.png")
     src.resize((WEB_ICON, WEB_ICON), Image.LANCZOS).save(WEB_OUT / "app-icon.png")
+    src.resize((FAVICON, FAVICON), Image.LANCZOS).save(WEB_OUT / "favicon.png")
+    src.resize((TOUCH_ICON, TOUCH_ICON), Image.LANCZOS).save(WEB_OUT / "apple-touch-icon.png")
     place_symbol(alpha, center, radius, fg, ANDROID_SAFE_RATIO).save(
         OUT / "android-icon-foreground.png"
     )

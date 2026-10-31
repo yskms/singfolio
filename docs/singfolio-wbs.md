@@ -95,8 +95,8 @@ v1.0より後（公開機能・Requests）の実装順序は、
 -   [x] 6.2 アイコン・スプラッシュ（1024×1024への縮小、Androidの前景画像、
     Play Store用512×512、favicon）
 -   [x] 6.3 プライバシーポリシー・ストア掲載情報（`docs/privacy-policy.md`・`docs/singfolio-store-listing.md`・
-    `docs/index.md`は作成済み。候補検索で外部へ送る検索語の説明とプライバシー申告を含む。
-    `docs/_config.yml` は、公開しないものを名前で除く（公開するページは index.md と privacy-policy.md）。
+    `docs/index.html`は作成済み（紹介ページ。のちに自前のHTMLにした）。候補検索で外部へ送る検索語の説明とプライバシー申告を含む。
+    `docs/_config.yml` は、公開しないものを名前で除く（公開するページは index.html・ja/index.html と privacy-policy.md）。
     GitHub Pages は `docs/` を公開元にして公開済みで、2つのURLが開けることと、他の docs のページが
     開けないことも確認した。フィーチャーグラフィックと、スクリーンショット（English・日本語。
     架空の曲で撮影）は `assets/` に作成済み）

@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Singfolio - 歌える曲を管理するレパートリーアプリ</title>
+  <meta name="description" content="Singfolioは、歌う人のためのレパートリー管理アプリ。歌える曲・練習中の曲・歌いたい曲を、キーやタグ、非公開メモと一緒にひとつの場所で管理できます。">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#111113" media="(prefers-color-scheme: dark)">
+  <link rel="canonical" href="https://yskms.github.io/singfolio/ja/">
+  <link rel="alternate" hreflang="en" href="https://yskms.github.io/singfolio/">
+  <link rel="alternate" hreflang="ja" href="https://yskms.github.io/singfolio/ja/">
+  <link rel="alternate" hreflang="x-default" href="https://yskms.github.io/singfolio/">
+  <link rel="icon" type="image/png" href="../favicon.png" sizes="48x48">
+  <link rel="icon" type="image/png" href="../app-icon.png" sizes="192x192">
+  <link rel="apple-touch-icon" href="../apple-touch-icon.png">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Singfolio">
+  <meta property="og:url" content="https://yskms.github.io/singfolio/ja/">
+  <meta property="og:title" content="Singfolio - 歌える曲を、ひとつの場所に">
+  <meta property="og:description" content="歌う人のためのレパートリー管理アプリ。歌える曲・練習中の曲・歌いたい曲を、ひとつの場所で管理できます。">
+  <meta property="og:image" content="https://yskms.github.io/singfolio/images/og.jpg">
+  <meta property="og:locale" content="ja_JP">
+  <meta property="og:locale:alternate" content="en_US">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Singfolio - 歌える曲を、ひとつの場所に">
+  <meta name="twitter:description" content="歌う人のためのレパートリー管理アプリ。歌える曲・練習中の曲・歌いたい曲を、ひとつの場所で管理できます。">
+  <meta name="twitter:image" content="https://yskms.github.io/singfolio/images/og.jpg">
+  <link rel="stylesheet" href="../site.css">
+  <!-- JSON-LD の description は、meta description と同じ文にしておく（片方だけ直さない）。
+       operatingSystem は、App Store に公開されたら "Android, iOS" にする（docs/_config.yml のコメント参照） -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "MobileApplication",
+    "name": "Singfolio",
+    "description": "Singfolioは、歌う人のためのレパートリー管理アプリ。歌える曲・練習中の曲・歌いたい曲を、キーやタグ、非公開メモと一緒にひとつの場所で管理できます。",
+    "applicationCategory": "MultimediaApplication",
+    "operatingSystem": "Android",
+    "url": "https://yskms.github.io/singfolio/ja/",
+    "image": "https://yskms.github.io/singfolio/app-icon.png",
+    "screenshot": [
+      "https://yskms.github.io/singfolio/images/ja-01.webp",
+      "https://yskms.github.io/singfolio/images/ja-04.webp",
+      "https://yskms.github.io/singfolio/images/ja-05.webp"
+    ],
+    "inLanguage": ["ja", "en"],
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
+    "author": { "@type": "Person", "name": "yskms" }
+  }
+  </script>
+</head>
+<body>
+  <main>
+    <nav class="lang-switch" aria-label="言語">
+      <a href="../" hreflang="en" lang="en">English</a>
+    </nav>
+
+    <header class="hero">
+      <h1><img src="../images/logo.webp" width="1128" height="207" alt="Singfolio"></h1>
+      <p class="tagline">歌える曲を、ひとつの場所に。</p>
+      <p class="lead">Singfolioは、歌う人のためのレパートリー管理アプリです。カラオケ、弾き語り、歌配信、ライブで。管理するのは歌の点数ではなく、自分が何を歌えるか。</p>
+      <div class="store">
+        <a href="https://play.google.com/store/apps/details?id=com.yskms.singfolio&amp;hl=ja"><img src="https://play.google.com/intl/en_us/badges/static/images/badges/ja_badge_web_generic.png" height="60" alt="Google Play で手に入れよう"></a>
+        <p class="note">iOS版は準備中です。</p>
+      </div>
+    </header>
+
+    <section aria-labelledby="screenshots-title">
+      <h2 id="screenshots-title">スクリーンショット</h2>
+      <ul class="shots" tabindex="0" aria-labelledby="screenshots-title">
+        <li><img src="../images/ja-01.webp" width="540" height="960" alt="歌える・練習中・歌いたいの件数、タグの絞り込み、各曲のキーが並ぶ曲リスト"></li>
+        <li><img src="../images/ja-02.webp" width="540" height="960" alt="ステータス、自分のキー、タグ、非公開メモを表示する曲の詳細"></li>
+        <li><img src="../images/ja-03.webp" width="540" height="960" alt="アーティスト、曲名、ステータス、キーを入力する曲の追加画面"></li>
+        <li><img src="../images/ja-04.webp" width="540" height="960" alt="各曲のボタンで「歌える」へ移せる、練習中の曲リスト"></li>
+        <li><img src="../images/ja-05.webp" width="540" height="960" alt="歌える曲をアーティストごとに並べて見せる、閲覧専用のShow Mode"></li>
+        <li><img src="../images/ja-06.webp" width="540" height="960" alt="ダークモードの設定画面。外観、言語、候補、タグ、アーティスト"></li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="lists-title">
+      <h2 id="lists-title">3つのリストを、ひとつの場所に</h2>
+      <ul class="lists">
+        <li class="ready"><strong>歌える</strong><span>歌える曲</span></li>
+        <li><strong>練習中</strong><span>練習している曲</span></li>
+        <li><strong>歌いたい</strong><span>歌ってみたい曲</span></li>
+      </ul>
+    </section>
+
+    <section class="grid" aria-label="機能">
+      <article class="card wide">
+        <h2>歌う人に必要なものを</h2>
+        <ul>
+          <li>曲名とアーティストで曲を追加。入力中に候補が出ます（オフにもできます）</li>
+          <li>曲ごとに、自分のキーをメモ。一覧でもひと目で確認</li>
+          <li>「バラード」「デュエット」などのタグを付けて、絞り込み</li>
+          <li>自分だけが見られる非公開メモ</li>
+          <li>曲名・アーティストで検索、好きな順に並び替え</li>
+          <li>「練習中」で絞り込んで、練習中の曲を一覧。歌えるようになったら、ワンタップで「歌える」へ</li>
+        </ul>
+      </article>
+      <article class="card">
+        <h2>Show Mode</h2>
+        <p>スマートフォンを友だちに見せて、歌える曲を伝えられます。Show Modeは「歌える」曲をアーティストごとに並べ、検索とタグの絞り込みができます。キーも非公開メモも出ず、編集もできません。</p>
+      </article>
+      <article class="card">
+        <h2>プライベートな設計</h2>
+        <ul>
+          <li>アカウント登録なし、広告なし、トラッキングなし</li>
+          <li>曲のリストは、端末の中だけに保存</li>
+          <li>候補は任意です。曲名・アーティストの入力欄に入力した文字だけを、候補を探すためにAppleへ送ります。設定でオフにできます</li>
+        </ul>
+      </article>
+    </section>
+
+    <p class="also">ライトモード・ダークモードに対応。日本語・英語で使えます。</p>
+    <p class="closing">点数も、ランキングもありません。歌えるものだけを。</p>
+
+    <footer>
+      <ul>
+        <li><a href="../privacy-policy.html">プライバシーポリシー</a></li>
+        <li><a href="https://github.com/yskms/singfolio/issues">サポート（GitHub Issues）</a></li>
+        <li><a href="https://github.com/yskms/singfolio">ソースリポジトリ</a></li>
+      </ul>
+      <p>© 2026 yskms</p>
+    </footer>
+  </main>
+</body>
+</html>

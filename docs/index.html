@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Singfolio - Song Repertoire Manager for Singers</title>
+  <meta name="description" content="Singfolio is a repertoire manager for singers. Keep the songs you can sing, are practicing, and want to sing in one place, with your key, tags, and private notes.">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#111113" media="(prefers-color-scheme: dark)">
+  <link rel="canonical" href="https://yskms.github.io/singfolio/">
+  <link rel="alternate" hreflang="en" href="https://yskms.github.io/singfolio/">
+  <link rel="alternate" hreflang="ja" href="https://yskms.github.io/singfolio/ja/">
+  <link rel="alternate" hreflang="x-default" href="https://yskms.github.io/singfolio/">
+  <link rel="icon" type="image/png" href="favicon.png" sizes="48x48">
+  <link rel="icon" type="image/png" href="app-icon.png" sizes="192x192">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Singfolio">
+  <meta property="og:url" content="https://yskms.github.io/singfolio/">
+  <meta property="og:title" content="Singfolio - Your songs, ready to sing">
+  <meta property="og:description" content="A repertoire manager for people who sing. Keep the songs you can sing, are practicing, and want to sing in one place.">
+  <meta property="og:image" content="https://yskms.github.io/singfolio/images/og.jpg">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:locale:alternate" content="ja_JP">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Singfolio - Your songs, ready to sing">
+  <meta name="twitter:description" content="A repertoire manager for people who sing. Keep the songs you can sing, are practicing, and want to sing in one place.">
+  <meta name="twitter:image" content="https://yskms.github.io/singfolio/images/og.jpg">
+  <link rel="stylesheet" href="site.css">
+  <!-- JSON-LD の description は、meta description と同じ文にしておく（片方だけ直さない）。
+       operatingSystem は、App Store に公開されたら "Android, iOS" にする（docs/_config.yml のコメント参照） -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "MobileApplication",
+    "name": "Singfolio",
+    "description": "Singfolio is a repertoire manager for singers. Keep the songs you can sing, are practicing, and want to sing in one place, with your key, tags, and private notes.",
+    "applicationCategory": "MultimediaApplication",
+    "operatingSystem": "Android",
+    "url": "https://yskms.github.io/singfolio/",
+    "image": "https://yskms.github.io/singfolio/app-icon.png",
+    "screenshot": [
+      "https://yskms.github.io/singfolio/images/en-01.webp",
+      "https://yskms.github.io/singfolio/images/en-04.webp",
+      "https://yskms.github.io/singfolio/images/en-05.webp"
+    ],
+    "inLanguage": ["en", "ja"],
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "author": { "@type": "Person", "name": "yskms" }
+  }
+  </script>
+</head>
+<body>
+  <main>
+    <nav class="lang-switch" aria-label="Language">
+      <a href="ja/" hreflang="ja" lang="ja">日本語</a>
+    </nav>
+
+    <header class="hero">
+      <h1><img src="images/logo.webp" width="1128" height="207" alt="Singfolio"></h1>
+      <p class="tagline">Your songs, ready to sing.</p>
+      <p class="lead">Singfolio is a repertoire manager for people who sing: at karaoke, for acoustic sets, on streams, or on stage. It keeps track of what you can sing, not how well you scored.</p>
+      <div class="store">
+        <a href="https://play.google.com/store/apps/details?id=com.yskms.singfolio"><img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" height="60" alt="Get it on Google Play"></a>
+        <p class="note">iOS version coming soon.</p>
+      </div>
+    </header>
+
+    <section aria-labelledby="screenshots-title">
+      <h2 id="screenshots-title">Screenshots</h2>
+      <ul class="shots" tabindex="0" aria-labelledby="screenshots-title">
+        <li><img src="images/en-01.webp" width="540" height="960" alt="Songs list showing the Ready, Practice, and Want counts, tag filters, and the key of each song"></li>
+        <li><img src="images/en-02.webp" width="540" height="960" alt="Song details with status, your key, tags, and a private note"></li>
+        <li><img src="images/en-03.webp" width="540" height="960" alt="Add Song form with artist, title, status, and key"></li>
+        <li><img src="images/en-04.webp" width="540" height="960" alt="Practice list with a button on each song that moves it to Ready"></li>
+        <li><img src="images/en-05.webp" width="540" height="960" alt="Show Mode, a read-only list of the songs you can sing, grouped by artist"></li>
+        <li><img src="images/en-06.webp" width="540" height="960" alt="Settings in dark mode: appearance, language, Suggestions, tags, and artists"></li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="lists-title">
+      <h2 id="lists-title">Three lists, one place</h2>
+      <ul class="lists">
+        <li class="ready"><strong>Ready</strong><span>Songs you can sing</span></li>
+        <li><strong>Practice</strong><span>Songs you're working on</span></li>
+        <li><strong>Want</strong><span>Songs you'd like to sing</span></li>
+      </ul>
+    </section>
+
+    <section class="grid" aria-label="Features">
+      <article class="card wide">
+        <h2>Everything a singer needs</h2>
+        <ul>
+          <li>Add songs with a title and an artist. Suggestions appear as you type (optional)</li>
+          <li>Note your own key for each song, and see it right in the list</li>
+          <li>Add tags like "Ballad" or "Duet", and filter by them</li>
+          <li>Keep private notes that only you can see</li>
+          <li>Search by title or artist, and sort the list your way</li>
+          <li>Filter by Practice to see the songs you're working on, and move one to Ready with a tap when you've got it</li>
+        </ul>
+      </article>
+      <article class="card">
+        <h2>Show Mode</h2>
+        <p>Hand your phone to a friend and let them see what you can sing. Show Mode lists your Ready songs by artist, with search and tag filters. It shows nothing private: no keys, no notes, no editing.</p>
+      </article>
+      <article class="card">
+        <h2>Private by design</h2>
+        <ul>
+          <li>No account, no ads, no tracking</li>
+          <li>Your song list stays on your device</li>
+          <li>Suggestions are optional. They send only what you type in Title and Artist to Apple to find matches, and you can turn them off in Settings</li>
+        </ul>
+      </article>
+    </section>
+
+    <p class="also">Light and dark mode. English and Japanese.</p>
+    <p class="closing">No scores. No rankings. Just what you can sing.</p>
+
+    <footer>
+      <ul>
+        <li><a href="privacy-policy.html">Privacy Policy</a></li>
+        <li><a href="https://github.com/yskms/singfolio/issues">Support (GitHub Issues)</a></li>
+        <li><a href="https://github.com/yskms/singfolio">Source repository</a></li>
+      </ul>
+      <p>© 2026 yskms</p>
+    </footer>
+  </main>
+</body>
+</html>

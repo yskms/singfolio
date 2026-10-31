@@ -14,13 +14,21 @@
     ただしMint・Purpleはアイコンの色が正。「ブランド」節参照）、
     モックアップ（参考イメージ）
 -   `assets/icon.png` --- アプリアイコンの原画（1024×1024、透過なし、iOS・ストア用）。
-    Play Storeアイコン（512×512）・公開Web用のfavicon（48×48）・紹介ページ用の
-    `docs/app-icon.png`（192×192）・Androidの前景・
+    Play Storeアイコン（512×512）・公開Web用のfavicon（48×48。`assets/favicon.png` と `docs/favicon.png`）・
+    紹介ページ用の `docs/app-icon.png`（192×192）・`docs/apple-touch-icon.png`（180×180）・Androidの前景・
     テーマアイコン・スプラッシュ画像はここから `scripts/generate-icons.py` で生成する
     （生成物は手で編集しない。faviconは公開Webで使うもので、app.jsonからは参照しない）。
     Androidの `adaptiveIcon.backgroundColor` はこの画像の背景色に合わせている
--   `docs/index.md`（紹介ページ）--- titleは、front matterと `docs/_config.yml` の `title` を
-    同じ文字にする（理由は `_config.yml` のコメント）
+-   `docs/index.html`・`docs/ja/index.html`（紹介ページ。英語は `/singfolio/`、日本語は `/singfolio/ja/`）---
+    自前のHTML・CSS（`docs/site.css`）で、Jekyllのテーマは通さない（front matter を付けない。付けると
+    Primer が描画してしまう）。`docs/privacy-policy.md` だけが、Primer で描画される。
+    **`/singfolio/` と `/singfolio/privacy-policy.html` のURLは動かさない**（App Store Connect・Play Console・
+    アプリ内に登録済み）。画像（`docs/images/`）は `scripts/generate-site-images.py` で `assets/` の原画から
+    生成する（手で編集しない）。文面は `docs/singfolio-store-listing.md` の掲載文に揃え、書いていない機能は足さない。
+    **App Store に公開されたら**：iOSのバッジとリンクを足し、「iOS version coming soon」の一文（en・ja）を外し、
+    JSON-LD の `operatingSystem` を `"Android, iOS"` にする（両ページ）。
+    スクリーンショットは Google Play のもの（キャプション入り、ストアの掲載と同じ）。差し替えたら、
+    `generate-site-images.py` を回し直す。
 
 **内部向けのメモは、公開リポジトリの外の `../singfolio-private`（非公開）に書く。** 詳細は「公開範囲」。
 
