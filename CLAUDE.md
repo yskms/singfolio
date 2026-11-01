@@ -25,8 +25,9 @@
     **`/singfolio/` と `/singfolio/privacy-policy.html` のURLは動かさない**（App Store Connect・Play Console・
     アプリ内に登録済み）。画像（`docs/images/`）は `scripts/generate-site-images.py` で `assets/` の原画から
     生成する（手で編集しない）。文面は `docs/singfolio-store-listing.md` の掲載文に揃え、書いていない機能は足さない。
-    **App Store に公開されたら**：iOSのバッジとリンクを足し、「iOS version coming soon」の一文（en・ja）を外し、
-    JSON-LD の `operatingSystem` を `"Android, iOS"` にする（両ページ）。
+    両ストア（App Store・Google Play）のバッジを載せ済みで、JSON-LD の `operatingSystem` は `"Android, iOS"`。
+    App Storeのバッジ（`docs/images/app-store-badge-{en,ja}.svg`）は、Apple公式のSVGをそのまま置いたもので
+    （生成物ではない。加工しない）、リンクは `https://apps.apple.com/app/id<ascAppId>`（日本語ページは `/jp/`）。
     スクリーンショットは Google Play のもの（キャプション入り、ストアの掲載と同じ）。差し替えたら、
     `generate-site-images.py` を回し直す。
 

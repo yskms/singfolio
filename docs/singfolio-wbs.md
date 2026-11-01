@@ -6,7 +6,7 @@ v1.0の作業（保存・管理は端末内で完結し、外部通信は候補�
 v1.0より後（公開機能・Requests）の実装順序は、
 `singfolio-publishing-backend.md` §9 を参照。
 
-**現在地**：6. リリース準備（6.4・6.5・6.8が残り。6.1・6.2・6.3・6.6・6.7は完了。6.4は、iOS を審査に提出済み（結果待ち）、Android は、6.8 の変更を含む AAB（versionCode 4）を作って、内部テストへアップロードして、Pixel 11 で確認した。Play Console の申告・掲載を入力して、製品版の審査へ送信し、審査を通って公開された。iOS が公開されたら、紹介ページを更新する（6.4 の末尾）。6.8は、アプリの変更・スクリーンショットの撮り直し・ストアの文の修正・両ストアへの入力・Android の実機での確認まで済んだ）
+**現在地**：6. リリース準備（6.5・6.8が残り。6.1・6.2・6.3・6.4・6.6・6.7は完了。6.4は、iOS の 1.0 を審査に提出して、審査を通って公開された。Android は、6.8 の変更を含む AAB（versionCode 4）を作って、内部テストへアップロードして、Pixel 11 で確認した。Play Console の申告・掲載を入力して、製品版の審査へ送信し、審査を通って公開された。iOS も審査を通って公開され、紹介ページに両ストアのバッジを載せた。6.8は、アプリの変更・スクリーンショットの撮り直し・ストアの文の修正・両ストアへの入力・Android の実機での確認まで済んだ）
 
 ## 0. 企画・設計
 
@@ -100,7 +100,7 @@ v1.0より後（公開機能・Requests）の実装順序は、
     GitHub Pages は `docs/` を公開元にして公開済みで、2つのURLが開けることと、他の docs のページが
     開けないことも確認した。フィーチャーグラフィックと、スクリーンショット（English・日本語。
     架空の曲で撮影）は `assets/` に作成済み）
--   [ ] 6.4 ビルド・ストア提出（`eas.json`・EASのプロジェクトは作成済み。ビルド番号はEASが持つ。App Store Connect のアプリは作成済み
+-   [x] 6.4 ビルド・ストア提出（`eas.json`・EASのプロジェクトは作成済み。ビルド番号はEASが持つ。App Store Connect のアプリは作成済み
     （バンドルID `com.yskms.singfolio`。`eas submit` 用に、`eas.json` の `submit.production.ios.ascAppId` に Apple ID を入れた）。
     iOS は、`eas build --platform ios --profile production --local` で `.ipa` を作り（Apple の配布証明書・プロファイルは EAS が
     作成・保管する。Apple ID の対話ログインが要るので、手元の端末で実行）、`eas submit --path <.ipa>` で TestFlight へ
@@ -108,7 +108,7 @@ v1.0より後（公開機能・Requests）の実装順序は、
     App Store Connect に、アプリ情報（カテゴリ・年齢指定・コンテンツ配信権）・アプリのプライバシー（検索履歴
     1項目）・価格（無料）・1.0のバージョン画面（English・日本語の掲載文、スクリーンショット、App Review のメモ。
     内容は `docs/singfolio-store-listing.md`）を入れて、**iOS の 1.0（ビルド番号2）を審査に提出した**。
-    審査の結果を待つ。AndroidはR8を有効にした
+    審査を通って、公開された。AndroidはR8を有効にした
     （`plugins/withAndroidR8.js`。Google Playが2027年2月から求める難読化・最適化・縮小の率のため）。
     Androidは、`eas build --local --platform android --profile production` で、全アーキテクチャのAABを作れることを
     確認した（署名鍵（upload key）は、EASが初回のビルドで自動作成して保管する）。
@@ -122,11 +122,10 @@ v1.0より後（公開機能・Requests）の実装順序は、
     （112 件）で、`.so` 22 種はすべて把握しているものだった。これを内部テストへアップロードし、Play Console で、署名鍵が受け入れられたこと・DEX コードの最適化（3つの率とも81%、評価は高）・
     権限が4個であることを確認した（versionCode 3 は 6.8 の変更を含まない）。
     Android の製品版は、審査を通って公開された（紹介ページには Google Play のバッジを載せ済み）。
-    **iOS が審査を通って公開されたら、紹介ページ（`docs/index.html`・`docs/ja/index.html`。
-    https://yskms.github.io/singfolio/）を更新する**（未）：App Store のバッジとリンクを足し、
-    「iOS version coming soon.」（en）・「iOS版は準備中です。」（ja）の一文を外し、JSON-LD の
-    `operatingSystem` を `"Android, iOS"` にする。両ページとも。更新したら、公開後のURLが開けて、
-    バッジのリンクがストアの掲載ページへ飛ぶことを確かめる（CLAUDE.md の冒頭にも同じ手順がある）
+    iOS の 1.0 も審査を通って公開された。紹介ページ（`docs/index.html`・`docs/ja/index.html`）に、
+    App Store のバッジとリンクを足し、「iOS version coming soon.」（en）・「iOS版は準備中です。」（ja）の
+    一文を外し、JSON-LD の `operatingSystem` を `"Android, iOS"` にした（済み）。GitHub Pages に反映された後、
+    公開後のURLで、2つのバッジのリンクがそれぞれのストアの掲載ページへ飛ぶことを確かめる
 -   [ ] 6.5 候補検索の提供元の利用条件の確認（問い合わせ済み。返事を待たずに、v1.0を iOS・Android の
     両方へ提出する。返事が来たら、内容に応じて、更新で対応する）
 -   [x] 6.7 スクリーンショットの撮り直し（読みの欄が増えた Add Song、並び替えのボタンが増えた Show Mode、

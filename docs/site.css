@@ -102,17 +102,17 @@ section { margin-top: 64px; }
   margin: 20px auto 0;
 }
 
+/* App Store と Google Play のバッジを横に並べる。狭い幅では折り返す */
 .store {
   margin-top: 28px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px 20px;
 }
 
-.store img { display: block; margin: 0 auto; }
-
-.store .note {
-  margin: 8px 0 0;
-  color: #52525b;
-  font-size: 0.9rem;
-}
+.store img { display: block; }
 
 /* スクリーンショット（キャプション入りの画像。Google Playと同じもの）。狭い幅では横にスクロールする */
 .shots {
