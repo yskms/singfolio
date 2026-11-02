@@ -256,8 +256,8 @@ AppleとGoogleの仕様は、各社の公式資料で確かめた（Appleは、I
 **nonce（リプレイ対策）**
 
 -   nonceの元になる値 `T` は、Workerが発行する、期限付きの1回限りの値。**発行は無状態で、D1に書かない。**
-    `POST /auth/nonce` が、乱数と期限（Androidのウェブのフローでは、あわせて検証用の値のハッシュ `C`）を、Workerの
-    秘密鍵でHMAC署名した文字列 `T` を返す（期限は数分）。
+    `POST /auth/nonce` が、乱数・期限・種別（`native` か `web`）と、`web`（Androidのウェブのフロー）のときだけ、
+    検証用の値のハッシュ `C` を、Workerの秘密鍵でHMAC署名した文字列 `T` を返す（期限は数分）。
 -   アプリは、`T` のハッシュ `SHA-256(T)`（base64url。43字）を、Apple・Googleのサインインの `nonce` に渡し、`T` を
     IDトークンと一緒にWorkerへ送る。Workerは、`T` の署名・期限、IDトークンの `nonce` が `SHA-256(T)` と一致する
     ことを確かめ、そのあとで使用済みとして記録する（`used_nonces`。一意制約で2回目を弾く）。D1に書くのは、
@@ -310,7 +310,7 @@ AndroidにはAppleのネイティブのサインインが無いので、Appleの
 ブラウザで開く。
 
 -   アプリは、まず乱数の検証用の値 `V` を作り、そのハッシュ `C = SHA-256(V)` を `POST /auth/nonce` に送って、
-    署名つきの値 `T`（乱数・期限・`C` をWorkerの秘密鍵でHMAC署名したもの。D1に書かない）を受け取る。`V` と `T` は、
+    署名つきの値 `T`（乱数・期限・種別 `web`・`C` をWorkerの秘密鍵でHMAC署名したもの。D1に書かない）を受け取る。`V` と `T` は、
     フローが終わるまで SecureStore に置く（ブラウザを開いている間にアプリが終了しても続けられるように）。
 -   アプリは、`client_id` にServices ID、`redirect_uri` にWorkerのコールバック
     （`https://singfolio.app/auth/apple/callback`。`auth` は予約語なので、`username` のURLと衝突しない）、
@@ -338,8 +338,15 @@ AndroidにはAppleのネイティブのサインインが無いので、Appleの
     頼らない（RFC 8252 は、httpsの戻りも「横取りされにくい」にとどめ、PKCEの併用を勧めている。Custom Tabの
     リダイレクトからアプリが開くかは未確認）。
 -   Appleの資料は、アプリに戻す前に、サーバーへ保存すると書いているが、ここでは保存しない。`V` の結びつけで、横取りされた
-    `code` が使えないので、保存して守る必要がない。コールバックで `code` を交換する形にすると、認証の要らない経路が
-    Appleへの問い合わせを起こし、アプリへ渡すための一時保管（D1への書き込み）も要る。
+    `code` が使えないので、保存して守る必要がない。コールバックで `code` を交換する形にすると、アプリへ渡すための
+    一時保管（D1への書き込み）が、認証の要らない経路に要る。
+-   採った形でも、`code` を受け取るエンドポイントは、認証なしで呼べる。`/auth/nonce` で誰でも `T` を得られるので、
+    でたらめな `code` を付けて、Appleの `/auth/token` を呼ばせられる（Appleのスロットルの条件は資料に書かれていない）。
+    そこで、このエンドポイントにも、`/auth/nonce` と同じレート制限を掛ける。iOSのネイティブとGoogleは、ログインで
+    Appleへ問い合わせない（公開鍵の取得だけ）ので、これはAndroidのAppleログインに固有の費用。
+-   `T` には種別（`native` と `web`）を入れて署名する。`web` の `T` は `C` を含み、`native` の `T` は含まない。
+    Android用のエンドポイントは `web` の `T` だけ、iOSのネイティブとGoogleのエンドポイントは `native` の `T` だけを
+    受け付ける。`C` の無い `T` では `V` の照合が飛ばされるので、取り違えを許さない。
 -   IDトークンの `aud` は2種類になる（iOSのネイティブはバンドルID、AndroidのWebはServices ID）。Workerは両方を受け入れ、
     失効は、そのトークンを得たときの `client_id` で行う。
 -   Services IDは、アプリのApp ID（primaryのApp ID）と同じグループにし、`singfolio.app` をTeamに登録して検証する。
