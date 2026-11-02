@@ -305,17 +305,29 @@ AppleとGoogleの仕様は、各社の公式資料で確かめた（Appleは、I
 AndroidにはAppleのネイティブのサインインが無いので、Appleの認可のWebのフロー（`appleid.apple.com/auth/authorize`）を
 ブラウザで開く。
 
--   アプリは、`client_id` にServices ID、`redirect_uri` にWorkerのコールバック（`https://singfolio.app/...`）、
-    `response_type=code`、`nonce` と `state`（どちらも無状態の署名つきの値）を付けて開く。名前とメールは要求しない
-    （スコープなし）ので、`response_mode=query` でよい（スコープを要求すると `form_post` が必須になる）。
--   Appleは、コールバックへ `code` と `state` を付けて戻す。コールバックは、アプリのURLスキームへリダイレクトして、
-    アプリに戻す（Androidはこの形で戻すよう、Appleが案内している。Appleの資料は、戻す前にサーバーへ保存すると
-    書いているが、ログイン前の経路はD1に書かない方針なので、`code` と `state` を保存せず、そのまま渡す形にする。
-    `code` は1回限りで5分有効。この形で動くかは、7.3で確かめる）。
--   アプリは、`code` と `state` をWorkerへ送る。Workerは `state` の署名を確かめ、`/auth/token` で交換し
-    （`client_id` はServices ID、`redirect_uri` が必須）、得たIDトークンを検証する（`aud` はServices ID、`nonce`）。
-    以降はiOSと同じ。交換で得るリフレッシュトークンは保存しない。
--   削除のときの再認証も、同じフローで `code` を得て、交換し、失効させる。
+-   アプリは、まず乱数の検証用の値 `V` を作り（フローが終わるまで SecureStore に置く。ブラウザを開いている間に
+    アプリが終了しても続けられるように）、そのハッシュ `C = SHA-256(V)` を `POST /auth/nonce` に送って、署名つきの値 `T`
+    （乱数・期限・`C` をWorkerの秘密鍵でHMAC署名したもの。D1に書かない）を受け取る。
+-   アプリは、`client_id` にServices ID、`redirect_uri` にWorkerのコールバック
+    （`https://singfolio.app/auth/apple/callback`。`auth` は予約語なので、`username` のURLと衝突しない）、
+    `response_type=code`、`state` と `nonce` に `T` を付けて開く。名前とメールは要求しない（スコープなし）ので、
+    `response_mode=query` でよい（スコープを要求すると `form_post` が必須になる）。
+-   Appleは、コールバックへ `code` と `state` を付けて戻す。コールバックは、アプリのURLスキームへリダイレクトして
+    アプリに戻す（Androidはこの形で戻すよう、Appleが案内している）。`code` と `state` は保存せず、ログにも出さない。
+-   アプリは、`code`・`state`・`V` をWorkerへ送る。Workerは、`T` の署名と期限を確かめ、`SHA-256(V)` が `T` の中の
+    `C` と一致することを確かめてから、`/auth/token` で交換し（`client_id` はServices ID、`redirect_uri` が必須）、
+    得たIDトークンを検証する（`aud` はServices ID、`nonce` が `T` と一致）。以降はiOSと同じ。交換で得るリフレッシュ
+    トークンは保存しない。
+-   削除のときの再認証も、同じフロー（同じ `V`・`T` の結びつけ）で `code` を得て、交換し、失効させる。
+-   **横取りの対策。** Androidでは、同じカスタムURLスキームを登録した別のアプリも、リダイレクトを受け取れる
+    （RFC 8252 §8.1）。横取りされた `code` と `state` だけでは、`V` が無いので、Workerは受け付けない。AppleのAPIには
+    PKCEのパラメータが無いので、`T` に結びつけた `V` で、PKCEと同じ役割を持たせる。`code` がブラウザの履歴などに
+    残っても、使えない。検証済みのApp Links（`assetlinks.json`）で戻す形は、追加の強化として検討できるが、これだけには
+    頼らない（RFC 8252 は、httpsの戻りも「横取りされにくい」にとどめ、PKCEの併用を勧めている。Custom Tabの
+    リダイレクトからアプリが開くかは未確認）。
+-   Appleの資料は、アプリに戻す前に、サーバーへ保存すると書いているが、ここでは保存しない。`V` の結びつけで、横取りされた
+    `code` が使えないので、保存して守る必要がない。コールバックで `code` を交換する形にすると、認証の要らない経路が
+    Appleへの問い合わせを起こし、アプリへ渡すための一時保管（D1への書き込み）も要る。
 -   IDトークンの `aud` は2種類になる（iOSのネイティブはバンドルID、AndroidのWebはServices ID）。Workerは両方を受け入れ、
     失効は、そのトークンを得たときの `client_id` で行う。
 -   Services IDは、アプリのApp ID（primaryのApp ID）と同じグループにし、`singfolio.app` をTeamに登録して検証する。
@@ -366,6 +378,10 @@ nonce・セッションの失効・Appleのトークン失効の方式は、「�
 -   GoogleのIDトークンの `aud` が、iOSとAndroidで同じ（サーバー用のクライアントID）になるか。iOSでサーバー用の
     クライアントIDを設定すれば、そうなるはず。別々になるなら、Workerは複数の `aud` を受け入れる。
 -   AppleのIDトークンの `sub` が、iOS（バンドルID）とAndroid（Services ID）で同じになるか（「AndroidのAppleログイン」）。
+-   Services IDで得たトークンを失効させたとき、同じグループのiOS（バンドルID）側の連携も取り消されるか（Appleの設定画面に
+    連携が残って見えないか）。残るなら、削除の要件は満たせるが、ユーザーに案内を出すか決める。
+-   AndroidのWebのフロー全体。Custom Tabからコールバック、アプリのURLスキームへのリダイレクトが続くか、`T` を `nonce` に
+    入れて、Appleが受け付ける長さか（`nonce` の長さの上限は資料に書かれていない）。
 
 実装時に決めること：
 
