@@ -300,16 +300,36 @@ AppleとGoogleの仕様は、各社の公式資料で確かめた（Appleは、I
     スナップショットも）削除する。
 -   同じ通知が2回届いても、結果は変わらない。その行の最後のサインインより前の `event_time` の通知は無視する。
 
+**AndroidのAppleログイン（Web経由）**
+
+AndroidにはAppleのネイティブのサインインが無いので、Appleの認可のWebのフロー（`appleid.apple.com/auth/authorize`）を
+ブラウザで開く。
+
+-   アプリは、`client_id` にServices ID、`redirect_uri` にWorkerのコールバック（`https://singfolio.app/...`）、
+    `response_type=code`、`nonce` と `state`（どちらも無状態の署名つきの値）を付けて開く。名前とメールは要求しない
+    （スコープなし）ので、`response_mode=query` でよい（スコープを要求すると `form_post` が必須になる）。
+-   Appleは、コールバックへ `code` と `state` を付けて戻す。コールバックは、アプリのURLスキームへリダイレクトして、
+    アプリに戻す（Androidはこの形で戻すよう、Appleが案内している。Appleの資料は、戻す前にサーバーへ保存すると
+    書いているが、ログイン前の経路はD1に書かない方針なので、`code` と `state` を保存せず、そのまま渡す形にする。
+    `code` は1回限りで5分有効。この形で動くかは、7.3で確かめる）。
+-   アプリは、`code` と `state` をWorkerへ送る。Workerは `state` の署名を確かめ、`/auth/token` で交換し
+    （`client_id` はServices ID、`redirect_uri` が必須）、得たIDトークンを検証する（`aud` はServices ID、`nonce`）。
+    以降はiOSと同じ。交換で得るリフレッシュトークンは保存しない。
+-   削除のときの再認証も、同じフローで `code` を得て、交換し、失効させる。
+-   IDトークンの `aud` は2種類になる（iOSのネイティブはバンドルID、AndroidのWebはServices ID）。Workerは両方を受け入れ、
+    失効は、そのトークンを得たときの `client_id` で行う。
+-   Services IDは、アプリのApp ID（primaryのApp ID）と同じグループにし、`singfolio.app` をTeamに登録して検証する。
+    サーバー間通知のエンドポイントも、このグループで1つ。
+-   `sub` が、iOS（バンドルID）とAndroid（Services ID）で同じになるか。同じグループなら資格情報は共有される
+    （Appleの資料）が、実際のトークンで確かめる（7.3）。違うと、Appleでの、OSをまたぐ引き継ぎはできない。
+
 **アカウントのつなぎ方**
 
+-   ログイン手段は、**iOS・Androidとも、AppleとGoogle**。OSをまたいで移る人が、どちらのOSでも同じ手段で入り、
+    アカウントと配ったURLを引き継げる（iOSは、App Store Review Guidelines 4.8により、Appleを同等に並べる）。
+    ローカルのレパートリーは端末内で、OSをまたいで移らない。
 -   `identities` で、ログイン済みの状態から、別のIDをつなげられる。**すでに別々に作った2つのアカウントを、1つに
     まとめることはできない**（`username`・スナップショット・Requestが2つあり、別の機能になる）。
--   ログイン手段は、**iOSがAppleとGoogle、AndroidがGoogle**。iOSでGoogleを出すのは、OSをまたいで移る人が、
-    アカウントと配ったURLを引き継げるようにするため（App Store Review Guidelines 4.8により、iOSの画面は、
-    Appleを同等に並べた2つのボタンになる）。ローカルのレパートリーは端末内で、OSをまたいで移らない。
--   AndroidのAppleログインは、v1では出さない。Web OAuth・Services ID・ブラウザ経由のフローと、IDトークンの `aud`
-    が2種類（バンドルIDとServices ID）になる複雑さに対して、使う人が少ない。そのため、Appleで始めた人は、
-    Androidへ移る前に、iOSでGoogleをつないでおく必要がある（つないでいない人は、新しいアカウントになる）。
 
 ### 技術検証と残課題
 
@@ -345,6 +365,7 @@ nonce・セッションの失効・Appleのトークン失効の方式は、「�
     成り立たない。ライブラリは、nonceを渡せるものを選ぶ。
 -   GoogleのIDトークンの `aud` が、iOSとAndroidで同じ（サーバー用のクライアントID）になるか。iOSでサーバー用の
     クライアントIDを設定すれば、そうなるはず。別々になるなら、Workerは複数の `aud` を受け入れる。
+-   AppleのIDトークンの `sub` が、iOS（バンドルID）とAndroid（Services ID）で同じになるか（「AndroidのAppleログイン」）。
 
 実装時に決めること：
 
@@ -353,8 +374,8 @@ nonce・セッションの失効・Appleのトークン失効の方式は、「�
 -   複数の端末から同じアカウントでPublishしたときの扱い（端末ごとのローカルDBなので、後勝ちで全体が
     差し替わる。版で衝突を検知するか）。再インストール後・別の端末で、空のローカルから最初にPublishして、
     公開内容を空で置き換えない保護（Publish前に確認を出す、版が合わなければ止める、など）も同じ問題。
--   サインイン済みの状態から、もう一方のID（AppleにGoogleを、GoogleにAppleを）をつなぐ画面。OSをまたぐ前に
-    つなげるようにするには、v1で用意するか（用意しないと、Appleで始めた人は、Androidへ移るときに引き継げない）。
+-   サインイン済みの状態から、もう一方のID（AppleにGoogleを、GoogleにAppleを）をつなぐ画面を、v1で用意するか。
+    OSをまたぐ引き継ぎには要らない（どちらのOSでも、AppleとGoogleのどちらでも入れる）。両方で入りたい人のため。
 -   `username` の変更の可否（§8「バックエンドが担当すること」）。
 -   アカウント削除後の `username` の再利用。削除でD1の行を消すと名前が解放され、配ったURLやQRコードが
     別の人のページを指しうる。再利用させない案では、名前だけを、ユーザーIDと結びつけずに残す
