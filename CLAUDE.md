@@ -7,7 +7,7 @@
 
 -   `docs/singfolio-requirements.md` --- 要件・対象外・UI/ブランド方針
 -   `docs/singfolio-screen-flow.md` --- v1.0の画面設計
--   `docs/singfolio-publishing-backend.md` --- 公開機能・バックエンド方針（未確定事項を含む）
+-   `docs/singfolio-publishing-backend.md` --- 公開機能・バックエンド方針（Cloudflareに決定。実装前に確かめることを含む）
 -   `docs/singfolio-data-model.md` --- ローカルDB（SQLite）のスキーマ・マイグレーション方針
 -   `docs/singfolio-wbs.md` --- v1.0の作業分解と進捗
 -   `docs/Singfolio ブランドスタイルガイドとアプリ展示板.png` --- ブランドカラー・フォント（確定。
@@ -71,13 +71,17 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     バックエンド・認証・同期処理は先行実装しない。
 -   v1.0で実装しない設定項目（Dataなど）は画面に表示しない。
 
-### バックエンドは未確定
+### 公開機能のバックエンド
 
--   バックエンド製品は未確定。公開機能の着手時に技術検証して決める
-    （`docs/singfolio-publishing-backend.md` §8）。特定の製品を前提として
-    コードやドキュメントを書かない。
--   特定のバックエンド製品のSDK・APIをアプリ全体に散らさない。公開機能は
-    Repository / Service境界の内側に閉じ込める。
+-   バックエンドは Cloudflare（Workers・D1・R2・Turnstile）に決めてある。実装は v1.0 より後で、
+    先行実装しない。ローカルでの技術検証は済んでいるが、デプロイとアカウントが要る確認が残っている
+    （`docs/singfolio-publishing-backend.md` §8「実装前に確かめること」）。
+-   公開内容は、R2 に置く「最後に正常に Publish したスナップショット」で、公開ページは D1 に触れない
+    （D1 が止まっても表示できるため）。公開する曲を D1 に行として持つ形（`published_songs` など）に
+    「簡略化」しない。D1 に置くのは、アカウント・セッション・プロフィール・Requests などの動的データ。
+-   バックエンドへの HTTP は Repository に閉じ込め、画面・Service から URL やレスポンスの形に触れない
+    （候補検索の `songCatalogRepository` と同じ）。公開機能は Repository / Service境界の内側に閉じ込める。
+-   Requests は、所有者がアプリ内の一覧で受け取る。Web の受信箱とプッシュ通知は現時点では対象外。
 
 ### 曲名・アーティストの候補（サジェスト）
 
@@ -122,7 +126,7 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     `readingProblem` で、**読みを変えたときだけ**確認する。Serviceに移さない（移すと、別の言語の
     設定で保存した読みを、開いて保存しただけで咎めてしまう）。
 -   LocalデータとPublished（公開）データは別モデル。My KeyとPrivate Noteを
-    公開モデルへ含めない（「Webで隠す」ではなく、最初から公開用DBに保存しない）。
+    公開モデルへ含めない（「Webで隠す」ではなく、最初から公開用のデータ（D1・R2）に含めない）。
 -   UIとDBを密結合させない。
 -   一度リリースしたマイグレーション（`src/db/migrations.ts`）は書き換えない。
     スキーマを変えるときは末尾に次の番号を追加する。

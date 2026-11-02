@@ -12,7 +12,8 @@ Singfolioのバックエンドも使わない。
 
 v1.0ではバックエンドを導入せず、将来の公開機能追加を前提としたデータ構造のみ考慮する。
 
-バックエンド製品は **未確定** で、公開機能の実装に着手する時点で決定する（§8）。
+バックエンドは **Cloudflare（Workers・D1・R2・Turnstile）** とする（§8）。公開機能の実装はv1.0より後で、
+v1.0には含めない。
 
 ## 2. 構成
 
@@ -22,19 +23,16 @@ Singfolio App (React Native / Expo)
        │
        │ Publish / Auto Publish
        ↓
-Backend（製品は未確定、§8参照）
-  ├─ Auth
-  ├─ Public Profile
-  ├─ Published Songs
-  └─ Requests（将来）
+Cloudflare Workers（API）
+  ├─ D1 ── アカウント・セッション・プロフィール・Requests
+  └─ R2 ── 公開スナップショット（最後に正常にPublishした内容）
        │
-       │ Publish時に公開スナップショットを生成
+       │ 公開ページはR2だけから表示する（D1に触れない）
        ↓
-Public Web (Cloudflare)
-  ├─ 公開スナップショット / Edge Cache
+Public Web (Cloudflare Workers)
   └─ singfolio.app/username
        ↑
-     Viewer
+     Viewer（Requestは匿名。Turnstileで確認して、D1へ保存する。将来）
 ```
 
 ## 3. ローカルデータと公開データ
@@ -56,10 +54,15 @@ Public Web (Cloudflare)
 
 ### Published Song
 
+-   id（Local Songと同じSong ID。Requestが対象の曲を指すために使う）
 -   title
 -   artist
 -   publicTags
 -   sortOrder
+
+Published Songは、サーバーのDB（D1）に曲ごとの行として持たない。プロフィール（Display Name・Bio）と
+Readyの曲の一覧を **1つのスナップショット（JSON）** にまとめて、R2に保存する。Publishは、このスナップショットを
+丸ごと差し替える操作で、Publishの時点の内容がそのまま公開される。
 
 以下の情報は原則としてサーバーへ送信しない。
 
@@ -68,7 +71,7 @@ Public Web (Cloudflare)
 -   その他の個人用管理情報
 
 「Webで非表示にする」のではなく、Privateな情報は
-**最初から公開用DBに保存しない** ことを原則とする。
+**最初から公開用のデータ（D1・R2）に含めない** ことを原則とする。
 
 ### 公開用データの扱い
 
@@ -85,6 +88,8 @@ Public Web (Cloudflare)
     公開ルールに基づいて選択されたタグだけを `publicTags` として公開用データへ
     含める。公開対象の選択方法とタグ単位の可視性設定は、公開機能の実装時に
     決定する。
+-   公開用データの実体は、R2のスナップショット。Publishが正常に完了するまでは、前のスナップショットが
+    公開され続ける（Publishの途中の失敗や、D1の状態に左右されない）。
 
 ## 4. Public Profile
 
@@ -181,47 +186,87 @@ Singfolio App ───────────────→ Backend
 
 Requestは匿名の視聴者からの書き込みになるため、スパム対策を前提に設計する。
 
+-   視聴者のログインは要らない。Cloudflare Turnstileで人間かどうかを確認し、レート制限を掛ける。
+-   受け付けるのは、公開済みスナップショットにある曲だけ（任意の文字列は保存しない）。入力の長さと、
+    1人の受信箱の件数に上限を置く。
+-   所有者は、Singfolioアプリの中のRequests一覧で受け取る（曲ごとの件数順）。Webの受信箱とプッシュ通知
+    （FCM / APNs）は、現時点では対象外。
+-   Requestはアカウントに紐づく動的データなので、D1に保存する。曲名・アーティスト名は、Requestの時点の
+    値を一緒に保存する（再Publishで曲が変わっても、Requestを読めるように）。
+
 ## 8. バックエンド
 
-### 選定方針
+### 採用する構成
 
-バックエンド製品は **未確定** とする。
+**Cloudflare Workers（API・公開ページ）+ D1（動的データ）+ R2（公開スナップショット）+
+Turnstile（匿名Requestの確認）** とする。
 
-公開機能の実装に着手する時点で、認証・認可、運用コスト、休眠時の挙動、
-可用性、実装量を技術検証して決定する。
-v1.0では特定製品に依存しない。
+v1.0では導入しない。公開機能の実装に着手する段階で導入する。
 
 ### 公開ページの可用性
 
 公開ページは、単なるHTTPキャッシュだけに依存せず、Publish時に
-**公開スナップショットを生成** してCloudflare側から配信する。
+**公開スナップショットをR2へ保存** して、Cloudflare側から配信する。
 
 ``` text
 Local SQLite
     ↓ Publish
-公開用DB
+Workers（認証・入力の確認）
     ↓
-公開スナップショット / Edge Cache
+R2: 公開スナップショット（ユーザーごとに1オブジェクト）
     ↓
 singfolio.app/username
 ```
 
-バックエンドの障害・停止中でも、最後に公開した状態は表示できる。
+-   PublishはR2のスナップショットを先に書き、成功したらD1のプロフィールの版を更新する。
+-   公開ページは、R2のスナップショットだけから表示し、D1に触れない。D1の障害・日次上限・メンテナンス中でも、
+    最後に正常にPublishした状態を表示できる。
 
-ただし、バックエンド停止中は新規ログイン・Publish・Request受付が止まる。
+ただし、D1が使えない間は、新規ログイン・Publish・Request受付が止まる。
 この仕組みが守るのは公開閲覧のみで、バックエンド全体の可用性を保証するもの
-ではない。
+ではない。Cloudflare自体の障害には対応しない。
 
-### 技術検証
+### 認証
 
-公開機能に着手する時点で、候補製品ごとに小さな技術検証を行って比較する。
+Apple / Googleのネイティブのサインイン（`expo-apple-authentication`・Googleのネイティブサインイン）が返す
+IDトークンを、Workersで検証する（各社の公開鍵（JWKS）で、署名・発行者・対象・期限を確認する）。
+確認できたら、Singfolio独自のセッションを発行する。
 
--   Apple / Googleログイン
--   Publish API
--   `singfolio.app/username` の取得
--   所有者以外による更新の拒否
--   Requestのスパム対策
--   バックエンド停止時の公開ページ表示
+-   ユーザーIDは、クライアントから受け取らない。更新はすべて、セッションが指すユーザーに対してだけ行う。
+-   セッションはD1に持ち、失効できる（ログアウト・アカウント削除）。詳細な方式は、実装前に詰める。
+-   アカウントの削除は、アプリの中から行える。D1の行とR2のスナップショットを消し、Sign in with Appleの
+    ユーザーはAppleのトークンも失効させる。
+
+### 技術検証と残課題
+
+ローカルの実行環境（デプロイなし）で、次を確かめた。
+
+-   Publish API。スナップショットの差し替えと、公開しない項目（My Key・Private Noteなど）が、送られてきても
+    保存されないこと
+-   公開ページ（`/username`）を、R2のスナップショットだけから表示すること
+-   所有者以外による更新の拒否。usernameの横取り、他人のRequest一覧の閲覧、未ログインと改ざんされた
+    セッションを拒否すること
+-   Requestの受付。Turnstile・レート制限・未公開の曲IDの拒否と、所有者がアプリから一覧を取れること
+-   D1が使えない状態でも、公開ページが最後のPublishのまま表示できること
+-   Apple / GoogleのIDトークンの検証。模擬の発行元で、署名・発行者・対象・期限の拒否を確認し、Googleの
+    公開鍵は本物で取得できること
+
+実装前に確かめること（デプロイとアカウントが要る）：
+
+-   本番のWorkersから、Appleの公開鍵（JWKS）を取得できるか。ローカルの実行環境では拒否された。取得できなければ、
+    鍵を自前で控える。
+-   Freeプランで一定期間アクセスがない状態から、手動の操作なしで再アクセスできるか（D1はscale-to-zeroとして
+    提供されているが、実環境での確認は未実施）。
+-   nonce・リプレイ対策、セッションの失効の方式、アカウント削除時のAppleのトークン失効API。
+-   AndroidでAppleログインを出すか（出すなら、Web OAuthと秘密鍵の定期的な再生成が要る。出さない場合は、
+    OSをまたぐアカウントのつなぎ方を決める）。
+-   `singfolio.app` の取得と、Cloudflareへの載せ替え。
+
+実装時に決めること：
+
+-   端末側のPublishの状態（「3 unpublished changes」の数え方のために、何を端末に持つか）。
+-   `username` の変更の可否（§8「バックエンドが担当すること」）。
+-   公開対象のタグの選び方（§3）。
 
 ### 外部の楽曲検索の結果を公開する際の扱い
 
@@ -231,29 +276,37 @@ singfolio.app/username
 
 ### バックエンドが担当すること
 
-どの製品を選んでも、以下を担当する。
+以下を担当する。
 
 -   Authentication
--   Database
+-   Database（D1）
 -   Public Profile
--   Published Songs
+-   Published Songs（R2のスナップショット）
 -   Requests
 -   API
 
-想定テーブル（製品に依存しない）：
+想定するデータ：
 
 ``` text
-profiles
-published_songs
-published_song_tags
-requests
+D1
+  users        アカウント
+  identities   ログイン手段（Apple / Google。1ユーザーに複数をつなげられる）
+  sessions     セッション（トークンのハッシュ。失効できる）
+  profiles     username・Display Name・Bio・スナップショットの版
+  requests     Request（曲ID・曲名・アーティスト名・ニックネーム・日時）
+
+R2
+  ユーザーごとに1オブジェクト   公開スナップショット（プロフィール + Readyの曲の一覧）
 ```
+
+曲ごとの行（`published_songs` など）はD1に作らない。Requestを受けるときの曲の確認も、スナップショットを引いて行う。
+`username` は一意で、変更を許すかは未定（許すなら、旧URLの扱いを決める）。
 
 v1.0では導入しない。公開プロフィール機能を実装する段階で導入する。
 
 ### Cloudflare
 
-公開Webのホスティングと、公開スナップショットの配信に利用する。
+API（Workers）・公開Webのホスティング・公開スナップショット（R2）の配信に利用する。
 
 ``` text
 singfolio.app/username
@@ -280,16 +333,17 @@ Webは公開情報のみを取得して表示する。
 
 ### v1.x
 
--   バックエンド選定（技術検証）
+-   バックエンド選定（技術検証。済み。§8）
+-   実装前に確かめること（§8）
 -   認証（Apple / Google）
 -   Public Profile
 -   Auto Publish
 -   Public Web
--   Cloudflare
+-   Cloudflare（Workers・D1・R2）
 
 ### v2.0
 
--   Requests
+-   Requests（所有者は、アプリ内の一覧で受け取る。Webの受信箱とプッシュ通知は対象外）
 -   未登録曲へのRequest
 -   Request → Want / Practice
 
@@ -302,8 +356,8 @@ Webは公開情報のみを取得して表示する。
 -   Private Note等を公開モデルへ含めない
 -   UIとDBを密結合させない
 -   将来の同期処理を追加できるRepository / Service構造を意識する
--   特定のバックエンド製品に依存しない（SDK・APIをアプリ全体に散らさず、
-    公開機能はService境界の内側に閉じ込められる構造にする）
+-   バックエンドへの通信（HTTP）はRepositoryに閉じ込め、画面・ServiceからURLやレスポンスの形に
+    触れない（公開機能はService境界の内側に閉じ込められる構造にする）
 
 ただし、将来機能のためのバックエンド導入・認証・同期処理などをv1.0へ先行実装しない
 （候補検索の外部通信は、これらとは別。Repository / Service境界の内側に閉じ込める）。

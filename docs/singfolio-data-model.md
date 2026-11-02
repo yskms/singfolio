@@ -1,8 +1,8 @@
 # Singfolio ローカルDB設計
 
 端末内SQLite（`expo-sqlite`、DBファイル名 `singfolio.db`）のスキーマとマイグレーションの方針。
-公開用データ（Published Song等）は別モデルで、ここには含まない
-（`singfolio-publishing-backend.md` §3）。
+公開用データ（Published Song等）は別モデルで、ここには含まない（サーバー側のスナップショットとして持ち、
+端末のSQLiteには置かない。`singfolio-publishing-backend.md` §3）。
 
 スキーマの実体は `src/db/migrations.ts`。
 

@@ -727,6 +727,8 @@ Requests実装後
 
 `Songs / Requests / Profile / Settings`（4つ。実装するときに、並びを見直す）
 
+Requestsは、視聴者のRequestを、曲ごとの件数順に並べる一覧。Webの受信箱とプッシュ通知は、現時点では対象外。
+
 ## 11. UI原則
 
 ### Fast
