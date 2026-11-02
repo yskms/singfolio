@@ -1,6 +1,7 @@
-# Singfolio v1.0 WBS
+# Singfolio WBS
 
-v1.0の作業（保存・管理は端末内で完結し、外部通信は候補検索だけ）を、機能単位に分解した進捗表。
+v1.0の作業（0〜6章。保存・管理は端末内で完結し、外部通信は候補検索だけ）と、v1.0より後の公開機能（7章）を、
+機能単位に分解した進捗表。
 番号は作業の順序の目安で、時期の約束ではない。
 
 v1.0より後（公開機能・Requests）の実装順序は、
@@ -153,12 +154,17 @@ v1.0より後（公開機能・Requests）の実装順序は、
 
 実装の前に、7.2 を済ませる。内容は `singfolio-publishing-backend.md` §8。
 
+公開機能は、扱うデータが増えるたびに、プライバシーポリシー（`docs/privacy-policy.md`）・
+`docs/singfolio-store-listing.md`・ストアの申告を直す（7.3・7.5・7.6）。
+
 -   [x] 7.1 バックエンドの技術検証と選定（Cloudflare Workers + D1 + R2 + Turnstile。ローカルの実行環境で、
     Publish・公開ページ・所有者以外の更新の拒否・Requestの受付・D1停止中の公開ページ表示・IDトークンの検証を確認した）
 -   [ ] 7.2 実装前に確かめること（本番のWorkersからのAppleの公開鍵の取得、Freeプランでの放置後の再アクセス、
     nonce・セッションの失効・Appleのトークン失効、AndroidのAppleログイン、`singfolio.app` の取得。
     候補検索由来の曲名の公開は、6.5 の結果次第で、実際の公開の前に決着が要る）
--   [ ] 7.3 認証（Apple / Google）とアカウント（アプリ内からの削除を含む）。プライバシーポリシー・ストアの申告も直す
+-   [ ] 7.3 認証（Apple / Google）とアカウント（アプリ内からの削除を含む）。プライバシーポリシー・ストアの申告を直す
+    （アカウント）
 -   [ ] 7.4 Public ProfileとPublish（Auto Publishを含む）
--   [ ] 7.5 公開Web（`singfolio.app/username`）
--   [ ] 7.6 Requests（所有者がアプリ内の一覧で受け取る）
+-   [ ] 7.5 公開Web（`singfolio.app/username`）。プライバシーポリシーを直す（視聴者のアクセス）
+-   [ ] 7.6 Requests（所有者がアプリ内の一覧で受け取る）。プライバシーポリシー・ストアの申告を直す
+    （視聴者のRequest。Turnstileとレート制限が扱う情報、ニックネーム）

@@ -9,7 +9,7 @@
 -   `docs/singfolio-screen-flow.md` --- v1.0の画面設計
 -   `docs/singfolio-publishing-backend.md` --- 公開機能・バックエンド方針（Cloudflareに決定。実装前に確かめることを含む）
 -   `docs/singfolio-data-model.md` --- ローカルDB（SQLite）のスキーマ・マイグレーション方針
--   `docs/singfolio-wbs.md` --- v1.0の作業分解と進捗
+-   `docs/singfolio-wbs.md` --- v1.0と、v1.0より後の公開機能の作業分解と進捗
 -   `docs/Singfolio ブランドスタイルガイドとアプリ展示板.png` --- ブランドカラー・フォント（確定。
     ただしMint・Purpleはアイコンの色が正。「ブランド」節参照）、
     モックアップ（参考イメージ）
@@ -79,6 +79,8 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
 -   公開内容は、R2 に置く「最後に正常に Publish したスナップショット」で、公開ページは D1 に触れない
     （D1 が止まっても表示できるため）。公開する曲を D1 に行として持つ形（`published_songs` など）に
     「簡略化」しない。D1 に置くのは、アカウント・セッション・プロフィール・Requests などの動的データ。
+-   公開スナップショットの R2 のキーは `username` から作る。ユーザーIDに「簡略化」しない（`username` から
+    引くのに D1 が要り、公開ページが D1 に触れない、が成り立たなくなる）。`username` の一意性は D1 だけが保証する。
 -   バックエンドへの HTTP は Repository に閉じ込め、画面・Service から URL やレスポンスの形に触れない
     （候補検索の `songCatalogRepository` と同じ）。公開機能は Repository / Service境界の内側に閉じ込める。
 -   Requests は、所有者がアプリ内の一覧で受け取る。Web の受信箱とプッシュ通知は現時点では対象外。
