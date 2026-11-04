@@ -161,11 +161,17 @@ v1.0より後（公開機能・Requests）の実装順序は、
     Publish・公開ページ・所有者以外の更新の拒否・Requestの受付・D1停止中の公開ページ表示・IDトークンの検証を確認した）
 -   [ ] 7.2 実装前に確かめること（済み: 本番のWorkersからのAppleの公開鍵の取得、`singfolio.app` の取得、
     nonce・セッションの失効・Appleのトークン失効の方式（§8「認証の方式」）、ログイン手段（iOS・Androidとも
-    AppleとGoogle。AndroidのAppleはWeb経由）。
+    AppleとGoogle。AndroidのAppleはWeb経由）、Googleのサインインの `nonce`・`aud`（iOS SimulatorとAndroidエミュレータで
+    確認。§8「Googleのサインイン」）。
     残り: Freeプランでの放置後の再アクセス（検証用のWorkerとD1を置いて放置中）。
     候補検索由来の曲名の公開は、6.5 の結果次第で、実際の公開の前に決着が要る）
 -   [ ] 7.3 認証（Apple / Google）とアカウント（アプリ内からの削除を含む）。プライバシーポリシー・ストアの申告を直す
-    （アカウント）。最初に、IDトークンの `nonce` の実機での確認と、nonceを渡せるGoogleサインインのライブラリの選定。
+    （アカウント）。最初に、AppleのIDトークンの `nonce` の実機での確認。
+    Googleのサインインは、公式SDKだけを使う自作の薄いExpoモジュールで実装する（§8「Googleのサインイン」。`nonce`・`aud` の
+    確認は済み。実機と署名したビルドでの確認が残る）。取り込むときの作業: ライセンス一覧の生成の対応（Android Software
+    Development Kit Licenseの依存を個別に許可し、Aboutに別枠で載せる）、AndroidクライアントへのSHA-1の追加登録
+    （EASのlocal build・Play App Signing）、ストアの申告・同意画面・プライバシーポリシーの見直し、`blockedPermissions` への
+    追加（CLAUDE.mdの該当の項も直す）。
     AndroidのAppleログイン（Web経由）には、Services ID・`singfolio.app` のドメイン検証・Workerのコールバックが要る
 -   [ ] 7.4 Public ProfileとPublish（Auto Publishを含む）
 -   [ ] 7.5 公開Web（`singfolio.app/username`）。プライバシーポリシーを直す（視聴者のアクセス）
