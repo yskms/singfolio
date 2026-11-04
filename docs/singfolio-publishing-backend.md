@@ -247,6 +247,9 @@ IDトークンを、Workersで検証する（各社の公開鍵（JWKS）で、�
 -   セッションはD1に持ち、失効できる（ログアウト・アカウント削除）。方式は次の節。
 -   アカウントの削除は、アプリの中から行える。D1の行とR2のスナップショットを消し、Sign in with Appleの
     ユーザーはAppleのトークンも失効させる。
+-   IDトークンの全文と、そのクレームの値（`email`・`name`・`picture` など）は、ログにも保存にも出さない。
+    保存するのは、アカウントの識別に使う `sub`（と、どのログイン手段か）と、検証が通ったときの使用済みの
+    記録だけ。Googleのトークンには、`email` などが入っている（「Googleのサインイン」）。
 
 ### 認証の方式
 
@@ -269,8 +272,9 @@ AppleとGoogleの仕様は、各社の公式資料で確かめた（Appleは、I
     それが上限を使い切る経路になり、ログイン・Publish・Request受付が止まる。ログイン前の経路は、D1に書かない。
 -   使用済みの記録のうち、期限を過ぎたものは、ログインの処理の中で消す（Cron Triggerは使わない。Freeでも使えるが、
     動く部品を増やさない）。
--   IDトークンの `nonce` が、渡した値（`SHA-256(T)`）そのままか（さらにハッシュされていないか）は、実機の実際の
-    トークンで確かめる（7.3）。ハッシュされて返るなら、Worker側も同じ処理をして比べる。
+-   IDトークンの `nonce` が、渡した値（`SHA-256(T)`）そのままか（さらにハッシュされていないか）。Googleは、
+    そのまま返ることを確かめた（「Googleのサインイン」）。Appleは、実機の実際のトークンで確かめる（7.3）。
+    ハッシュされて返るなら、Worker側も同じ処理をして比べる。
 
 **セッション**
 
@@ -354,6 +358,47 @@ AndroidにはAppleのネイティブのサインインが無いので、Appleの
 -   `sub` が、iOS（バンドルID）とAndroid（Services ID）で同じになるか。同じグループなら資格情報は共有される
     （Appleの資料）が、実際のトークンで確かめる（7.3）。違うと、Appleでの、OSをまたぐ引き継ぎはできない。
 
+**Googleのサインイン（iOS・Android）**
+
+Googleの公式SDKだけを使う、自作の薄いExpoモジュールで実装する。モジュールの口は `signInWithGoogle(nonce)` の
+1つで、IDトークンの文字列を返す（キャンセルや失敗は、コードの付いたエラーにする）。第三者のラッパーのライブラリは
+使わない。Androidでは、アカウント選択のシートを、アプリの上にそのまま出せる（Credential Manager）。画面・Service
+から、SDKの呼び出しやレスポンスの形に触れないよう、Repository / Service境界の内側に閉じ込める。
+
+-   iOS: GoogleSignIn。`signIn(withPresenting:hint:additionalScopes:nonce:)` に `nonce` を渡す。Info.plistに、
+    iOSのクライアントID（`GIDClientID`）、サーバー用（Web）のクライアントID（`GIDServerClientID`。IDトークンの
+    `aud` になる）、反転したiOSのクライアントIDのURL schemeを置く。IDトークンを取ったら、すぐに `signOut()` を呼び、
+    Googleの状態を端末に残さない。
+-   Android: Credential Managerの `GetSignInWithGoogleOption`（サーバー用のクライアントIDを指定し、`setNonce`）。
+    AndroidのクライアントIDはコードに現れず、パッケージ名と署名のSHA-1で、Google側が照合する（鍵ごとに登録が要る:
+    ローカルのビルド、EASのlocal build、Play App Signing）。
+-   クライアントIDは3つ（Web・iOS・Android）。秘密情報ではない（アプリに埋め込まれる）。Webクライアントの
+    `client_secret` は使わない（Workerは、IDトークンをGoogleのJWKSで検証するだけ）。
+-   確かめたこと（iOS SimulatorとAndroidエミュレータで、実際のトークンを使った）:
+    -   IDトークンの `nonce` は、渡した値（`SHA-256(T)` の43字）そのまま。
+    -   `aud` は、iOSもAndroidも、Web（サーバー用）のクライアントID。Workerは、これを `aud` として受け入れる。
+    -   `azp` は、OSごとに違う（iOSはiOSのクライアント、AndroidはAndroidのクライアント）。Workerは、`azp` を
+        `aud` と同じかどうかでは見ない。
+    -   IDトークンに、`email`・`name`・`given_name`・`picture` も入る。SDKの側で、減らす手段は見つからなかった
+        （iOSのSDKは、基本のプロフィールのスコープを常に要求し、追加できるクレームは `auth_time` と `amr` だけ。
+        Androidの `setClaims` も、追加の指定と見ているが、効き方は未確認）。アプリは、これらを使わず、`sub` だけを
+        使う。Workerは、受け取ることは避けられないので、ログにも保存にも出さない（「認証」）。
+    -   ログイン中のログ（iOSのアプリのプロセス、Androidのlogcat）に、トークンらしい文字列は、検証した範囲では
+        見つからなかった。iOSは、ログイン後に、Googleの状態が端末のキーチェーンに残らない。
+    -   キャンセルは、Androidと、iOS（GoogleSignIn 9.2.0）で、キャンセルを表すエラーになる。iOSの10.1.0での
+        キャンセルと2回目のログインは、まだ確認していない。
+-   実装の制約:
+    -   iOSは、GoogleSignInの版を固定する（確認したのは10.1.0）。Swiftの依存（AppCheckCore）のために、Podfileで
+        GoogleUtilitiesとRecaptchaInteropにmodular headersを指定する（外すと `pod install` が失敗する。config pluginで入れる）。
+    -   Androidは、googleidを1.2.0に固定する。最新の1.2.1は、Kotlin 2.4のメタデータで、Expo SDK 57のKotlin 2.1.0
+        ではコンパイルできない。依存に、Play services（alpha版を含む）が入る。
+    -   Androidの依存が足す `USE_BIOMETRIC` と `USE_FINGERPRINT` は、`blockedPermissions` で外す（外してもログインは動く）。
+    -   Androidは、2回目以降のログインでも、アカウント選択と確認の画面が出る。ログアウトで `clearCredentialState` を
+        呼ぶかは、7.3で決める。
+-   7.3で決着が要ること: Googleの同意画面（OAuthの公開状態とブランド）、ストアの申告とプライバシーポリシー
+    （SDKのプライバシーマニフェストが、利用状況などの収集を宣言している。そのときの版のマニフェストを読み直して決める）、
+    Androidの依存（Android Software Development Kit Licenseで配布される）の、ライセンス一覧への載せ方。
+
 **アカウントのつなぎ方**
 
 -   ログイン手段は、**iOS・Androidとも、AppleとGoogle**。OSをまたいで移る人が、どちらのOSでも同じ手段で入り、
@@ -382,6 +427,8 @@ AndroidにはAppleのネイティブのサインインが無いので、Appleの
     （1か所のデータセンターから6回）では、いずれも取得できた（Googleの公開鍵も同様）。実装時は、取得の失敗に
     備えた扱い（キャッシュ・再試行）を決める。取得に支障が出るようなら、鍵を自前で控える。
 -   `singfolio.app` は取得済み（Cloudflare Registrar）。ドメインがCloudflareにあるので、載せ替えは要らない。
+-   Googleのサインインの `nonce` と `aud`。iOS SimulatorとAndroidエミュレータで、実際のトークンを使って確かめた
+    （「Googleのサインイン」）。実機と、署名したビルドでの確認は、7.3の中で行う。
 
 残り：
 
@@ -391,11 +438,7 @@ AndroidにはAppleのネイティブのサインインが無いので、Appleの
 nonce・セッションの失効・Appleのトークン失効の方式は、「認証の方式」に決めた。次は、7.3の最初に、実機・実際の
 トークンで確かめる：
 
--   Apple・GoogleのIDトークンの `nonce` が、渡した値そのままか。
--   Googleのサインインのライブラリが、iOS・Androidで `nonce` を渡せるか。渡せないと、nonceの設計はGoogleでは
-    成り立たない。ライブラリは、nonceを渡せるものを選ぶ。
--   GoogleのIDトークンの `aud` が、iOSとAndroidで同じ（サーバー用のクライアントID）になるか。iOSでサーバー用の
-    クライアントIDを設定すれば、そうなるはず。別々になるなら、Workerは複数の `aud` を受け入れる。
+-   AppleのIDトークンの `nonce` が、渡した値そのままか。
 -   AppleのIDトークンの `sub` が、iOS（バンドルID）とAndroid（Services ID）で同じになるか（「AndroidのAppleログイン」）。
 -   Services IDで得たトークンを失効させたとき、同じグループのiOS（バンドルID）側の連携も取り消されるか（Appleの設定画面に
     連携が残って見えないか）。残るなら、削除の要件は満たせるが、ユーザーに案内を出すか決める。
