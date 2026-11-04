@@ -7,7 +7,7 @@ v1.0の作業（0〜6章。保存・管理は端末内で完結し、外部通�
 v1.0より後（公開機能・Requests）の実装順序は、
 `singfolio-publishing-backend.md` §9 を参照。進捗は「7. 公開機能」に書く。
 
-**現在地**：6. リリース準備（6.5・6.8が残り。6.1・6.2・6.3・6.4・6.6・6.7は完了。6.4は、iOS の 1.0 を審査に提出して、審査を通って公開された。Android は、6.8 の変更を含む AAB（versionCode 4）を作って、内部テストへアップロードして、Pixel 11 で確認した。Play Console の申告・掲載を入力して、製品版の審査へ送信し、審査を通って公開された。iOS も審査を通って公開され、紹介ページに両ストアのバッジを載せた。6.8は、アプリの変更・スクリーンショットの撮り直し・ストアの文の修正・両ストアへの入力・Android の実機での確認まで済んだ）。7. 公開機能（v1.0より後）は、7.1（バックエンドの技術検証と選定）が済み、7.2 を進めている（Appleの公開鍵の取得・`singfolio.app` の取得・認証の方式の決定は済み。ログイン手段はiOS・Androidとも、AppleとGoogleに決めた。Freeプランでの放置後の再アクセスだけが、放置中で残っている）
+**現在地**：6. リリース準備（6.5・6.8が残り。6.1・6.2・6.3・6.4・6.6・6.7は完了。6.4は、iOS の 1.0 を審査に提出して、審査を通って公開された。Android は、6.8 の変更を含む AAB（versionCode 4）を作って、内部テストへアップロードして、Pixel 11 で確認した。Play Console の申告・掲載を入力して、製品版の審査へ送信し、審査を通って公開された。iOS も審査を通って公開され、紹介ページに両ストアのバッジを載せた。6.8は、アプリの変更・スクリーンショットの撮り直し・ストアの文の修正・両ストアへの入力・Android の実機での確認まで済んだ）。7. 公開機能（v1.0より後）は、7.1（バックエンドの技術検証と選定）が済み、7.2 を進めている（Appleの公開鍵の取得・`singfolio.app` の取得・認証の方式の決定は済み。ログイン手段はiOS・Androidとも、AppleとGoogleに決めた。Freeプランでの放置後の再アクセスだけが、放置中で残っている）。7.3 は、小さな作業（7.3.1 から 7.3.13）に分けた
 
 ## 0. 企画・設計
 
@@ -166,13 +166,36 @@ v1.0より後（公開機能・Requests）の実装順序は、
     残り: Freeプランでの放置後の再アクセス（検証用のWorkerとD1を置いて放置中）。
     候補検索由来の曲名の公開は、6.5 の結果次第で、実際の公開の前に決着が要る）
 -   [ ] 7.3 認証（Apple / Google）とアカウント（アプリ内からの削除を含む）。プライバシーポリシー・ストアの申告を直す
-    （アカウント）。最初に、AppleのIDトークンの `nonce` の実機での確認。
-    Googleのサインインは、公式SDKだけを使う自作の薄いExpoモジュールで実装する（§8「Googleのサインイン」。`nonce`・`aud` の
-    確認は済み。実機と署名したビルドでの確認が残る）。取り込むときの作業: ライセンス一覧の生成の対応（Android Software
-    Development Kit Licenseの依存を個別に許可し、Aboutに別枠で載せる）、AndroidクライアントへのSHA-1の追加登録
-    （EASのlocal build・Play App Signing）、ストアの申告・同意画面・プライバシーポリシーの見直し、`blockedPermissions` への
-    追加（CLAUDE.mdの該当の項も直す）。
-    AndroidのAppleログイン（Web経由）には、Services ID・`singfolio.app` のドメイン検証・Workerのコールバックが要る
+    （アカウント）。内容は `singfolio-publishing-backend.md` §8「認証」「認証の方式」。次の小さな作業に分ける（番号は
+    目安で、順序の約束ではない。7.3.1 は、7.2 の待ちの間に進められる。7.3.2 以降の実装は、7.2 が済んでから）。
+    -   [ ] 7.3.1 前提の準備（利用者の作業）。Apple: Sign in with Appleの設定（primary App ID・Services ID・鍵。サーバー間通知の
+        エンドポイントは 7.3.10）。Google: OAuthの同意画面の公開と、AndroidクライアントへのSHA-1の追加登録（EASのlocal build・
+        Play App Signing）。Cloudflare: 本番のWorkersとD1、`singfolio.app` のルート、秘密情報（R2は 7.3.10 まで、Turnstileは 7.6）
+    -   [ ] 7.3.2 Workerの土台。プロジェクトの構成、D1のスキーマとマイグレーション（`users`・`identities`・`sessions`・
+        `used_nonces`）、開発用と本番用の設定、秘密情報の扱い、リクエストのログに認証の値を出さない設定
+    -   [ ] 7.3.3 nonce。`POST /auth/nonce`（無状態。`T` の署名・期限・種別、レート制限）と、`T` の検証・使用済みの記録
+    -   [ ] 7.3.4 IDトークンの検証（Apple・Google。公開鍵（JWKS）の取得とキャッシュ、`iss`・`aud`・`exp`・`nonce`）と、`sub` から
+        `identities` を引く・作る処理。模擬の発行元で、拒否の条件を確かめる
+    -   [ ] 7.3.5 セッション。発行（ハッシュだけをD1に置く）、最終利用の時刻の書き込み（24時間以上たったときだけ）、
+        ログアウト（行の削除）
+    -   [ ] 7.3.6 アプリ側の認証の土台。HTTPをRepositoryに閉じ込める、SecureStoreにセッション、初回起動でセッションを捨てる、
+        失敗の扱い。ログインを要求しない（ログアウトのままでも、v1.0の機能はすべて使える）
+    -   [ ] 7.3.7 Appleのサインイン（iOS。`expo-apple-authentication`）。最初に、実機で、AppleのIDトークンの `nonce` が、渡した値
+        そのままかを確かめる
+    -   [ ] 7.3.8 Googleのサインイン（iOS・Android）。検証済みの自作モジュール（§8「Googleのサインイン」）を、mainから切った
+        新しいブランチへ取り込む（検証用の画面は持ち込まない）。ライセンス一覧の生成の対応（Android Software Development Kit
+        Licenseの依存を個別に許可し、Aboutに別枠で載せる）、`blockedPermissions` への追加（CLAUDE.mdの該当の項も直す）
+    -   [ ] 7.3.9 AndroidのAppleログイン（Web経由）。Custom Tab、Workerのコールバック（`/auth/apple/callback`）、`V`・`T` の
+        結びつけ、レート制限、アプリのURLスキームへの戻し
+    -   [ ] 7.3.10 アカウントの削除（アプリ内。再認証、Appleのトークンの失効、D1の行とR2のスナップショットの削除）と、Appleの
+        サーバー間通知（`consent-revoked`・`account-deleted`）。通知のエンドポイントは、primary App IDに登録する
+    -   [ ] 7.3.11 アカウントの画面（ログイン・ログアウト・削除の入口）。置き場所（ProfileかSettings）は、画面設計で決める。
+        サインイン済みから別のIDをつなぐ画面を、v1で用意するか決める
+    -   [ ] 7.3.12 申告と文書。プライバシーポリシー、`docs/singfolio-store-listing.md`、App Store・Google Playの申告（SDKの
+        プライバシーマニフェストを、そのときの版で読み直して決める）、Googleの同意画面（ブランド）、CLAUDE.mdの「スコープ」の節
+    -   [ ] 7.3.13 確認。実機と署名したビルド（TestFlight・Playの内部テスト）で、ログイン・キャンセル・再ログイン・ログアウト・削除。
+        Appleの `sub` がiOSとAndroidで同じか、Services IDで得たトークンを失効させたときの連携、AndroidのWebのフロー全体、
+        異常系（通信断・アカウントの切り替え・連打）
 -   [ ] 7.4 Public ProfileとPublish（Auto Publishを含む）
 -   [ ] 7.5 公開Web（`singfolio.app/username`）。プライバシーポリシーを直す（視聴者のアクセス）
 -   [ ] 7.6 Requests（所有者がアプリ内の一覧で受け取る）。プライバシーポリシー・ストアの申告を直す
