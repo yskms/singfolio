@@ -17,6 +17,8 @@ private/
 *.p12
 *.pem
 *.mobileprovision
+# EASの鍵をダウンロードしたときの設定ファイル（keystoreのパスとパスワードを含む）
+credentials.json
 
 # ビルド成果物（最終成果物）
 *.ipa
