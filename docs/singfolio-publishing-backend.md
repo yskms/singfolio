@@ -355,7 +355,8 @@ AndroidにはAppleのネイティブのサインインが無いので、Appleの
     失効は、そのトークンを得たときの `client_id` で行う。
 -   Services IDは、アプリのApp ID（primaryのApp ID）と同じグループにし、`singfolio.app` と、コールバックのURLを、
     Services IDの設定（Website URLs）に登録する。Appleの手順は、ドメインの検証ファイルのアップロードは要らない、と
-    している。画面で検証を求められるかは、7.3の最初に確かめる。サーバー間通知のエンドポイントは、primary App IDに
+    している。実際に、Services IDの登録と設定（Website URLsの保存）で、画面は検証ファイルを求めなかった。
+    サーバー間通知のエンドポイントは、primary App IDに
     登録し、このグループで1つ（TLS 1.2が要る）。
 -   `sub` が、iOS（バンドルID）とAndroid（Services ID）で同じになるか。同じグループなら資格情報は共有される
     （Appleの資料）が、実際のトークンで確かめる（7.3）。違うと、Appleでの、OSをまたぐ引き継ぎはできない。
