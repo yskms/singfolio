@@ -169,8 +169,9 @@ v1.0より後（公開機能・Requests）の実装順序は、
     （アカウント）。内容は `singfolio-publishing-backend.md` §8「認証」「認証の方式」。次の小さな作業に分ける（番号は
     目安で、順序の約束ではない。7.3.1 は、7.2 の待ちの間に進められる。7.3.2 以降の実装は、7.2 が済んでから）。
     -   [ ] 7.3.1 前提の準備（利用者の作業）。Apple: Sign in with Appleの設定（primary App ID・Services ID・鍵。サーバー間通知の
-        エンドポイントは 7.3.10）。Google: OAuthの同意画面の公開と、AndroidクライアントへのSHA-1の追加登録（EASのlocal build・
-        Play App Signing）。Cloudflare: 本番のWorkersとD1、`singfolio.app` のルート、秘密情報（R2は 7.3.10 まで、Turnstileは 7.6）
+        エンドポイントは 7.3.10）。Google: クライアント（Web・iOS・Androidの署名の鍵ごと。EASのlocal build・
+        Play App Signingの鍵を含む）は作成済み。同意画面の「公開」は、ホームページとプライバシーポリシーのURLが要る
+        ため、7.3.12 で決める（それまでは「テスト中」）。Cloudflare: 本番のWorkersとD1、`singfolio.app` のルート、秘密情報（R2は 7.3.10 まで、Turnstileは 7.6）
     -   [ ] 7.3.2 Workerの土台。プロジェクトの構成、D1のスキーマとマイグレーション（`users`・`identities`・`sessions`・
         `used_nonces`）、開発用と本番用の設定、秘密情報の扱い、リクエストのログに認証の値を出さない設定
     -   [ ] 7.3.3 nonce。`POST /auth/nonce`（無状態。`T` の署名・期限・種別、レート制限）と、`T` の検証・使用済みの記録
