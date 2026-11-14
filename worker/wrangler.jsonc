@@ -28,11 +28,12 @@
     "required": ["NONCE_HMAC_KEY"]
   },
 
-  // `database_id` は、本番のD1を作ったあとに足す（ローカルの開発・テストには要らない）。
+  // `database_id` は本番のD1のID（秘密ではない）。ローカルの開発・テストでは使われない。
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "singfolio",
+      "database_id": "32b6f13c-a7fe-43ef-826e-996b650a76af",
       "migrations_dir": "migrations"
     }
   ]
