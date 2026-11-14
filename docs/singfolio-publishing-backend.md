@@ -560,7 +560,8 @@ Repositoryを、同じコミットで直せるため）。
     `account-deleted` は `identities` の行を消す（セッションも消える）。
     **親テーブル（`users`・`identities`）は、作り直さない。** 外部キーが有効なとき、`DROP TABLE` は
     暗黙の `DELETE` として `ON DELETE CASCADE` を発動し、子の行を消す。ローカルのD1では、
-    `PRAGMA defer_foreign_keys` でも、バッチ内の `PRAGMA foreign_keys = OFF` でも止まらなかった。
+    `PRAGMA defer_foreign_keys` でも `PRAGMA foreign_keys = OFF` でも止まらなかった（バッチの中、単独の文、
+    `wrangler d1 migrations apply` の3経路。OFF は、実行後も値が 1 のまま変わらない。本番では未確認）。
     「新テーブルを作る → コピー → `DROP` → `RENAME`」ではなく、`ALTER TABLE ... ADD COLUMN` などで変える。
     作り直しが避けられないときは、先にローカルのDBで、子の行が残ることを確かめてから適用する。
     テストは、同じ手順で適用したローカルDBに対して行う（`worker/` で `npm test`。ルートの
@@ -571,6 +572,9 @@ Repositoryを、同じコミットで直せるため）。
     **最初のデプロイだけは、`wrangler deploy --secrets-file <ファイル>` で渡す。** Workerがまだ無いと、
     必須の秘密情報が足りないとして `deploy` が止まり（wranglerのソースで確認）、`secret put` は、
     空の仮のWorkerを先に作る。秘密情報のファイルは、リポジトリの外に作り、デプロイ後すぐ消す。
+    形式は**JSON**（`{"NAME":"値"}`）にする。wranglerは、先にJSONとして読み、読めないときだけ `.env` 形式
+    として読む（ソースで確認）。`.env` 形式だと、値の中の `$VAR` が展開され、同名の環境変数がファイルの値より
+    優先される。
     2回目以降のデプロイは、設定済みの秘密情報が引き継がれる。
 -   **ログ。** Workers Logs は無効にしている（`observability.enabled: false`）。Cloudflareの資料は、
     記録に含まれるヘッダー（`Authorization` など）と、`invocation_logs` を無効にしたときの

@@ -89,7 +89,7 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     いないため。有効にする条件は同じ節。`worker/test/config.test.ts` が固定している。Workerのテストは `worker/` で
     `npm test`（ルートの `npm test` には含まれない）。D1の本番に適用したマイグレーションは書き換えず、次の番号を足す。
     親テーブル（`users`・`identities`）は、`DROP` で作り直さない（外部キーの `CASCADE` で、子の行が消える。
-    D1では `PRAGMA` でも止まらない）。`ALTER TABLE ... ADD COLUMN` などで変える。
+    ローカルのD1では、`PRAGMA` でも止まらないことを確認した。詳細は同じ節）。`ALTER TABLE ... ADD COLUMN` などで変える。
 -   バックエンドへの HTTP は Repository に閉じ込め、画面・Service から URL やレスポンスの形に触れない
     （候補検索の `songCatalogRepository` と同じ）。公開機能は Repository / Service境界の内側に閉じ込める。
 -   Requests は、所有者がアプリ内の一覧で受け取る。Web の受信箱とプッシュ通知は現時点では対象外。

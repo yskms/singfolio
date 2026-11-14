@@ -13,9 +13,10 @@
 --
 -- 今後のマイグレーションの注意（親テーブルを作り直さない）
 -- - 外部キーが有効なとき、親テーブル（users・identities）の DROP TABLE は、暗黙の DELETE として
---   ON DELETE CASCADE を発動し、子（identities・sessions）の行を消す。D1では、
---   `PRAGMA defer_foreign_keys` でも、バッチ内の `PRAGMA foreign_keys = OFF` でも止まらない
---   （ローカルのD1で確認。worker/test/dropCascade.test.ts）。
+--   ON DELETE CASCADE を発動し、子（identities・sessions）の行を消す。ローカルのD1では、
+--   `PRAGMA defer_foreign_keys` でも `PRAGMA foreign_keys = OFF` でも止まらなかった（バッチの中、
+--   単独の文、`wrangler d1 migrations apply` の3経路。OFF は、実行後も値が 1 のまま。
+--   worker/test/dropCascade.test.ts。本番では未確認）。
 -- - そのため、users・identities は「新テーブルを作る → コピー → DROP → RENAME」で変えず、
 --   `ALTER TABLE ... ADD COLUMN` などで変える。作り直しが避けられないときは、先にローカルのDBで、
 --   子の行が残ることを確かめてから適用する。
