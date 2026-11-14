@@ -537,6 +537,37 @@ singfolio.app/username
 
 Webは公開情報のみを取得して表示する。
 
+### Workerの構成と運用（`worker/`）
+
+Workerのコードは、このリポジトリの `worker/` に置く（別のリポジトリにしない。仕様のdocsとアプリ側の
+Repositoryを、同じコミットで直せるため）。
+
+-   **独立したパッケージ。** `worker/` は、自前の `package.json`・ロックファイル・tsconfigを持つ。
+    npm workspacesにはしない（ルートのExpo / React Nativeの依存は、版を固定した状態を保っていて、
+    hoistingで配置が変わると崩れうるため）。ルートの `tsconfig.json` は `worker/` を除外する
+    （Expoの設定で型チェックしない）。アプリとコードは共有せず、リクエスト・レスポンスの形は、
+    このdocsを正として、両側に書く。Metroは `worker/` も走査するが、ファイル数は約2千で、
+    ルートの `node_modules`（約7万）に比べて小さく、除外の設定はしていない。
+-   **環境は2つだけ。** ローカル（`wrangler dev`。D1は `worker/.wrangler/` のローカルDB）と、
+    本番（`singfolio.app`）。開発用のクラウド側のWorker・D1は作らない。実機のログインの確認も、
+    公開前の本番に対して行う。`workers.dev` とプレビューのURLは出さず、入口は `singfolio.app` だけ。
+-   **D1のスキーマ。** `worker/migrations/NNNN_*.sql` を `wrangler d1 migrations` で適用する。
+    本番へ適用したマイグレーションは書き換えず、次の番号を足す（アプリのローカルDBと同じ約束）。
+    時刻はINTEGER（ミリ秒）。TEXTの主キーのテーブルは `WITHOUT ROWID` にする（ROWID付きだと、
+    主キーの索引の分だけ書き込みが増え、Freeの書き込みの上限（10万行/日）に響く）。外部キーは有効で、
+    `users` の行を消すと、`identities`・`sessions` も消える。テストは、同じ手順で適用した
+    ローカルDBに対して行う（`npm test`）。
+-   **秘密情報。** 値は、`wrangler.jsonc` にもリポジトリにも書かない。必要な名前だけを
+    `secrets.required` に書く（デプロイの前に、本番に無いものを検出でき、型にも出る）。
+    本番は `wrangler secret put`、ローカルは `worker/.dev.vars`（gitignore。見本は `.dev.vars.example`）。
+-   **ログ。** Workers Logs は無効にしている（`observability.enabled: false`）。Cloudflareの資料は、
+    記録に含まれるヘッダー（`Authorization` など）と、`invocation_logs` を無効にしたときの
+    `console.log` のメタデータを書いていない。セッションの値をヘッダーで送るため、確かめずに有効にしない。
+    有効にするときは、実際に記録された内容を見て、認証の値（セッション、nonce、Appleのコールバックの
+    `code`・`state`、IDトークン）が含まれないことを確かめる。`redact_query_string: true` は、有効にされた
+    ときの安全弁（クエリを記録から外す）。自前のコードも、認証の値をログに出さない。方針は
+    `worker/test/config.test.ts` が固定している。
+
 ## 9. 実装順序
 
 版番号は実装順序の目安であり、時期の約束ではない。

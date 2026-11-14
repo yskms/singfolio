@@ -23,6 +23,8 @@
     "${configDir}/jest.config.js",
     "${configDir}/android",
     "${configDir}/ios",
+    // Workers のコード。独自の package.json・tsconfig を持ち、Expo の設定では型チェックしない。
+    "${configDir}/worker",
     "${configDir}/**/*.test.ts",
     "${configDir}/src/testing"
   ]

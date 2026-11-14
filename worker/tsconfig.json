@@ -1,0 +1,20 @@
+{
+  // Workers の実行環境（workerd）向けの型チェック。Node のグローバル（process など）は
+  // 使えないので、型に入れない。テストは tsconfig.test.json。
+  // worker-configuration.d.ts は `npm run types`（wrangler types）の生成物。
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022"],
+    "types": [],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "allowImportingTsExtensions": true
+  },
+  "include": ["worker-configuration.d.ts", "src/**/*.ts"],
+  "exclude": ["node_modules"]
+}

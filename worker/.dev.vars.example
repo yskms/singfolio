@@ -1,0 +1,5 @@
+# ローカル開発用の秘密情報の見本。`.dev.vars` にコピーして使う（.dev.vars は gitignore）。
+# 本番の値とは別の、使い捨ての値にする。本番は `wrangler secret put <名前>` で入れる。
+
+# nonce の元になる値 T の署名鍵（HMAC。7.3.3）。例: openssl rand -base64 32
+NONCE_HMAC_KEY=replace-with-a-random-value

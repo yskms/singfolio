@@ -81,6 +81,13 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     「簡略化」しない。D1 に置くのは、アカウント・セッション・プロフィール・Requests などの動的データ。
 -   公開スナップショットの R2 のキーは `username` から作る。ユーザーIDに「簡略化」しない（`username` から
     引くのに D1 が要り、公開ページが D1 に触れない、が成り立たなくなる）。`username` の一意性は D1 だけが保証する。
+-   Workerは `worker/` に置く独立したパッケージ（自前の `package.json`・ロックファイル・tsconfig）。npm workspaces に
+    「簡略化」しない（ルートの Expo / RN の依存の固定が、hoisting で崩れうる）。ルートの `tsconfig.json` は `worker/` を
+    除外している。外さない。アプリとコードを共有しない（リクエスト・レスポンスの形は docs を正として両側に書く）。
+    詳細は `docs/singfolio-publishing-backend.md` §8「Workerの構成と運用」。
+-   Workers Logs（`worker/wrangler.jsonc` の `observability`）は無効のまま。資料が、ヘッダーなどが記録されるかを書いて
+    いないため。有効にする条件は同じ節。`worker/test/config.test.ts` が固定している。D1の本番に適用したマイグレーションは
+    書き換えず、次の番号を足す。
 -   バックエンドへの HTTP は Repository に閉じ込め、画面・Service から URL やレスポンスの形に触れない
     （候補検索の `songCatalogRepository` と同じ）。公開機能は Repository / Service境界の内側に閉じ込める。
 -   Requests は、所有者がアプリ内の一覧で受け取る。Web の受信箱とプッシュ通知は現時点では対象外。

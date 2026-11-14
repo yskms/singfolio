@@ -1,0 +1,39 @@
+// Singfolio のバックエンド（Cloudflare Workers + D1）。構成と理由は docs/singfolio-publishing-backend.md §8。
+// 環境は「ローカル（wrangler dev。D1は .wrangler/state のローカルDB）」と「本番（singfolio.app）」の2つだけ。
+// 開発用のクラウド側のWorker・D1は作らない（実機のログインの確認も、公開前の本番に対して行う）。
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "singfolio",
+  "main": "src/index.ts",
+  // 上げるときは、wranglerを上げて、動きが変わらないか確かめる。
+  "compatibility_date": "2026-11-13",
+
+  // 到達できる入口を singfolio.app だけにする（workers.dev とプレビューのURLは出さない）。
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "singfolio.app", "custom_domain": true }],
+
+  // ログに認証の値（セッション、nonce、Appleのコールバックの code・state、IDトークン）を出さない。
+  // Workers Logs は無効のままにする。理由と、有効にするときの条件は docs/singfolio-publishing-backend.md §8「Workerの構成と運用」。
+  // redact_query_string は、有効にしたときの安全弁（無効の間は効かない）。
+  "observability": {
+    "enabled": false,
+    "redact_query_string": true
+  },
+
+  // 秘密情報は、このファイルにも、リポジトリにも書かない。本番は `wrangler secret put`、
+  // ローカルは .dev.vars（gitignore。.dev.vars.example が見本）。ここに名前を書くと、
+  // デプロイの前に、本番に無い秘密情報を検出でき、型（Env）にも出る。
+  "secrets": {
+    "required": ["NONCE_HMAC_KEY"]
+  },
+
+  // `database_id` は、本番のD1を作ったあとに足す（ローカルの開発・テストには要らない）。
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "singfolio",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

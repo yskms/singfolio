@@ -1,0 +1,9 @@
+{
+  // テスト（Node で直接実行。型除去での実行なので、enum などは使わない）の型チェック用。
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "erasableSyntaxOnly": true
+  },
+  "include": ["worker-configuration.d.ts", "src/**/*.ts", "test/**/*.ts"]
+}
