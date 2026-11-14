@@ -10,6 +10,15 @@
 -- - profiles（username など）と requests は、7.4 以降で足す。
 -- - 外部キーの ON DELETE CASCADE で、users の行を消すと identities と sessions も消える
 --   （アカウントの削除。D1は外部キーを常に有効にする）。
+--
+-- 今後のマイグレーションの注意（親テーブルを作り直さない）
+-- - 外部キーが有効なとき、親テーブル（users・identities）の DROP TABLE は、暗黙の DELETE として
+--   ON DELETE CASCADE を発動し、子（identities・sessions）の行を消す。D1では、
+--   `PRAGMA defer_foreign_keys` でも、バッチ内の `PRAGMA foreign_keys = OFF` でも止まらない
+--   （ローカルのD1で確認。worker/test/dropCascade.test.ts）。
+-- - そのため、users・identities は「新テーブルを作る → コピー → DROP → RENAME」で変えず、
+--   `ALTER TABLE ... ADD COLUMN` などで変える。作り直しが避けられないときは、先にローカルのDBで、
+--   子の行が残ることを確かめてから適用する。
 
 CREATE TABLE users (
   id TEXT PRIMARY KEY NOT NULL,
@@ -31,7 +40,9 @@ CREATE TABLE identities (
 CREATE INDEX idx_identities_user_id ON identities (user_id);
 
 -- セッション。不透明なランダム値のハッシュだけを置く（値そのものは端末のSecureStoreにだけある）。
--- どのログイン手段で作ったかを持つ（Appleの `consent-revoked` で、その手段のセッションだけを失効させる）。
+-- どのログイン手段で作ったかを持つ。Appleの `consent-revoked` は、その手段のセッションの行だけを消す
+-- （identities の行は残す。`last_sign_in_at` で、重複・古い通知を見分けるため）。`account-deleted` は、
+-- identities の行を消す（そのセッションも一緒に消える）。
 -- ユーザーは identities を引いて得る。期限は `last_used_at` から数える（最後の利用から90日が目安）。
 -- `last_used_at` は、前回の更新から24時間以上たったときだけ書く（書き込みの上限を使わないため）。
 CREATE TABLE sessions (

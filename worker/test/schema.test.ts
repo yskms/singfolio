@@ -106,7 +106,26 @@ describe('D1のスキーマ（migrations/）', () => {
     assert.equal(await count('sessions', 'token_hash', bystanderHash), 1);
   });
 
-  it('identities の行を消すと、その手段のセッションだけが消える（Appleの consent-revoked）', async () => {
+  // Appleの `consent-revoked`: その手段のセッションだけを消す。identities の行は残す
+  // （行が持つ last_sign_in_at で、重複・古い通知を見分けるため。消すと、次のサインインで
+  // 別のユーザーが作られ、以前の username とスナップショットから切り離される）。
+  it('consent-revoked: セッションだけを消し、identities の行（last_sign_in_at）と他の手段は残す', async () => {
+    const userId = await addUser();
+    const apple = await addIdentity(userId, 'apple');
+    const google = await addIdentity(userId, 'google');
+    await addSession(apple);
+    await addSession(google);
+
+    await db.prepare('DELETE FROM sessions WHERE identity_id = ?').bind(apple).run();
+
+    assert.equal(await count('sessions', 'identity_id', apple), 0);
+    assert.equal(await count('sessions', 'identity_id', google), 1);
+    assert.equal(await count('identities', 'id', apple), 1);
+    assert.equal(await count('users', 'id', userId), 1);
+  });
+
+  // Appleの `account-deleted`: その identities の行を消す。セッションも一緒に消える。
+  it('account-deleted: identities の行を消すと、その手段のセッションも消え、他の手段は残る', async () => {
     const userId = await addUser();
     const apple = await addIdentity(userId, 'apple');
     const google = await addIdentity(userId, 'google');
@@ -115,6 +134,7 @@ describe('D1のスキーマ（migrations/）', () => {
 
     await db.prepare('DELETE FROM identities WHERE id = ?').bind(apple).run();
 
+    assert.equal(await count('identities', 'id', apple), 0);
     assert.equal(await count('sessions', 'identity_id', apple), 0);
     assert.equal(await count('sessions', 'identity_id', google), 1);
     assert.equal(await count('users', 'id', userId), 1);

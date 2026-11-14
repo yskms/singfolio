@@ -555,18 +555,30 @@ Repositoryを、同じコミットで直せるため）。
     本番へ適用したマイグレーションは書き換えず、次の番号を足す（アプリのローカルDBと同じ約束）。
     時刻はINTEGER（ミリ秒）。TEXTの主キーのテーブルは `WITHOUT ROWID` にする（ROWID付きだと、
     主キーの索引の分だけ書き込みが増え、Freeの書き込みの上限（10万行/日）に響く）。外部キーは有効で、
-    `users` の行を消すと、`identities`・`sessions` も消える。テストは、同じ手順で適用した
-    ローカルDBに対して行う（`npm test`）。
+    `users` の行を消すと、`identities`・`sessions` も消える。Appleの `consent-revoked` は、
+    `sessions` の行だけを消す（`identities` の行は残す。`last_sign_in_at` が要るため）。
+    `account-deleted` は `identities` の行を消す（セッションも消える）。
+    **親テーブル（`users`・`identities`）は、作り直さない。** 外部キーが有効なとき、`DROP TABLE` は
+    暗黙の `DELETE` として `ON DELETE CASCADE` を発動し、子の行を消す。ローカルのD1では、
+    `PRAGMA defer_foreign_keys` でも、バッチ内の `PRAGMA foreign_keys = OFF` でも止まらなかった。
+    「新テーブルを作る → コピー → `DROP` → `RENAME`」ではなく、`ALTER TABLE ... ADD COLUMN` などで変える。
+    作り直しが避けられないときは、先にローカルのDBで、子の行が残ることを確かめてから適用する。
+    テストは、同じ手順で適用したローカルDBに対して行う（`worker/` で `npm test`。ルートの
+    `npm test` には含まれない）。
 -   **秘密情報。** 値は、`wrangler.jsonc` にもリポジトリにも書かない。必要な名前だけを
     `secrets.required` に書く（デプロイの前に、本番に無いものを検出でき、型にも出る）。
     本番は `wrangler secret put`、ローカルは `worker/.dev.vars`（gitignore。見本は `.dev.vars.example`）。
+    **最初のデプロイだけは、`wrangler deploy --secrets-file <ファイル>` で渡す。** Workerがまだ無いと、
+    必須の秘密情報が足りないとして `deploy` が止まり（wranglerのソースで確認）、`secret put` は、
+    空の仮のWorkerを先に作る。秘密情報のファイルは、リポジトリの外に作り、デプロイ後すぐ消す。
+    2回目以降のデプロイは、設定済みの秘密情報が引き継がれる。
 -   **ログ。** Workers Logs は無効にしている（`observability.enabled: false`）。Cloudflareの資料は、
     記録に含まれるヘッダー（`Authorization` など）と、`invocation_logs` を無効にしたときの
     `console.log` のメタデータを書いていない。セッションの値をヘッダーで送るため、確かめずに有効にしない。
     有効にするときは、実際に記録された内容を見て、認証の値（セッション、nonce、Appleのコールバックの
     `code`・`state`、IDトークン）が含まれないことを確かめる。`redact_query_string: true` は、有効にされた
     ときの安全弁（クエリを記録から外す）。自前のコードも、認証の値をログに出さない。方針は
-    `worker/test/config.test.ts` が固定している。
+    `worker/test/config.test.ts` が固定している（`worker/` で `npm test`。ルートの `npm test` には含まれない）。
 
 ## 9. 実装順序
 

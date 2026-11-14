@@ -86,8 +86,10 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     除外している。外さない。アプリとコードを共有しない（リクエスト・レスポンスの形は docs を正として両側に書く）。
     詳細は `docs/singfolio-publishing-backend.md` §8「Workerの構成と運用」。
 -   Workers Logs（`worker/wrangler.jsonc` の `observability`）は無効のまま。資料が、ヘッダーなどが記録されるかを書いて
-    いないため。有効にする条件は同じ節。`worker/test/config.test.ts` が固定している。D1の本番に適用したマイグレーションは
-    書き換えず、次の番号を足す。
+    いないため。有効にする条件は同じ節。`worker/test/config.test.ts` が固定している。Workerのテストは `worker/` で
+    `npm test`（ルートの `npm test` には含まれない）。D1の本番に適用したマイグレーションは書き換えず、次の番号を足す。
+    親テーブル（`users`・`identities`）は、`DROP` で作り直さない（外部キーの `CASCADE` で、子の行が消える。
+    D1では `PRAGMA` でも止まらない）。`ALTER TABLE ... ADD COLUMN` などで変える。
 -   バックエンドへの HTTP は Repository に閉じ込め、画面・Service から URL やレスポンスの形に触れない
     （候補検索の `songCatalogRepository` と同じ）。公開機能は Repository / Service境界の内側に閉じ込める。
 -   Requests は、所有者がアプリ内の一覧で受け取る。Web の受信箱とプッシュ通知は現時点では対象外。

@@ -177,8 +177,9 @@ v1.0より後（公開機能・Requests）の実装順序は、
         `used_nonces`）、開発用と本番用の設定、秘密情報の扱い、リクエストのログに認証の値を出さない設定。
         済み: `worker/`（独立したパッケージ。構成は §8「Workerの構成と運用」）、D1のスキーマ（`migrations/0001_initial.sql`）と
         そのテスト、設定の方針のテスト（Workers Logs を無効にする、入口は `singfolio.app` だけ、秘密情報を設定に書かない）、
-        ローカルでの起動。残り: 本番のD1の作成（`database_id` を設定へ足す）・マイグレーションの適用・秘密情報
-        （`NONCE_HMAC_KEY`）の登録・初回のデプロイ（`singfolio.app` で404を返すこと）
+        ローカルでの起動。残り: 本番のD1の作成（`database_id` を設定へ足す）・マイグレーションの適用・
+        初回のデプロイ（`--secrets-file` で `NONCE_HMAC_KEY` を渡す。`singfolio.app` で404を返すことと、
+        `workers.dev` が出ていないことを確かめる）
     -   [ ] 7.3.3 nonce。`POST /auth/nonce`（無状態。`T` の署名・期限・種別、レート制限）と、`T` の検証・使用済みの記録
     -   [ ] 7.3.4 IDトークンの検証（Apple・Google。公開鍵（JWKS）の取得とキャッシュ、`iss`・`aud`・`exp`・`nonce`）と、`sub` から
         `identities` を引く・作る処理。模擬の発行元で、拒否の条件を確かめる
