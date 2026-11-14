@@ -97,6 +97,12 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     書くのは、検証が通ったときの使用済みの記録だけ。「発行時に D1 へ置く」形に「簡略化」しない（Free の書き込み
     10万行/日を、認証の要らないエンドポイントで使い切られ、ログイン・Publish・Request 受付が止まる）。セッションの
     最終利用の時刻も、毎回は書かない。詳細は `docs/singfolio-publishing-backend.md` §8「認証の方式」。
+-   Worker は、`fetch` の最初に、HTTPS でないリクエストを 403 で拒否する（`worker/src/https.ts`）。外さない。
+    「Always Use HTTPS」（ゾーンの設定）に「簡略化」しない（Worker より先に効くかが資料に無く、リポジトリの外の
+    設定で、リダイレクトは最初の1通が平文で出たあとの話）。本番は HTTP をそのまま Worker が受ける（実測）。
+    通すのはホスト名が `localhost` などの完全一致だけで、環境変数で切る口は作らない。`worker/package.json` の
+    `dev` の `--infer-origin-from-routes=false` も外さない（外すと `wrangler dev` が `singfolio.app` の HTTP に
+    見え、ローカルで 403 になる）。詳細は同じ節「Workerの構成と運用」の「HTTPS」。
 
 ### 曲名・アーティストの候補（サジェスト）
 

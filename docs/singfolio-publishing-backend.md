@@ -265,8 +265,21 @@ AppleとGoogleの仕様は、各社の公式資料で確かめた（Appleは、I
     IDトークンと一緒にWorkerへ送る。Workerは、`T` の署名・期限、IDトークンの `nonce` が `SHA-256(T)` と一致する
     ことを確かめ、そのあとで使用済みとして記録する（`used_nonces`。一意制約で2回目を弾く）。D1に書くのは、
     これらが正しかったときだけ。
--   `T` をそのまま渡さずにハッシュを渡すのは、`T` が100字を超えるため。Appleの `nonce` の長さの上限は資料に書かれて
-    おらず、生のまま渡すと、上限に当たったときに設計を戻すことになる。
+-   `T` をそのまま渡さずにハッシュを渡すのは、`T` が長いため（実測で `native` は91字、`web` は131字）。Appleの `nonce` の
+    長さの上限は資料に書かれておらず、生のまま渡すと、上限に当たったときに設計を戻すことになる。
+-   **`POST /auth/nonce`**（実装済み。`worker/src/auth.ts`・`worker/src/nonce.ts`）。ログインの前に呼ぶので認証は無く、D1に触れない。
+    -   リクエスト: JSON。`{"kind":"native"}`、または `{"kind":"web","challenge":"<C>"}`（`C` は `SHA-256(V)` の base64url、43字）。
+        `native` に `challenge` を付けたものは弾く（取り違えを見逃さないため）。本文は1KBまで。
+    -   レスポンス: 200 `{"nonce":"<T>","expiresAt":<ミリ秒>}`、`Cache-Control: no-store`。期限は発行から5分。エラーは、
+        400（本文の不備。`{"error":"invalid_request"}`）、405（`POST` 以外。`Allow: POST`）、413（本文が大きい）。
+        HTTPSでないリクエストは403（「Workerの構成と運用」の「HTTPS」）。
+    -   `T` の形は `v1.<kind>.<expiresAt>.<random>.<C>.<signature>`（`.` 区切りの6つ。`native` では `C` が空）。`random` は16バイト、
+        `signature` は先頭から `C` までの HMAC-SHA256（鍵は `NONCE_HMAC_KEY`）。アプリは `T` の中身を解釈せず、不透明な値として扱う。
+    -   検証（`verifyNonce`）は、署名 → 種別 → 期限の順で、D1に触れない。種別が違う `T` は、署名が正しくても拒否する。
+        署名は、復号した値を再エンコードして一致しない表記も拒否する（署名の最後の字は下位2ビットが余りで、そこだけ違う
+        別の表記も、同じバイト列に復号されて検証が通ってしまう。1つの `T` を1通りの文字列に保つ）。
+    -   使用済みの記録（`consumeNonce`）は別の関数で、IDトークンの `nonce` が `SHA-256(T)` と一致したあとに呼ぶ。1回目は `true`、
+        2回目以降は `false`。期限を過ぎた記録は、同じバッチ（トランザクション）の中で消す。
 -   発行のたびにD1へ書かない理由: D1のFreeは、書き込みが10万行/日で、INSERT・UPDATE・DELETEと索引の書き込みが
     数えられ、超えるとその日（UTCの0時まで）D1へのクエリが止まる。認証の要らないエンドポイントが書き込むと、
     それが上限を使い切る経路になり、ログイン・Publish・Request受付が止まる。ログイン前の経路は、D1に書かない。
@@ -477,6 +490,9 @@ nonce・セッションの失効・Appleのトークン失効の方式は、「�
 -   Unpublish後の、受信済みのRequestの扱い（残す案。§6）。
 -   所有者がRequestを削除・拒否する手段（不適切なニックネームへの対応を含む）。
 -   レート制限のキー（IPアドレスを使うか。使う場合も保存しない案を基本とし、プライバシーポリシーに書く）。
+    Cloudflareの資料（Workers の Rate Limiting API）で確かめたこと：カウントは拠点ごとで、近似・結果整合のため、全世界での
+    厳密な上限にはならない。`period` は10秒か60秒。キーは任意の文字列で、資料はIPアドレスを勧めていない（共有のIPがあるため）。
+    キーが保存・記録されるかは書かれていない。Freeプランで使えるかも書かれていない（デプロイして確かめる）。
 -   公開対象のタグの選び方（§3）。
 
 ### 外部の楽曲検索の結果を公開する際の扱い
@@ -583,6 +599,33 @@ Repositoryを、同じコミットで直せるため）。
     `code`・`state`、IDトークン）が含まれないことを確かめる。`redact_query_string: true` は、有効にされた
     ときの安全弁（クエリを記録から外す）。自前のコードも、認証の値をログに出さない。方針は
     `worker/test/config.test.ts` が固定している（`worker/` で `npm test`。ルートの `npm test` には含まれない）。
+-   **HTTPS。** Workerは、HTTPSでないリクエストを、本文を見る前に403で拒否する（リダイレクトしない。
+    `worker/src/https.ts`。`fetch` の最初で呼ぶ）。「Always Use HTTPS」（ゾーンの設定）には頼らない。理由：
+    -   Workerが404しか返さない状態の本番で実測した（2026-11-14）。`http://singfolio.app/` は、Workerにそのまま届いて、
+        平文で404を返した（リダイレクトも `Strict-Transport-Security` も無い）。
+    -   Cloudflareの資料は、Always Use HTTPS がWorkerより先に効くかを書いていない。ゾーンの設定はリポジトリの外にあり、
+        コードとテストで固定できない。
+    -   リダイレクトは、最初の1通（`Authorization` や、クエリの `code` を含みうる）が平文で出たあとの話で、秘密を守れない。
+        拒否なら、Workerは中身を処理せず、呼んだ側も気づく。
+    -   アプリの側は、リリースビルドでHTTPを出せない（確かめた）。iOSのATSは、URLローディングシステム（典型的には
+        `URLSession`）のHTTP接続にHTTPSを要求する（Appleの資料。生成された `Info.plist` は `NSAllowsArbitraryLoads` が
+        `false`）。Androidは、API 28以上を対象にしたアプリの既定が平文通信の禁止（Androidの資料）で、main manifestに許可は無く、
+        許すのはdebug用のmanifest（Metro用）だけ。`.app` は、Chromiumのpreloadリストで `force-https`・
+        `include_subdomains: true`（ブラウザの話で、アプリのAPI呼び出しは守らない。ほかのブラウザのリストは確かめていない）。
+        そのため、HTTPで届くのは、アプリ以外のクライアントか、設定ミスのときだけで、この検査は多層の防御にあたる。
+        HSTSヘッダーは付けない（`.app` のpreloadで足り、APIの呼び出し元は使わない）。
+    -   判定は、`request.url` のスキームと、見えたときの `X-Forwarded-Proto`（どちらも「`http` なら拒否」の向きにだけ使う）。
+        **エッジで、`request.url` がクライアントの接続を反映するかは、資料に書かれていない。** `wrangler dev`（workerd）では、
+        HTTPで来ると `http:` になることを確かめた。エッジでは、デプロイ後に `curl -i -X POST http://singfolio.app/auth/nonce` が
+        403になることを確かめる（7.3.3の確認項目）。素通りなら、この検査は効いていないので、別の手がかり（`CF-Visitor`）を足す。
+    -   ローカルの開発だけ、ホスト名が `localhost`・`127.0.0.1`・`[::1]` のものを通す（完全一致）。エッジでは、Custom Domainは
+        `singfolio.app` に一致するリクエストだけを受けるので、`localhost` のHostは届かない（資料）。環境変数などで検査を切る口は
+        作らない。`wrangler dev` は、既定で `routes` のホスト（`singfolio.app`）を `request.url` に入れ、`localhost` が見えず403に
+        なる。`npm run dev` が `--infer-origin-from-routes=false` を付けて、実際のオリジンを保つ（`config.test.ts` が固定）。
+    -   公開ページ（7.4以降）では、`GET`/`HEAD` をリダイレクトにする余地がある。いまは、`/auth/` しか無いので、一律に拒否している。
+-   **ローカルのD1の置き場所。** `wrangler.jsonc` に `database_id` を足したので、ローカルのD1のファイル名（ハッシュ）が変わる
+    （足す前後の設定で `wrangler d1 migrations apply --local` を比べて確かめた）。`migrations apply` とテスト（`getPlatformProxy`）は
+    同じ設定を読むので一貫する。`wrangler dev` 自身がD1を使う経路は、まだ無い（D1に触れるエンドポイントを足すときに確かめる）。
 
 ## 9. 実装順序
 

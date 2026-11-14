@@ -31,6 +31,22 @@ describe('wrangler.jsonc', () => {
     }
   });
 
+  it('npm run dev は、実際のローカルのオリジンを保つ（HTTPS検査が localhost を通すため）', () => {
+    // wrangler dev は、既定で routes の singfolio.app を request.url のホストに書き換える。すると
+    // Workerから localhost が見えず、HTTPS検査（src/https.ts）がローカルのHTTPを403で拒否する。
+    const pkg = JSON.parse(readFileSync(path.join(workerDir, 'package.json'), 'utf8')) as {
+      scripts: Record<string, string>;
+    };
+    assert.match(pkg.scripts.dev ?? '', /--infer-origin-from-routes=false/);
+  });
+
+  it('HTTPS検査を迂回する設定を vars に置かない', () => {
+    // 検査は、localhost のホスト名だけを通す。環境変数などで切る口は作らない（docs §8「HTTPS」）。
+    for (const name of Object.keys(config.vars ?? {})) {
+      assert.doesNotMatch(name, /insecure|http|ssl|tls/i, `${name}: HTTPS検査を切る口にならないか確認する`);
+    }
+  });
+
   it('.dev.vars.example に、必須の秘密情報がすべて載っている', () => {
     const example = readFileSync(path.join(workerDir, '.dev.vars.example'), 'utf8');
     for (const name of config.secrets?.required ?? []) {

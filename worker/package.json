@@ -9,7 +9,7 @@
     "types": "wrangler types",
     "typecheck": "wrangler types && tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "test": "node --disable-warning=ExperimentalWarning --test \"test/**/*.test.ts\"",
-    "dev": "wrangler dev",
+    "dev": "wrangler dev --infer-origin-from-routes=false",
     "migrations:create": "wrangler d1 migrations create DB",
     "migrations:apply:local": "wrangler d1 migrations apply DB --local",
     "migrations:apply:remote": "wrangler d1 migrations apply DB --remote",
