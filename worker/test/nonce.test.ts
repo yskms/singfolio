@@ -5,7 +5,7 @@ import { after, before, describe, it } from 'node:test';
 import { consumeNonce, issueNonce, NONCE_TTL_MS, nonceHash, verifyNonce } from '../src/nonce.ts';
 import { openLocalDatabase, type LocalDatabase } from './localDatabase.ts';
 
-const SECRET = 'test-secret-value';
+const SECRET = 'test-secret-value-0123456789abcdef';
 const NOW = 1_700_000_000_000;
 // 43字の base64url（SHA-256 の出力の形）。
 const CHALLENGE = createHash('sha256').update('verifier').digest('base64url');
@@ -16,6 +16,27 @@ const withPart = (nonce: string, index: number, value: string) =>
     .split('.')
     .map((part, i) => (i === index ? value : part))
     .join('.');
+
+describe('鍵（NONCE_HMAC_KEY）の検証', () => {
+  it('32バイト未満・空・無い（undefined）鍵は、原因が分かるエラーにする', async () => {
+    for (const secret of ['', 'short', 'x'.repeat(31), undefined as unknown as string]) {
+      await assert.rejects(issueNonce(secret, { kind: 'native' }, NOW), /NONCE_HMAC_KEY/);
+      await assert.rejects(verifyNonce(secret, 'v1.native.1.AAAAAAAAAAAAAAAAAAAAAA..AAAA', 'native', NOW), /NONCE_HMAC_KEY/);
+    }
+  });
+
+  it('32バイトちょうどの鍵は使える（`openssl rand -base64 32` の44字も）', async () => {
+    for (const secret of ['x'.repeat(32), Buffer.alloc(32, 7).toString('base64')]) {
+      const { nonce } = await issueNonce(secret, { kind: 'native' }, NOW);
+      assert.equal((await verifyNonce(secret, nonce, 'native', NOW)).ok, true);
+    }
+  });
+
+  it('文字数ではなくバイト数で数える（日本語は1字が3バイト）', async () => {
+    await assert.rejects(issueNonce('あ'.repeat(10), { kind: 'native' }, NOW), /NONCE_HMAC_KEY/); // 30バイト
+    await assert.doesNotReject(issueNonce('あ'.repeat(11), { kind: 'native' }, NOW)); // 33バイト
+  });
+});
 
 describe('issueNonce', () => {
   it('native: 期限は5分後で、challenge を含まない', async () => {
@@ -84,7 +105,7 @@ describe('verifyNonce', () => {
   });
 
   it('別の鍵で署名された T は拒否する', async () => {
-    const { nonce } = await issueNonce('another-secret', { kind: 'native' }, NOW);
+    const { nonce } = await issueNonce('another-secret-0123456789abcdefghij', { kind: 'native' }, NOW);
     assert.deepEqual(await verifyNonce(SECRET, nonce, 'native', NOW), { ok: false, reason: 'signature' });
   });
 

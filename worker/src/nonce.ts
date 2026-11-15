@@ -33,8 +33,17 @@ function fromBase64Url(value: string): Uint8Array | null {
   }
 }
 
+// 鍵の長さの下限（バイト）。HMAC-SHA256 の出力と同じ。`openssl rand -base64 32`（44字）は満たす。
+const MIN_SECRET_BYTES = 32;
+
 function hmacKey(secret: string, usage: 'sign' | 'verify'): Promise<CryptoKey> {
-  return crypto.subtle.importKey('raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, [usage]);
+  // 秘密情報が無い（.dev.vars が無い）と undefined が来る。空のバイト列で importKey が分かりにくい
+  // 例外を投げる前に、原因が分かるエラーにする。短い鍵（置き忘れた見本の値など）も弾く。
+  const keyBytes = typeof secret === 'string' ? encoder.encode(secret) : new Uint8Array(0);
+  if (keyBytes.length < MIN_SECRET_BYTES) {
+    throw new Error(`NONCE_HMAC_KEY is missing or shorter than ${MIN_SECRET_BYTES} bytes`);
+  }
+  return crypto.subtle.importKey('raw', keyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, [usage]);
 }
 
 /** アプリがIDトークンの `nonce` に渡す値と同じ、SHA-256(T) の base64url（43字）。 */

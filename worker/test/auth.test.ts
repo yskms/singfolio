@@ -5,7 +5,7 @@ import { describe, it } from 'node:test';
 import worker from '../src/index.ts';
 import { verifyNonce } from '../src/nonce.ts';
 
-const SECRET = 'test-secret-value';
+const SECRET = 'test-secret-value-0123456789abcdef';
 // D1 には触れないので、DB は渡さない（触れたら、テストが落ちる）。
 const env = { NONCE_HMAC_KEY: SECRET } as Env;
 const CHALLENGE = createHash('sha256').update('verifier').digest('base64url');
@@ -83,6 +83,69 @@ describe('POST /auth/nonce', () => {
       body: '{"kind":"native"}',
     });
     assert.equal((await worker.fetch(lying, env)).status, 413);
+  });
+
+  // Content-Length の無い（chunked の）本文。上限を超えたら、残りを読まずに止める。
+  const streamOf = (chunks: number, chunkBytes: number, counter: { pulled: number }) =>
+    new ReadableStream<Uint8Array>({
+      pull(controller) {
+        counter.pulled++;
+        if (counter.pulled > chunks) controller.close();
+        else controller.enqueue(new Uint8Array(chunkBytes).fill(0x20));
+      },
+    });
+  const postStream = (body: ReadableStream<Uint8Array>, headers: Record<string, string> = {}) =>
+    worker.fetch(
+      new Request('https://singfolio.app/auth/nonce', {
+        method: 'POST',
+        headers,
+        body,
+        duplex: 'half',
+      } as RequestInit),
+      env,
+    );
+
+  it('Content-Length が無くても、上限を超えた時点で読むのをやめて 413（全部は読まない）', async () => {
+    const counter = { pulled: 0 };
+    // 1KB × 20000 = 約20MB。上限（1KB）を超えるのは2チャンク目。
+    const response = await postStream(streamOf(20000, 1024, counter));
+    assert.equal(response.status, 413);
+    assert.ok(counter.pulled < 10, `読み込みが止まらなかった: ${counter.pulled} チャンク`);
+  });
+
+  it('Content-Length が数値でなくても、実際の長さで判定する', async () => {
+    const counter = { pulled: 0 };
+    const big = await postStream(streamOf(20000, 1024, counter), { 'content-length': 'abc' });
+    assert.equal(big.status, 413);
+    assert.ok(counter.pulled < 10);
+    const small = await worker.fetch(
+      new Request('https://singfolio.app/auth/nonce', {
+        method: 'POST',
+        headers: { 'content-length': 'abc' },
+        body: '{"kind":"native"}',
+      }),
+      env,
+    );
+    assert.equal(small.status, 200);
+  });
+
+  it('上限ちょうど(1024バイト)の本文は読める。1バイト超えると 413', async () => {
+    const exact = JSON.stringify({ kind: 'native' }).padEnd(1024, ' ');
+    assert.equal(new TextEncoder().encode(exact).length, 1024);
+    assert.equal((await post(exact)).status, 200);
+    assert.equal((await post(`${exact} `)).status, 413);
+  });
+
+  it('本文が無い POST は 400', async () => {
+    const response = await worker.fetch(new Request('https://singfolio.app/auth/nonce', { method: 'POST' }), env);
+    assert.equal(response.status, 400);
+  });
+
+  it('鍵が無い・短いときは、応答を作らずに例外になる（原因が分かる）', async () => {
+    const request = () =>
+      new Request('https://singfolio.app/auth/nonce', { method: 'POST', body: '{"kind":"native"}' });
+    await assert.rejects(worker.fetch(request(), {} as Env), /NONCE_HMAC_KEY/);
+    await assert.rejects(worker.fetch(request(), { NONCE_HMAC_KEY: 'short' } as Env), /NONCE_HMAC_KEY/);
   });
 
   it('HTTP は、本文を見る前に 403 で拒否する', async () => {
