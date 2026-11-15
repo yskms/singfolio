@@ -31,6 +31,20 @@ describe('wrangler.jsonc', () => {
     }
   });
 
+  it('IDトークンの aud（vars）は、アプリ・Appleの設定と食い違っていない', () => {
+    const vars = (config.vars ?? {}) as Record<string, unknown>;
+    const app = JSON.parse(readFileSync(path.join(workerDir, '..', 'app.json'), 'utf8')) as {
+      expo: { ios: { bundleIdentifier: string }; android: { package: string } };
+    };
+    // Appleのネイティブのトークンの aud は、アプリのバンドルID（iOS）。ずれると、すべてのAppleログインが拒否される。
+    assert.equal(vars.APPLE_BUNDLE_ID, app.expo.ios.bundleIdentifier);
+    // Services ID は、primary App ID とは別の識別子（AndroidのWeb経由のログイン用）。
+    assert.match(String(vars.APPLE_SERVICES_ID), /^[a-z0-9.-]+$/);
+    assert.notEqual(vars.APPLE_SERVICES_ID, vars.APPLE_BUNDLE_ID);
+    // Googleの aud は、サーバー用（Web）のクライアントID。iOS・Androidのクライアントではない。
+    assert.match(String(vars.GOOGLE_WEB_CLIENT_ID), /^\d+-[a-z0-9]+\.apps\.googleusercontent\.com$/);
+  });
+
   it('npm run dev は、実際のローカルのオリジンを保つ（HTTPS検査が localhost を通すため）', () => {
     // wrangler dev は、既定で routes の singfolio.app を request.url のホストに書き換える。すると
     // Workerから localhost が見えず、HTTPS検査（src/https.ts）がローカルのHTTPを403で拒否する。

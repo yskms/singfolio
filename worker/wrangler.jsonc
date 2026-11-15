@@ -28,6 +28,15 @@
     "required": ["NONCE_HMAC_KEY"]
   },
 
+  // IDトークンの `aud`（src/idToken.ts の audienceFor）。どれも公開してよい識別子で、秘密情報ではない
+  // （アプリに埋め込まれる、またはAppleの設定画面で付けた名前）。Googleのクライアントの `client_secret` は使わない。
+  // APPLE_BUNDLE_ID は app.json の ios.bundleIdentifier と同じ（test/config.test.ts が固定している）。
+  "vars": {
+    "APPLE_BUNDLE_ID": "com.yskms.singfolio",
+    "APPLE_SERVICES_ID": "com.yskms.singfolio.web",
+    "GOOGLE_WEB_CLIENT_ID": "432571830797-0b95abaac13gs6dkhcunkpni8d74lt6c.apps.googleusercontent.com"
+  },
+
   // `database_id` は本番のD1のID（秘密ではない）。ローカルの開発・テストでは使われない。
   "d1_databases": [
     {
