@@ -1,5 +1,5 @@
-// 入口。エンドポイントは 7.3.3 以降で足す。
-import { handleNonce } from './auth.ts';
+// 入口。エンドポイントは 7.3.10 以降も足す。
+import { handleLogin, handleLogout, handleNonce } from './auth.ts';
 import { httpsRequiredResponse, isInsecureRequest } from './https.ts';
 
 export default {
@@ -9,6 +9,8 @@ export default {
 
     const { pathname } = new URL(request.url);
     if (pathname === '/auth/nonce') return handleNonce(request, env, Date.now());
+    if (pathname === '/auth/login') return handleLogin(request, env, Date.now());
+    if (pathname === '/auth/logout') return handleLogout(request, env);
 
     return new Response('Not Found', {
       status: 404,
