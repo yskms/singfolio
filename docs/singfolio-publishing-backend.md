@@ -416,9 +416,9 @@ AndroidにはAppleのネイティブのサインインが無いので、Appleの
 -   `T` には種別（`native` と `web`）を入れて署名する。`web` の `T` は `C` を含み、`native` の `T` は含まない。
     Android用のエンドポイントは `web` の `T` だけ、iOSのネイティブとGoogleのエンドポイントは `native` の `T` だけを
     受け付ける。`C` の無い `T` では `V` の照合が飛ばされるので、取り違えを許さない。
--   IDトークンの `aud` は2種類になる（iOSのネイティブはバンドルID、AndroidのWebはServices ID）。Workerは両方を受け入れるが、
-    `T` の種別で1つに絞る（`native` はバンドルID、`web` はServices ID。「IDトークンの検証」の `audienceFor`）。失効は、そのトークンを
-    得たときの `client_id` で行う。
+-   IDトークンの `aud` の値は、ログイン経路によって2種類ある（iOSのネイティブはバンドルID、AndroidのWebはServices ID）。
+    Workerが1回の検証で受け入れるのは、`T` の種別に合う1つだけ（`native` はバンドルID、`web` はServices ID。「IDトークンの検証」の
+    `audienceFor`）。もう一方の `aud` のトークンは拒否する。失効は、そのトークンを得たときの `client_id` で行う。
 -   Services IDは、アプリのApp ID（primaryのApp ID）と同じグループにし、`singfolio.app` と、コールバックのURLを、
     Services IDの設定（Website URLs）に登録する。Appleの手順は、ドメインの検証ファイルのアップロードは要らない、と
     している。実際に、Services IDの登録と設定（Website URLsの保存）で、画面は検証ファイルを求めなかった。
