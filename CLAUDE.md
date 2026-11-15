@@ -105,6 +105,13 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     通すのはホスト名が `localhost` などの完全一致だけで、環境変数で切る口は作らない。`worker/package.json` の
     `dev` の `--infer-origin-from-routes=false` も外さない（外すと `wrangler dev` が `singfolio.app` の HTTP に
     見え、ローカルで 403 になる）。詳細は同じ節「Workerの構成と運用」の「HTTPS」。
+-   IDトークンの検証（`worker/src/idToken.ts`）は、jose の `jwtVerify` に `algorithms: ['RS256']` と
+    `requiredClaims: ['exp', 'sub']` を付けて呼ぶ。外さない（jose は `exp` の無いトークンを期限なしとして通す）。
+    `kid` の無いトークンも通さない（jose は、合う鍵が1本だけなら `kid` 無しでも通す）。公開鍵の取得に jose の
+    `createRemoteJWKSet` を使わない（取得に失敗したとき、前の鍵に落ちられない）。取得中の Promise を、リクエストを
+    またいで共有しない（workerd は別のリクエストの入出力を待てない）。結果・例外にクレームを載せない（jose の
+    例外は `payload` を持つ。理由だけ取り出して捨てる）。`aud` は `T` の種別とログイン手段で1つに決め、両方を
+    受け入れる形に「簡略化」しない。詳細は同じ docs の §8「IDトークンの検証」。
 
 ### 曲名・アーティストの候補（サジェスト）
 

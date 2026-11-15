@@ -291,6 +291,56 @@ AppleとGoogleの仕様は、各社の公式資料で確かめた（Appleは、I
     そのまま返ることを確かめた（「Googleのサインイン」）。Appleは、実機の実際のトークンで確かめる（7.3）。
     ハッシュされて返るなら、Worker側も同じ処理をして比べる。
 
+**IDトークンの検証**（実装済み。`worker/src/idToken.ts`・`worker/src/identity.ts`）
+
+-   検証は jose の `jwtVerify`（Workerの実行時の依存は jose だけ。依存を持たず、MIT。版は固定する）。署名・`iss`・`aud`・`exp` は
+    jose に任せ、自前で持つのは、公開鍵の取得とキャッシュ、jose が既定では見ない点（下）、`nonce`、失敗の分類だけ。
+-   **受け付ける条件。** どれか1つでも欠けたら拒否する。
+    -   `alg` は RS256 のみ（AppleもGoogleもRS256）。`none` と、公開鍵を共通鍵として使う `HS256` を拒否する。
+    -   `kid` が必須。joseは、`kid` が無いトークンを「合う鍵が1本だけ」のときに、その鍵で検証してしまう（鍵の本数で挙動が変わる）。
+        鍵の取得より前に弾く。
+    -   `iss`: Appleは `https://appleid.apple.com`、Googleは `https://accounts.google.com` か `accounts.google.com`。
+    -   `aud`: `T` の種別とログイン手段で**1つに決める**（`audienceFor`）。Apple の `native` はバンドルID、Apple の `web` は
+        Services ID、Google の `native` はサーバー用（Web）のクライアントID。Google の `web` は無い（拒否）。値は `wrangler.jsonc` の
+        `vars`（秘密情報ではない）。
+    -   `exp` と `sub` が必須。**jose は `exp` の無いトークンを、期限なしとして通す。** `requiredClaims` で必須にしている。`sub` は
+        1〜255字の文字列（Googleは最大255字、Appleは約44字）。
+    -   `nbf` は、あれば見る。時計のずれは30秒まで許す（`exp` と `nbf` の両方に効く）。
+    -   `nonce` は、`SHA-256(T)` と一致する文字列（無い・文字列でない場合も拒否する。Appleの `nonce_supported` が偽のときなど）。
+    -   `azp` は見ない（「Googleのサインイン」）。`email`・`name` などは使わない。
+-   **結果にクレームを載せない。** 返すのは `sub` と、失敗の理由だけ。jose の `JWTClaimValidationFailed` は `payload`（クレームの全体）を
+    持つので、捕まえたら理由だけを取り出して捨てる。トークンの全文もログに出さない（「認証」）。
+-   **失敗の理由**（`malformed`・`signature`・`unknown_key`・`issuer`・`audience`・`expired`・`claims`・`nonce`・`unavailable`）。呼ぶ側
+    （7.3.5のログイン）は、`unavailable`（公開鍵を取得できず、使える古い鍵も無い。トークンの問題ではない）だけを503にし、残りは
+    同じ401にして、どの検査で落ちたかを教えない。
+-   **公開鍵（JWKS）。** 取得先はAppleが `https://appleid.apple.com/auth/keys`、Googleが `https://www.googleapis.com/oauth2/v3/certs`。
+    ログイン手段ごとに、Workerのisolateのメモリにキャッシュする（KV・Cache APIは使わない。取り直すのは、isolateの起動直後と
+    1時間ごとだけで、ログインは頻繁ではない）。
+    -   取得は GET、認証情報なし、リダイレクトには従わない（200以外は失敗）、5秒でタイムアウト。再試行はしない（アプリがやり直す）。
+    -   **1時間**は取り直さない。過ぎたら、次の検証で取り直す。
+    -   取り直しに失敗しても、取得から**25時間**（1時間 + 24時間）までは、前の鍵で検証を続ける（発行元の一時的な不調でログインを
+        止めないため。鍵は公開情報で、入れ替わっても古い鍵はしばらく残る）。それを超えたら `unavailable`。
+    -   **冷却は60秒。** 取得を試みてから60秒の間は、次の取得を試みない（失敗した試みも数える）。知らない `kid` を付けた偽のトークンや、
+        落ちている発行元への連打が、外部への呼び出しを増やさないため（認証の要らない経路なので）。知らない `kid` は、冷却が済んでいれば
+        1回だけ取り直す（鍵の入れ替えに追いつくため）。前の鍵が無いときだけは、冷却に関わらず取りに行く。
+    -   **取得中の Promise を、リクエストをまたいで共有しない**（同時の取得を1つにまとめない）。workerd は、別のリクエストの入出力を
+        待つことを許さない。共有するのは、取得し終えた鍵（データ）だけ。jose の `createRemoteJWKSet` を使わないのは、取得に失敗した
+        とき前の鍵に落ちられないため。
+    -   取り直しの失敗は、ログに出さない（Workers Logs は無効。失敗が続くと、鍵が古いまま気づかれずに過ぎる点は、分かって受け入れる。
+        25時間を超えると、ログインが `unavailable` になって表に出る）。
+-   **ログイン手段の引き当て**（`resolveIdentity(db, provider, sub, now)`）。`(provider, sub)` から `identities` を引き、無ければ
+    `users` ごと作る。1つのバッチで行う（引いてから作る形を2回のクエリに分けると、同じ人の同時の初回ログインで、一意制約に当たるか、
+    `identities` の無いユーザーが残る）。引いたときも作ったときも `last_sign_in_at` を進める（時計が戻る値は書かない）。
+    **`provider` が違えば、`sub` が同じでも別のユーザー**（自動ではつながない。「アカウントのつなぎ方」）。保存するのは `provider` と
+    `sub` だけ。
+-   **ログインの処理の順序**（7.3.5）: `verifyNonce`（署名・種別・期限。D1に触れない）→ IDトークンの検証（`nonce` が `SHA-256(T)` と
+    一致するところまで）→ `consumeNonce`（使用済みの記録）→ `resolveIdentity` → セッションの発行。D1に書くのは、前の2つが通ってから。
+    `consumeNonce` のあとにD1が失敗しても、`T` は使い切りになる（アプリが新しい `T` で、やり直す）。
+-   確かめたこと: 模擬の発行元（テスト用のRSA鍵とJWKSを返す fetch）で、上の拒否の条件とキャッシュの動きをテストした。本物のApple・Googleの
+    JWKSを、Node から取得して読めることを確かめた（鍵の形は、どちらも `kty: RSA`・`alg: RS256`・`use: sig`・`kid` 付き）。workerd
+    （`wrangler dev`）で、模擬のJWKSとローカルのD1に対して、検証と `resolveIdentity` が動くことを確かめた。本物のトークンでの確認は、
+    7.3.7（Apple）と 7.3.8（Google）。
+
 **セッション**
 
 -   不透明なランダム値（JWTにしない）。D1の `sessions` にはハッシュだけを置き、端末は SecureStore に持つ。
@@ -366,8 +416,9 @@ AndroidにはAppleのネイティブのサインインが無いので、Appleの
 -   `T` には種別（`native` と `web`）を入れて署名する。`web` の `T` は `C` を含み、`native` の `T` は含まない。
     Android用のエンドポイントは `web` の `T` だけ、iOSのネイティブとGoogleのエンドポイントは `native` の `T` だけを
     受け付ける。`C` の無い `T` では `V` の照合が飛ばされるので、取り違えを許さない。
--   IDトークンの `aud` は2種類になる（iOSのネイティブはバンドルID、AndroidのWebはServices ID）。Workerは両方を受け入れ、
-    失効は、そのトークンを得たときの `client_id` で行う。
+-   IDトークンの `aud` は2種類になる（iOSのネイティブはバンドルID、AndroidのWebはServices ID）。Workerは両方を受け入れるが、
+    `T` の種別で1つに絞る（`native` はバンドルID、`web` はServices ID。「IDトークンの検証」の `audienceFor`）。失効は、そのトークンを
+    得たときの `client_id` で行う。
 -   Services IDは、アプリのApp ID（primaryのApp ID）と同じグループにし、`singfolio.app` と、コールバックのURLを、
     Services IDの設定（Website URLs）に登録する。Appleの手順は、ドメインの検証ファイルのアップロードは要らない、と
     している。実際に、Services IDの登録と設定（Website URLsの保存）で、画面は検証ファイルを求めなかった。
@@ -449,8 +500,9 @@ Googleの公式SDKだけを使う、自作の薄いExpoモジュールで実装�
 実装前に確かめること（デプロイとアカウントが要る）。次は確かめ済み：
 
 -   本番のWorkersから、Appleの公開鍵（JWKS）を取得できる。ローカルの実行環境では拒否されたが、本番のWorkers
-    （1か所のデータセンターから6回）では、いずれも取得できた（Googleの公開鍵も同様）。実装時は、取得の失敗に
-    備えた扱い（キャッシュ・再試行）を決める。取得に支障が出るようなら、鍵を自前で控える。
+    （1か所のデータセンターから6回）では、いずれも取得できた（Googleの公開鍵も同様）。取得の失敗に備えた扱い
+    （キャッシュ・前の鍵での継続・冷却）は、決めて実装した（「IDトークンの検証」）。取得に支障が出るようなら、
+    鍵を自前で控える。
 -   `singfolio.app` は取得済み（Cloudflare Registrar）。ドメインがCloudflareにあるので、載せ替えは要らない。
 -   Googleのサインインの `nonce` と `aud`。iOS SimulatorとAndroidエミュレータで、実際のトークンを使って確かめた
     （「Googleのサインイン」）。実機と、署名したビルドでの確認は、7.3の中で行う。
