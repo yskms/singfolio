@@ -29,6 +29,17 @@ export function isLanguage(value: unknown): value is Language {
   return LANGUAGES.some((language) => language === value);
 }
 
+/**
+ * アカウントのログイン手段（公開機能。iOS・Androidとも、AppleとGoogle）。Workerの `provider` と同じ文字列。
+ * 同じ人でも手段が違えば別のアカウントになる（自動ではつながない。docs/singfolio-publishing-backend.md §8）。
+ */
+export const AUTH_PROVIDERS = ['apple', 'google'] as const;
+export type AuthProvider = (typeof AUTH_PROVIDERS)[number];
+
+export function isAuthProvider(value: unknown): value is AuthProvider {
+  return AUTH_PROVIDERS.some((provider) => provider === value);
+}
+
 export interface Tag {
   id: string;
   name: string;

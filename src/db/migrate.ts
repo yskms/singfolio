@@ -29,12 +29,20 @@ export interface Migration {
  * マイグレーションのSQL側ではなく、ここでトランザクションの外から切り替える。
  * 代わりに、コミット前に `PRAGMA foreign_key_check` で整合性を検査する。
  *
+ * `onNewDatabase` は、DBを新しく作るとき（`user_version` が0。初回起動・再インストール）に、
+ * **最初のマイグレーションを実行する前に**呼ぶ。端末内のデータが空なのに、DBの外に残っている
+ * 状態（iOSのKeychainに残ったセッションなど）を捨てるための口。マイグレーションの後に呼ぶと、
+ * 間でアプリが終わったときに、次の起動は「新しくない」DBになり、二度と呼ばれない。前に呼べば、
+ * 途中で終わっても次の起動でもう一度呼ばれる（なので、何度呼んでも同じ結果になる処理にする）。
+ * 投げたら、マイグレーションは何も実行せず、そのまま投げる（次の起動でやり直す）。
+ *
  * アプリ起動時に、DBを他の処理へ渡す前に1回だけ呼ぶこと。
  * `withTransactionAsync` は排他ではなく、同じ接続の他のクエリが割り込みうる。
  */
 export async function runMigrations(
   db: MigrationDb,
   migrations: readonly Migration[],
+  options: { onNewDatabase?: () => Promise<void> } = {},
 ): Promise<void> {
   migrations.forEach((migration, index) => {
     if (migration.version !== index + 1) {
@@ -53,6 +61,8 @@ export async function runMigrations(
   // 新しいバージョンのアプリで作られたDBを、古いアプリで開いた場合。
   // 知らないスキーマを書き換えないよう、起動を止める。
   if (current > latest) throw new DatabaseTooNewError(current, latest);
+
+  if (current === 0) await options.onNewDatabase?.();
 
   const pending = migrations.filter((migration) => migration.version > current);
   if (pending.length === 0) return;

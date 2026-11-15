@@ -2,6 +2,8 @@
 // Service層からこの型を受け取る。DBに依存しないこのファイルから出すのは、Nodeのテストが
 // `index.ts`（expo-sqlite を読み込む）を経由せずに使えるようにするため。
 export { DatabaseTooNewError } from '../db/errors.ts';
+// アカウントの失敗（`code` で区別する）。ServiceError とは別（利用者向けの文言への対応は、画面を足すときに作る）。
+export { AuthError, isTemporaryAuthError, type AuthErrorCode } from '../repositories/authError.ts';
 
 // UIが利用者向けの文言（多言語化の仕組みを通す）に変換できるよう、
 // 失敗の種類は `message` ではなく `code` で区別する。`message` はログ用の英語。

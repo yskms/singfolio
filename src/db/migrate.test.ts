@@ -136,6 +136,70 @@ describe('runMigrations', () => {
     );
   });
 
+  describe('onNewDatabase（DBを新しく作るときの、DBの外の状態の後始末）', () => {
+    it('新規DBでは、最初のマイグレーションの前に1回だけ呼ぶ。既存のDBでは呼ばない', async () => {
+      const { raw, db } = openDb();
+      const seen: { version: number; tables: number }[] = [];
+      const onNewDatabase = async () => {
+        seen.push({
+          version: userVersion(raw),
+          tables: count(raw, 'sqlite_master'),
+        });
+      };
+      await runMigrations(db, migrations, { onNewDatabase });
+      // 呼ばれた時点では、何も作られておらず、バージョンも0
+      assert.deepEqual(seen, [{ version: 0, tables: 0 }]);
+
+      // 2回目の起動（既存のDB）、新しいマイグレーションが加わる更新のどちらも呼ばない
+      await runMigrations(db, migrations, { onNewDatabase });
+      await runMigrations(
+        db,
+        [...migrations, { version: migrations.length + 1, sql: 'CREATE TABLE extra (id TEXT)' }],
+        { onNewDatabase },
+      );
+      assert.equal(seen.length, 1);
+    });
+
+    it('投げたら、マイグレーションを何も実行せず、そのまま投げる。次の起動でもう一度呼ばれる', async () => {
+      const { raw, db } = openDb();
+      let calls = 0;
+      await assert.rejects(
+        runMigrations(db, migrations, {
+          onNewDatabase: async () => {
+            calls += 1;
+            throw new Error('cleanup failed');
+          },
+        }),
+        /cleanup failed/,
+      );
+      assert.equal(userVersion(raw), 0);
+      assert.equal(count(raw, 'sqlite_master'), 0);
+
+      await runMigrations(db, migrations, {
+        onNewDatabase: async () => {
+          calls += 1;
+        },
+      });
+      assert.equal(calls, 2);
+      assert.equal(userVersion(raw), migrations.length);
+    });
+
+    it('アプリより新しいDBでは呼ばない（何にも触れずに拒否する）', async () => {
+      const { raw, db } = openDb();
+      raw.exec(`PRAGMA user_version = ${migrations.length + 1}`);
+      let called = false;
+      await assert.rejects(
+        runMigrations(db, migrations, {
+          onNewDatabase: async () => {
+            called = true;
+          },
+        }),
+        DatabaseTooNewError,
+      );
+      assert.equal(called, false);
+    });
+  });
+
   describe('テーブルの作り直し（SQLite公式の手順）', () => {
     // songs を作り直すマイグレーション。外部キーが有効なままだと、DROP TABLE が
     // ON DELETE CASCADE を発火させて song_tags が全件消える。

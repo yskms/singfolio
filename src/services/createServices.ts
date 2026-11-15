@@ -1,6 +1,9 @@
 import type { Database } from '../db/appDatabase.ts';
+import type { AuthProvider } from '../domain/types.ts';
 import { createArtistRepository } from '../repositories/artistRepository.ts';
+import { createAuthRepository, type AuthFetchLike } from '../repositories/authRepository.ts';
 import type { RepositoryEnv } from '../repositories/env.ts';
+import { createSessionRepository, type SecureStorage } from '../repositories/sessionRepository.ts';
 import { createSettingsRepository } from '../repositories/settingsRepository.ts';
 import {
   createSongCatalogRepository,
@@ -8,6 +11,11 @@ import {
 } from '../repositories/songCatalogRepository.ts';
 import { createSongRepository } from '../repositories/songRepository.ts';
 import { createTagRepository } from '../repositories/tagRepository.ts';
+import {
+  createAccountService,
+  type AccountService,
+  type IdTokenProvider,
+} from './accountService.ts';
 import { createArtistService, type ArtistService } from './artistService.ts';
 import { createSettingsService, type SettingsService } from './settingsService.ts';
 import { createShowService, type ShowService } from './showService.ts';
@@ -24,6 +32,22 @@ export interface Services {
   show: ShowService;
   settings: SettingsService;
   suggestions: SuggestionsService;
+  /** アカウント（ログイン・ログアウト）。ログインを要求しない: 使えなくても、v1.0の機能は変わらない */
+  account: AccountService;
+}
+
+/** アカウントの通信・保存に使うもの。渡さなければ、`account` はサインインできない（常にログアウト中）。 */
+export interface AuthOptions {
+  /** グローバルの `fetch`。送るのは、`POST /auth/*` だけ（`authRepository`） */
+  fetch: AuthFetchLike;
+  /** セッションの保存先（SecureStore） */
+  storage: SecureStorage;
+  /** 文字列の SHA-256 を base64url（パディングなし）にする */
+  sha256Base64Url(text: string): Promise<string>;
+  /** 組み込み済みの各社のサインイン（7.3.7 以降）。無い手段は `provider-unavailable` */
+  idTokenProviders?: Partial<Record<AuthProvider, IdTokenProvider>>;
+  /** APIの置き場（既定は本番）。テスト用 */
+  origin?: string;
 }
 
 export interface ServicesOptions {
@@ -34,6 +58,11 @@ export interface ServicesOptions {
    * アーティストだけになる。
    */
   catalogFetch?: FetchLike;
+  /**
+   * アカウントの通信・保存。渡さなければ、`account` は使えない（ログアウト中のまま）。
+   * 渡す側は `index.ts`（アプリ）とテストだけ。
+   */
+  auth?: AuthOptions;
 }
 
 /**
@@ -59,6 +88,7 @@ export function createServices(
     artists: artistRepository,
   });
   const tags = createTagService({ db, tags: tagRepository });
+  const { auth } = options;
   return {
     songs,
     tags,
@@ -73,5 +103,15 @@ export function createServices(
       isEnabled: () => settings.getSuggestionsEnabled(),
       now: env.now,
     }),
+    account: createAccountService(
+      auth
+        ? {
+            auth: createAuthRepository(auth.fetch, { origin: auth.origin }),
+            sessions: createSessionRepository(auth.storage),
+            sha256Base64Url: auth.sha256Base64Url,
+            idTokenProviders: auth.idTokenProviders ?? {},
+          }
+        : null,
+    ),
   };
 }

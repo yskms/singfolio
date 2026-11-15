@@ -242,6 +242,7 @@ export const THIRD_PARTY_PACKAGES: readonly ThirdPartyPackage[] = [
       "androidx.arch.core:core-common:2.2.0",
       "androidx.arch.core:core-runtime:2.2.0",
       "androidx.autofill:autofill:1.3.0",
+      "androidx.biometric:biometric:1.1.0",
       "androidx.cardview:cardview:1.0.0",
       "androidx.collection:collection-jvm:1.5.0",
       "androidx.collection:collection-ktx:1.5.0",
@@ -552,6 +553,13 @@ export const THIRD_PARTY_PACKAGES: readonly ThirdPartyPackage[] = [
     "kind": "npm",
     "name": "expo-router",
     "version": "57.0.25",
+    "license": "MIT",
+    "text": 3
+  },
+  {
+    "kind": "npm",
+    "name": "expo-secure-store",
+    "version": "57.0.4",
     "license": "MIT",
     "text": 3
   },

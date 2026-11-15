@@ -41,12 +41,16 @@ describe('app.json', () => {
     assert.equal(expo.android.adaptiveIcon.backgroundColor, brand.mint);
   });
 
-  it('使っていないAndroidの権限（他のアプリの上への表示・外部ストレージ）を外している', () => {
+  it('使っていないAndroidの権限（他のアプリの上への表示・外部ストレージ・生体認証）を外している', () => {
+    // 生体認証の2つは、expo-secure-store の依存（androidx.biometric）が足す。生体認証は使っていない
+    // （SecureStoreの requireAuthentication は使わない）。
     assert.deepEqual(
       [...expo.android.blockedPermissions].sort(),
       [
         'android.permission.READ_EXTERNAL_STORAGE',
         'android.permission.SYSTEM_ALERT_WINDOW',
+        'android.permission.USE_BIOMETRIC',
+        'android.permission.USE_FINGERPRINT',
         'android.permission.WRITE_EXTERNAL_STORAGE',
       ],
     );
