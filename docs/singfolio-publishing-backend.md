@@ -492,7 +492,10 @@ nonce・セッションの失効・Appleのトークン失効の方式は、「�
 -   Unpublish後の、受信済みのRequestの扱い（残す案。§6）。
 -   所有者がRequestを削除・拒否する手段（不適切なニックネームへの対応を含む）。
 -   レート制限が何を守るか、と、そのキー（IPアドレスを使うか。使う場合も保存しない案を基本とし、プライバシーポリシーに書く）。
-    先に、守るものを切り分ける。
+    先に、守るものを切り分ける。**決定（2026-11-15）: `POST /auth/nonce` には、Workerの中のレート制限を入れない。** このエンドポイントは
+    D1に書かず、1回の呼び出しの費用はHMACの計算だけで、外部サービスも呼ばない（乱用で増える費用が無い）。日次のリクエスト上限は、まず残る
+    リスクとして受け入れる。WAFのRate limiting rules（1ルール）の実測は、ダッシュボードの操作が要るので、残している。
+    乱用の費用が生じる経路（7.3.9 のAppleのトークン交換を呼ぶコールバックなど）で、あらためて決める。
     -   **乱用の抑止**（AndroidのAppleログインのコールバックが、Appleの `/auth/token` を呼ぶ費用など）。Workerの中で足りる
         （Workers の Rate Limiting API）。カウントは拠点ごとで、近似・結果整合のため、全世界での厳密な上限にはならない。
         `period` は10秒か60秒。キーは任意の文字列で、資料はIPアドレスを勧めていない（共有のIPがあるため）。キーが
@@ -614,8 +617,8 @@ Repositoryを、同じコミットで直せるため）。
     Cloudflareのエラーページ（Error 1101 が典型。資料は「Workerの実行時の例外で典型的に起きる」と書く）が返り、メッセージは
     応答に出ない。Workers Logs は無効なので、残りもしない。HTTPSの確認が500（1101）なら、まず鍵の長さを疑い、
     `wrangler secret put` で入れ直す。メッセージを見るなら `wrangler tail`（資料: Real-time logs は、キャッチされなかった
-    例外を含み、保存はしない。Workers Logs を無効にしたときも使えるかは、資料に明記が無いので、そのときに確かめる）を
-    起動してから、もう一度呼ぶ（鍵の不足は、毎回同じように起きる）。
+    例外を含み、保存はしない。Workers Logs を無効にしたままでも使えることは、実測した）を起動してから、もう一度呼ぶ
+    （鍵の不足は、毎回同じように起きる）。
 -   **ログ。** Workers Logs は無効にしている（`observability.enabled: false`）。Cloudflareの資料は、
     記録に含まれるヘッダー（`Authorization` など）と、`invocation_logs` を無効にしたときの
     `console.log` のメタデータを書いていない。セッションの値をヘッダーで送るため、確かめずに有効にしない。
@@ -639,17 +642,24 @@ Repositoryを、同じコミットで直せるため）。
         そのため、HTTPで届くのは、アプリ以外のクライアントか、設定ミスのときだけで、この検査は多層の防御にあたる。
         HSTSヘッダーは付けない（`.app` のpreloadで足り、APIの呼び出し元は使わない）。
     -   判定は、`request.url` のスキームと、見えたときの `X-Forwarded-Proto`（どちらも「`http` なら拒否」の向きにだけ使う）。
-        **エッジで、`request.url` がクライアントの接続を反映するかは、資料に書かれていない。** `wrangler dev`（workerd）では、
-        HTTPで来ると `http:` になることを確かめた。エッジでは、デプロイ後に `curl -i -X POST http://singfolio.app/auth/nonce` が
-        403になることを確かめる（7.3.3の確認項目）。素通りなら、この検査は効いていないので、別の手がかり（`CF-Visitor`）を足す。
-    -   **逆向きの失敗（HTTPSまで403になる）も確かめる。** 資料の `X-Forwarded-Proto` の節には、「既定は `https`。訪問者が別の
-        暗号化モードを選んだときを除く」とも書かれていて、オリジン側の暗号化モードの値と読める余地がある。Workerにこのヘッダーが
-        届くかも書かれていない。HTTPSのリクエストにも `http` が入っていれば、本番のすべてのリクエストが403になる。HTTPが403になる
-        確認では見つからないので、デプロイ後に `curl -i -X POST https://singfolio.app/auth/nonce -d '{"kind":"native"}'` が
-        200になることも確かめる。403なら、`wrangler rollback` で戻し、`X-Forwarded-Proto` の判定を外して（`request.url` だけにして）
-        出し直す。ただし、403が自前の拒否とは限らない（WAFなど、Cloudflare側の403もありうる）。**本文が `HTTPS required` なら
-        自前の拒否**で、上の手順に進む。それ以外の403は別の原因なので、戻す前に、本文とヘッダーを見る。500（1101）は、
-        Workerの例外で、HTTPSの検査ではない（まず `NONCE_HMAC_KEY` の長さを疑う）。
+        **エッジで、`request.url` がクライアントの接続を反映するかは、資料に書かれていない。** 本番にデプロイして実測した
+        （2026-11-15。`wrangler tail` で、Workerが受けたリクエストを見た）: `http://singfolio.app/...` は、`request.url` が
+        `http:`、`X-Forwarded-Proto: http`、`CF-Visitor: {"scheme":"http"}` で届き、403になった。`https://` は、順に `https:`・
+        `https`・`{"scheme":"https"}` で、200になった。3つの信号は一致し、HTTPSに `http` が入ることは無い。資料に無いので、
+        この挙動が変わる可能性は残る。変わったときに気づけるよう、デプロイ後の確認（下）を、手順として残す。
+    -   **デプロイ後の確認（HTTPSまで403になる逆向きの失敗を含む）。** 資料の `X-Forwarded-Proto` の節には、「既定は `https`。
+        訪問者が別の暗号化モードを選んだときを除く」とも書かれていて、オリジン側の暗号化モードの値と読める余地があった
+        （実測では、HTTPSのリクエストは `https` で届いた）。HTTPSのリクエストにも `http` が入ると、本番のすべてのリクエストが
+        403になり、HTTPが403になる確認では見つからない。そのため、`curl -i -X POST http://singfolio.app/auth/nonce` が403、
+        `curl -i -X POST https://singfolio.app/auth/nonce -d '{"kind":"native"}'` が200、の両方を確かめる。HTTPSが403なら、
+        `wrangler rollback` で戻し、`X-Forwarded-Proto` の判定を外して（`request.url` だけにして）出し直す。ただし、403が自前の
+        拒否とは限らない（WAFなど、Cloudflare側の403もありうる）。**本文が `HTTPS required` なら自前の拒否**で、上の手順に進む。
+        それ以外の403は別の原因なので、戻す前に、本文とヘッダーを見る。500（1101）は、Workerの例外で、HTTPSの検査ではない
+        （まず `NONCE_HMAC_KEY` の長さを疑う）。
+    -   `wrangler tail` は、Workers Logs を無効にしたまま使える（実測。リクエストのURL・ヘッダー・`exceptions` の欄が出る。
+        例外が実際に出ることは、本番では試していない）。出力にはリクエストのヘッダー（接続元のIPなど）が含まれ、認証の値
+        （`Authorization` など）が付くリクエストが流れる段階では、それも出うる。端末に出すだけで保存はされないが、出力を
+        共有・保存しない。
     -   ローカルの開発だけ、ホスト名が `localhost`・`127.0.0.1`・`[::1]` のものを通す（完全一致）。エッジでは、Custom Domainは
         `singfolio.app` に一致するリクエストだけを受けるので、`localhost` のHostは届かない（資料）。環境変数などで検査を切る口は
         作らない。`wrangler dev` は、既定で `routes` のホスト（`singfolio.app`）を `request.url` に入れ、`localhost` が見えず403に
