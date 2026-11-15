@@ -119,3 +119,36 @@ describe('suggestions', () => {
     assert.equal(await services.settings.getSuggestionsEnabled(), false);
   });
 });
+
+describe('ローカルデータの識別子（ensureLocalDataId）', () => {
+  it('最初の呼び出しで作って保存し、以後は同じ値を返す', async () => {
+    const { services, sqlite } = await createTestServices();
+    const first = await services.settings.ensureLocalDataId();
+    assert.notEqual(first, '');
+    assert.equal(await services.settings.ensureLocalDataId(), first);
+    const rows = sqlite.prepare("SELECT value FROM settings WHERE key = 'local_data_id'").all();
+    assert.deepEqual(
+      rows.map((row) => row.value),
+      [first],
+    );
+  });
+
+  it('同時に呼んでも、1つの値に決まる（読んでから書くまでが1つのトランザクション）', async () => {
+    const { services, sqlite } = await createTestServices();
+    const ids = await Promise.all(Array.from({ length: 8 }, () => services.settings.ensureLocalDataId()));
+    assert.equal(new Set(ids).size, 1);
+    assert.equal(
+      (sqlite.prepare("SELECT count(*) AS c FROM settings WHERE key = 'local_data_id'").get() as { c: number }).c,
+      1,
+    );
+  });
+
+  it('保存済みの値が空なら、作り直す。ほかの設定には触れない', async () => {
+    const { services, sqlite } = await createTestServices();
+    await services.settings.setAppearance('dark');
+    sqlite.exec("INSERT INTO settings (key, value) VALUES ('local_data_id', '')");
+    const id = await services.settings.ensureLocalDataId();
+    assert.notEqual(id, '');
+    assert.equal(await services.settings.getAppearance(), 'dark');
+  });
+});

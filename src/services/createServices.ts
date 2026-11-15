@@ -80,7 +80,7 @@ export function createServices(
   const tagRepository = createTagRepository(env);
   const artistRepository = createArtistRepository(env);
   const settingsRepository = createSettingsRepository();
-  const settings = createSettingsService({ db, settings: settingsRepository });
+  const settings = createSettingsService({ db, settings: settingsRepository, newId: env.newId });
   const songs = createSongService({
     db,
     songs: songRepository,
@@ -109,6 +109,7 @@ export function createServices(
             auth: createAuthRepository(auth.fetch, { origin: auth.origin }),
             sessions: createSessionRepository(auth.storage),
             sha256Base64Url: auth.sha256Base64Url,
+            localDataId: () => settings.ensureLocalDataId(),
             idTokenProviders: auth.idTokenProviders ?? {},
           }
         : null,

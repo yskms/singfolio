@@ -22,8 +22,13 @@ export type AuthErrorCode =
   | 'provider-unavailable'
   /** すでにサインインしている。先にログアウトする */
   | 'already-signed-in'
-  /** セッションを端末に保存できなかった（サーバー側のセッションは失効させてある） */
-  | 'storage-failed';
+  /**
+   * 端末のセッションの保存先（SecureStore）に書けなかった、または消せなかった。サインインでは、サーバー側の
+   * セッションは失効させてある。ログアウトでは、端末の値が消えていない（やり直せる）
+   */
+  | 'storage-failed'
+  /** 想定外の失敗（各社のサインインが契約に反して投げた、ハッシュの計算に失敗した、など）。アプリの不具合 */
+  | 'unexpected';
 
 export class AuthError extends Error {
   readonly code: AuthErrorCode;

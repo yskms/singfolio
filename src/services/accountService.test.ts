@@ -9,8 +9,8 @@ import type { AuthProvider } from '../domain/types.ts';
 import { AuthError } from '../repositories/authError.ts';
 import type { AuthRepository } from '../repositories/authRepository.ts';
 import { createSessionRepository, type SecureStorage } from '../repositories/sessionRepository.ts';
-import { createAccountService, type IdTokenProvider } from './accountService.ts';
 import { createTestServices } from '../testing/testDatabase.ts';
+import { createAccountService, type IdTokenProvider } from './accountService.ts';
 
 const sha256Base64Url = async (text: string) =>
   createHash('sha256').update(text).digest('base64url');
@@ -49,6 +49,7 @@ function setup(
   options: {
     auth?: Partial<AuthRepository>;
     providers?: Partial<Record<AuthProvider, IdTokenProvider>>;
+    sha256?: (text: string) => Promise<string>;
   } = {},
 ) {
   const { storage, items } = memoryStorage();
@@ -62,13 +63,16 @@ function setup(
       return 'ID-TOKEN';
     },
   };
+  // ローカルDBの識別子。`state.id` を変えると、DBを新しく作った（再インストール）状態になる。
+  const state = { id: 'data-1' };
   const account = createAccountService({
     auth,
     sessions,
-    sha256Base64Url,
+    sha256Base64Url: options.sha256 ?? sha256Base64Url,
+    localDataId: async () => state.id,
     idTokenProviders: options.providers ?? { apple },
   });
-  return { account, sessions, items, calls, hashed };
+  return { account, sessions, items, calls, hashed, state };
 }
 
 async function rejectsWith(promise: Promise<unknown>, code: string): Promise<void> {
@@ -84,7 +88,11 @@ describe('signIn', () => {
     // 各社に渡すのは T そのものではなく SHA-256(T) の base64url（43字）
     assert.deepEqual(hashed, [createHash('sha256').update('T-1').digest('base64url')]);
     assert.equal(hashed[0].length, 43);
-    assert.deepEqual(await sessions.get(), { session: 'SESSION-1', provider: 'apple' });
+    // ローカルDBの識別子と一緒に保存する
+    assert.deepEqual(await sessions.read(), {
+      kind: 'found',
+      value: { session: 'SESSION-1', provider: 'apple', localDataId: 'data-1' },
+    });
     assert.equal(await account.getSignedInProvider(), 'apple');
   });
 
@@ -116,8 +124,7 @@ describe('signIn', () => {
     await rejectsWith(account.signIn('apple'), 'cancelled');
     assert.deepEqual(calls, ['nonce']);
     assert.equal(items.size, 0);
-    // やり直せる
-    assert.equal(await account.getSignedInProvider(), null);
+    assert.equal(await account.getSignedInProvider(), null); // やり直せる
   });
 
   it('IDトークンが空・文字列でなければ invalid-response（login を呼ばない）', async () => {
@@ -170,10 +177,113 @@ describe('signIn', () => {
         deleteItemAsync: async () => {},
       }),
       sha256Base64Url,
+      localDataId: async () => 'data-1',
       idTokenProviders: { apple: { getIdToken: async () => 'ID-TOKEN' } },
     });
     await rejectsWith(account.signIn('apple'), 'storage-failed');
     assert.deepEqual(calls, ['logout:SESSION-1']);
+  });
+
+  it('別のローカルDBのセッション（再インストール前の残り）は、サインイン中として扱わず、上書きして入れる', async () => {
+    const { account, sessions, state } = setup();
+    await account.signIn('apple');
+    state.id = 'data-2'; // DBを新しく作った。DBの外のセッションは残っている
+    assert.equal(await account.getSignedInProvider(), null);
+    await account.signIn('apple'); // already-signed-in にならない
+    assert.deepEqual(await sessions.read(), {
+      kind: 'found',
+      value: { session: 'SESSION-1', provider: 'apple', localDataId: 'data-2' },
+    });
+    assert.equal(await account.getSignedInProvider(), 'apple');
+  });
+
+  it('読めない値が残っていても、サインインは進めて上書きする（読めないだけで止めると、二度と入れない）', async () => {
+    const { account, items } = setup();
+    items.set('singfolio.session', 'garbage');
+    await account.signIn('apple');
+    assert.equal(await account.getSignedInProvider(), 'apple');
+  });
+});
+
+describe('失敗は AuthError に包む（画面が code で分類できる）', () => {
+  it('ハッシュの計算の失敗は unexpected。保存も login もしない', async () => {
+    const { account, calls, items } = setup({
+      sha256: async () => {
+        throw new Error('digest unavailable');
+      },
+    });
+    await rejectsWith(account.signIn('apple'), 'unexpected');
+    assert.deepEqual(calls, ['nonce']);
+    assert.equal(items.size, 0);
+  });
+
+  it('各社のサインインが契約に反して投げた例外は unexpected。元の例外の内容（トークンなど）は載せない', async () => {
+    const { account } = setup({
+      providers: {
+        apple: {
+          getIdToken: async () => {
+            throw new Error('SDK failed for token SECRET-TOKEN');
+          },
+        },
+      },
+    });
+    await assert.rejects(account.signIn('apple'), (error) => {
+      assert.ok(error instanceof AuthError);
+      assert.equal(error.code, 'unexpected');
+      assert.ok(!error.message.includes('SECRET-TOKEN'));
+      return true;
+    });
+  });
+
+  it('識別子を取れない（DBの失敗）のも unexpected', async () => {
+    const { storage } = memoryStorage();
+    const account = createAccountService({
+      auth: fakeAuth().auth,
+      sessions: createSessionRepository(storage),
+      sha256Base64Url,
+      localDataId: async () => {
+        throw new Error('db closed');
+      },
+      idTokenProviders: { apple: { getIdToken: async () => 'ID-TOKEN' } },
+    });
+    await rejectsWith(account.signIn('apple'), 'unexpected');
+  });
+
+  it('ログアウトで端末の値を消せなければ storage-failed。サーバーへは送らない。状態は変わらない', async () => {
+    const calls: string[] = [];
+    const { storage } = memoryStorage();
+    const sessions = createSessionRepository({
+      ...storage,
+      deleteItemAsync: async () => {
+        throw new Error('delete failed');
+      },
+    });
+    await sessions.set({ session: 'SESSION-1', provider: 'apple', localDataId: 'data-1' });
+    const account = createAccountService({
+      auth: fakeAuth({ logout: async (s) => void calls.push(s) }).auth,
+      sessions,
+      sha256Base64Url,
+      localDataId: async () => 'data-1',
+      idTokenProviders: {},
+    });
+    await rejectsWith(account.signOut(), 'storage-failed');
+    assert.deepEqual(calls, []);
+    assert.equal(await account.getSignedInProvider(), 'apple'); // 端末の状態と見た目が食い違わない
+  });
+
+  it('削除が黙って失敗して値が残る（iOS）ときも storage-failed（ログアウトできたことにしない）', async () => {
+    const { storage } = memoryStorage();
+    const sessions = createSessionRepository({ ...storage, deleteItemAsync: async () => {} });
+    await sessions.set({ session: 'SESSION-1', provider: 'apple', localDataId: 'data-1' });
+    const account = createAccountService({
+      auth: fakeAuth().auth,
+      sessions,
+      sha256Base64Url,
+      localDataId: async () => 'data-1',
+      idTokenProviders: {},
+    });
+    await rejectsWith(account.signOut(), 'storage-failed');
+    assert.equal(await account.getSignedInProvider(), 'apple');
   });
 });
 
@@ -188,7 +298,7 @@ describe('signOut', () => {
         await storage.deleteItemAsync(key);
       },
     });
-    await sessions.set({ session: 'SESSION-9', provider: 'google' });
+    await sessions.set({ session: 'SESSION-9', provider: 'google', localDataId: 'data-1' });
     const account = createAccountService({
       auth: fakeAuth({
         logout: async (session) => {
@@ -197,6 +307,7 @@ describe('signOut', () => {
       }).auth,
       sessions,
       sha256Base64Url,
+      localDataId: async () => 'data-1',
       idTokenProviders: {},
     });
     assert.deepEqual(await account.signOut(), { serverRevoked: true });
@@ -238,33 +349,49 @@ describe('signOut', () => {
     assert.deepEqual(calls, []);
   });
 
-  it('読めない値が残っていても、消す（サーバーへは送れない）', async () => {
+  it('読めない値が残っていたら、消すが、失効を確認できたとは言わない（serverRevoked: false）。サーバーへは送らない', async () => {
     const { account, items, calls } = setup();
     items.set('singfolio.session', 'garbage');
-    assert.deepEqual(await account.signOut(), { serverRevoked: true });
+    assert.deepEqual(await account.signOut(), { serverRevoked: false });
     assert.equal(items.size, 0);
     assert.deepEqual(calls, []);
   });
 
-  it('端末の値を消せなければ投げる（ログアウトできていないことを成功に見せない）。サーバーへは送らない', async () => {
+  it('端末の読み取りが一時的に失敗していたときも、serverRevoked: false（値があるかもしれない）', async () => {
     const calls: string[] = [];
-    const { storage } = memoryStorage();
-    const sessions = createSessionRepository({
-      ...storage,
-      deleteItemAsync: async () => {
-        throw new Error('delete failed');
-      },
-    });
-    await sessions.set({ session: 'SESSION-1', provider: 'apple' });
+    const items = new Map<string, string>([['singfolio.session', 'x']]);
+    let failReads = true;
     const account = createAccountService({
       auth: fakeAuth({ logout: async (s) => void calls.push(s) }).auth,
-      sessions,
+      sessions: createSessionRepository({
+        getItemAsync: async (key) => {
+          // 最初の読み取り（signOut の冒頭）だけ失敗し、消したあとの読み戻しは通る
+          if (failReads) {
+            failReads = false;
+            throw new Error('keychain locked');
+          }
+          return items.get(key) ?? null;
+        },
+        setItemAsync: async () => {},
+        deleteItemAsync: async (key) => void items.delete(key),
+      }),
       sha256Base64Url,
+      localDataId: async () => 'data-1',
       idTokenProviders: {},
     });
-    await assert.rejects(account.signOut(), /delete failed/);
+    assert.deepEqual(await account.signOut(), { serverRevoked: false });
+    assert.equal(items.size, 0);
     assert.deepEqual(calls, []);
-    assert.equal(await account.getSignedInProvider(), 'apple'); // 端末の状態と見た目が食い違わない
+  });
+
+  it('別のローカルDBのセッション（再インストール前の残り）も、サーバーのセッションは実在するので、失効させる', async () => {
+    const { account, calls, state, items } = setup();
+    await account.signIn('apple');
+    state.id = 'data-2';
+    calls.length = 0;
+    assert.deepEqual(await account.signOut(), { serverRevoked: true });
+    assert.deepEqual(calls, ['logout:SESSION-1']);
+    assert.equal(items.size, 0);
   });
 });
 
@@ -301,22 +428,22 @@ describe('直列化', () => {
   });
 });
 
-describe('注入しないとき（createServices に auth を渡さない）', () => {
-  it('ログアウト中のままで、signIn は provider-unavailable。signOut は何もしない', async () => {
+describe('createServices との結合', () => {
+  it('auth を渡さなければ、ログアウト中のままで、signIn は provider-unavailable。signOut は何もしない', async () => {
     const { services } = await createTestServices();
     assert.equal(await services.account.getSignedInProvider(), null);
     await rejectsWith(services.account.signIn('apple'), 'provider-unavailable');
     assert.deepEqual(await services.account.signOut(), { serverRevoked: true });
   });
 
-  it('createServices に auth を渡すと、アカウントが組み立てられる', async () => {
-    const { storage } = memoryStorage();
+  function authOptions(storage: SecureStorage) {
     const requests: string[] = [];
-    const { services } = await createTestServices({
+    return {
+      requests,
       auth: {
         storage,
         sha256Base64Url,
-        fetch: async (url) => {
+        fetch: async (url: string) => {
           requests.push(url);
           return url.endsWith('/auth/nonce')
             ? { ok: true, status: 200, json: async () => ({ nonce: 'T-1' }) }
@@ -324,9 +451,33 @@ describe('注入しないとき（createServices に auth を渡さない）', (
         },
         idTokenProviders: { apple: { getIdToken: async () => 'ID-TOKEN' } },
       },
-    });
+    };
+  }
+
+  it('auth を渡すと、アカウントが組み立てられ、DBの識別子と一緒にセッションを保存する', async () => {
+    const { storage, items } = memoryStorage();
+    const { requests, auth } = authOptions(storage);
+    const { services, sqlite } = await createTestServices({ auth });
     await services.account.signIn('apple');
     assert.equal(await services.account.getSignedInProvider(), 'apple');
     assert.deepEqual(requests, ['https://singfolio.app/auth/nonce', 'https://singfolio.app/auth/login']);
+    const dataId = (sqlite.prepare("SELECT value FROM settings WHERE key = 'local_data_id'").get() as { value: string })
+      .value;
+    assert.equal(JSON.parse([...items.values()][0]).localDataId, dataId);
+  });
+
+  it('DBを新しく作ったあと（再インストール）は、DBの外に残ったセッションを、サインイン中として扱わない', async () => {
+    const { storage } = memoryStorage();
+    const first = await createTestServices({ auth: authOptions(storage).auth });
+    await first.services.account.signIn('apple');
+    assert.equal(await first.services.account.getSignedInProvider(), 'apple');
+
+    // 同じSecureStore（残ったKeychain）と、新しいDB。テストの環境は連番のIDを作るので、最初のIDが
+    // 古いDBと同じにならないよう、1つ進めておく（本物は、毎回ちがうUUID）
+    const second = await createTestServices({ auth: authOptions(storage).auth });
+    second.env.newId();
+    assert.equal(await second.services.account.getSignedInProvider(), null);
+    await second.services.account.signIn('apple'); // already-signed-in にならない
+    assert.equal(await second.services.account.getSignedInProvider(), 'apple');
   });
 });

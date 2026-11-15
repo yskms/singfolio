@@ -2,7 +2,10 @@
 // Keystoreで暗号化）にだけ置く。SQLite（ローカルDB）・settings・ログには置かない。
 //
 // 保存するのは、セッションの値と、どのログイン手段で入ったか（アカウントの削除の再認証と、画面の表示に
-// 要る）。ユーザーID・メール・名前は端末に持たない（サーバーもクライアントから受け取らない）。
+// 要る）と、**ローカルDBの識別子**（`settings.local_data_id`）。ユーザーID・メール・名前は端末に持たない
+// （サーバーもクライアントから受け取らない）。識別子を一緒に置くのは、このセッションが、今のローカルDBに
+// 属するかを確かめるため（`accountService`。iOSのKeychainは、アプリを削除しても残りうるので、再インストール
+// のあと、ローカルは空なのにセッションだけが生きている状態を作らない）。
 //
 // `SecureStorage` は注入する（`services/index.ts` が expo-secure-store を渡す）。Nodeのテストは
 // メモリ上の偽物で動かす。
@@ -19,11 +22,23 @@ export interface StoredSession {
   /** セッションの値（不透明。`Authorization: Bearer` で送る。画面・ログに出さない） */
   session: string;
   provider: AuthProvider;
+  /** 保存したときの、ローカルDBの識別子（`settings.local_data_id`） */
+  localDataId: string;
 }
+
+/**
+ * 保存先の読み取りの結果。`none`（項目が無い）と `unreadable`（読み取りに失敗した、壊れている、知らない版）を
+ * 区別する。どちらも「サインインしていない」扱いだが、`unreadable` は、値が残っていてサーバーのセッションも
+ * 生きているかもしれない（ログアウトで、失効を確認できたと言ってはいけない）。
+ */
+export type SessionRead =
+  | { kind: 'none' }
+  | { kind: 'unreadable' }
+  | { kind: 'found'; value: StoredSession };
 
 // SecureStore のキーは、英数字と `.`・`-`・`_` だけ。
 const SESSION_KEY = 'singfolio.session';
-/** 保存する形の版。読めない版（将来のアプリが保存したものなど）は、サインインしていない扱い。 */
+/** 保存する形の版。読めない版（将来のアプリが保存したものなど）は `unreadable`。 */
 const FORMAT_VERSION = 1;
 
 function parse(raw: string): StoredSession | null {
@@ -34,47 +49,56 @@ function parse(raw: string): StoredSession | null {
     return null;
   }
   if (typeof data !== 'object' || data === null) return null;
-  const { v, session, provider } = data as Record<string, unknown>;
+  const { v, session, provider, localDataId } = data as Record<string, unknown>;
   if (v !== FORMAT_VERSION) return null;
   if (typeof session !== 'string' || session === '' || !isAuthProvider(provider)) return null;
-  return { session, provider };
+  if (typeof localDataId !== 'string' || localDataId === '') return null;
+  return { session, provider, localDataId };
 }
 
 export function createSessionRepository(storage: SecureStorage) {
   return {
     /**
-     * 保存したセッション。無い・読めない・形が違うときは `null`（サインインしていない扱い）。
-     * 読み取りの失敗（端末がロック中、Androidで鍵が失われた、など）も `null` にして、投げない:
-     * 読めないことは「サインインしていない」と同じにしか扱えず、v1.0の機能を止める理由にならない。
-     * 読めない値は消さない（一時的な失敗かもしれない）。次の `set` で上書きされる。
+     * 保存したセッション。読み取りの失敗（端末がロック中、Androidで鍵が失われた、など）も、壊れた値・知らない版も、
+     * 投げずに `unreadable`（読めないことは、v1.0の機能を止める理由にならない）。読めない値は消さない
+     * （一時的な失敗かもしれない）。次の `set` で上書きされる。
      */
-    async get(): Promise<StoredSession | null> {
+    async read(): Promise<SessionRead> {
       let raw: string | null;
       try {
         raw = await storage.getItemAsync(SESSION_KEY);
       } catch {
-        return null;
+        return { kind: 'unreadable' };
       }
-      return raw === null ? null : parse(raw);
+      if (raw === null) return { kind: 'none' };
+      const value = parse(raw);
+      return value ? { kind: 'found', value } : { kind: 'unreadable' };
     },
 
     /** 保存する（上書き）。失敗したら投げる。 */
     async set(value: StoredSession): Promise<void> {
       await storage.setItemAsync(
         SESSION_KEY,
-        JSON.stringify({ v: FORMAT_VERSION, session: value.session, provider: value.provider }),
+        JSON.stringify({
+          v: FORMAT_VERSION,
+          session: value.session,
+          provider: value.provider,
+          localDataId: value.localDataId,
+        }),
       );
     },
 
     /**
      * 消す。無くても成功。消せていなければ投げる（黙って見逃さない）。iOSの `deleteItemAsync` は、Keychainの
      * 削除の結果を捨てて、失敗しても投げない（expo-secure-store のソース）。そこで、消したあとに読んで、
-     * 残っていれば失敗にする。読めない（投げた）ときは、残っているとは言えないので、消えた扱い。
+     * 残っていれば失敗にする。**読み戻しの失敗も投げる**（残っていないと確かめられない）。ログアウトが、
+     * 端末の値が消えたことを保証するため。
      */
     async clear(): Promise<void> {
       await storage.deleteItemAsync(SESSION_KEY);
-      const remaining = await storage.getItemAsync(SESSION_KEY).catch(() => null);
-      if (remaining !== null) throw new Error('The stored session could not be removed');
+      if ((await storage.getItemAsync(SESSION_KEY)) !== null) {
+        throw new Error('The stored session could not be removed');
+      }
     },
   };
 }

@@ -7,14 +7,17 @@ import { ServiceError } from './errors.ts';
 export interface SettingsServiceDeps {
   db: Database;
   settings: SettingsRepository;
+  /** 新しいUUIDを返す（`ensureLocalDataId` が使う）。 */
+  newId(): string;
 }
 
 const APPEARANCE_KEY = 'appearance';
 const LANGUAGE_KEY = 'language';
 const SUGGESTIONS_KEY = 'suggestions';
+const LOCAL_DATA_ID_KEY = 'local_data_id';
 
 // 書き込みは必ず `db.transaction` の中で行う（理由は db/appDatabase.ts）。
-export function createSettingsService({ db, settings }: SettingsServiceDeps) {
+export function createSettingsService({ db, settings, newId }: SettingsServiceDeps) {
   return {
     /**
      * 外観の設定。未設定や、型の外から来た値（アプリの将来のバージョンが保存した
@@ -63,6 +66,25 @@ export function createSettingsService({ db, settings }: SettingsServiceDeps) {
 
     async setSuggestionsEnabled(enabled: boolean): Promise<void> {
       await db.transaction((tx) => settings.set(tx, SUGGESTIONS_KEY, enabled ? 'on' : 'off'));
+    },
+
+    /**
+     * このローカルDBの識別子（UUID）。DBを新しく作った（初回起動・再インストール）あとの最初の呼び出しで
+     * 作って保存し、以後は同じ値を返す。DBの外（SecureStoreのセッション）が、このDBに属するかを
+     * 確かめるために使う（`accountService`）。利用者の設定ではなく、画面に出さず、公開用データにも含めない。
+     * バックアップでDBが戻れば、同じ値も戻る。読んでから書くまでを1つのトランザクションにして、
+     * 同時に呼んでも、1つの値に決まる。
+     */
+    async ensureLocalDataId(): Promise<string> {
+      const existing = await settings.get(db, LOCAL_DATA_ID_KEY);
+      if (existing !== null && existing !== '') return existing;
+      return db.transaction(async (tx) => {
+        const current = await settings.get(tx, LOCAL_DATA_ID_KEY);
+        if (current !== null && current !== '') return current;
+        const id = newId();
+        await settings.set(tx, LOCAL_DATA_ID_KEY, id);
+        return id;
+      });
     },
   };
 }

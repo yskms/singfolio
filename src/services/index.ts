@@ -41,9 +41,16 @@ let servicesPromise: Promise<Services> | null = null;
 export function getServices(): Promise<Services> {
   servicesPromise ??= getDatabase({
     // DBを新しく作るとき（初回起動・再インストール）は、保存済みのセッションを捨てる。iOSの
-    // Keychainは、アプリを削除しても残りうる（保証はされない）。残ったままだと、ローカルは空なのに
-    // セッションだけが生きている。捨てられなければ、起動の失敗にする（次の起動でやり直す）。
-    onNewDatabase: () => createSessionRepository(secureStorage).clear(),
+    // Keychainは、アプリを削除しても残りうる（保証はされない）。**後始末で、失敗しても起動を止めない**
+    // （ログインを要求しないので、SecureStoreの不調で、v1.0の機能まで使えなくしない）。残ったセッションは、
+    // ローカルDBの識別子が合わないので、サインイン中として扱われない（`accountService`）。
+    onNewDatabase: async () => {
+      try {
+        await createSessionRepository(secureStorage).clear();
+      } catch {
+        // 握りつぶす。ここに依存して、セッションが生きないようにはしていない
+      }
+    },
   })
     .then((raw) =>
       createServices(

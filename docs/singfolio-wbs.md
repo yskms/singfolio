@@ -200,13 +200,16 @@ v1.0より後（公開機能・Requests）の実装順序は、
     -   [x] 7.3.6 アプリ側の認証の土台。HTTPをRepositoryに閉じ込める、SecureStoreにセッション、初回起動でセッションを捨てる、
         失敗の扱い。ログインを要求しない（ログアウトのままでも、v1.0の機能はすべて使える）。`authRepository`（`/auth/nonce`・
         `/auth/login`・`/auth/logout`）、`sessionRepository`（SecureStore）、`account` Service（`signIn(provider)`・`signOut`。各社の
-        サインインは `IdTokenProvider` として 7.3.7 以降が注入する）。初回起動の破棄は `runMigrations` の `onNewDatabase`（最初のマイグレー
-        ションの前。捨てられなければ起動の失敗）。ログアウトは端末の値を先に捨て、通信できなくても端末はログアウトする。
+        サインインは `IdTokenProvider` として 7.3.7 以降が注入する）。セッションは、ローカルDBの識別子（`settings.local_data_id`）と一緒に保存し、
+        今のDBと合わなければ、サインイン中として扱わない（再インストール後にKeychainに残ったセッションを生かさない）。初回起動の破棄
+        （`runMigrations` の `onNewDatabase`。最初のマイグレーションの前）は後始末で、失敗しても起動を止めない。ログアウトは端末の値を先に
+        捨て、通信できなくても端末はログアウトする。
         `expo-secure-store` を足し、config plugin は足さず（Androidのバックアップ規則がSQLiteを外すため）、`androidx.biometric` が足す
         `USE_BIOMETRIC`・`USE_FINGERPRINT` を `blockedPermissions` に足した。Androidエミュレータ（R8入りのrelease）とiOS Simulatorで確かめた
         （§8「アプリ側の認証の土台」）
     -   [ ] 7.3.7 Appleのサインイン（iOS。`expo-apple-authentication`）。最初に、実機で、AppleのIDトークンの `nonce` が、渡した値
-        そのままかを確かめる
+        そのままかを確かめる。`IdTokenProvider`（`getIdToken`）の実装では、時間の上限と取り消しを決める（結果が返らないと、`account` の
+        直列化で、後ろのログアウトが待ち続ける。Googleの7.3.8も同じ。§8「アプリ側の認証の土台」の「直列化」）
     -   [ ] 7.3.8 Googleのサインイン（iOS・Android）。検証済みの自作モジュール（§8「Googleのサインイン」）を、mainから切った
         新しいブランチへ取り込む（検証用の画面は持ち込まない）。ライセンス一覧の生成の対応（Android Software Development Kit
         Licenseの依存を個別に許可し、Aboutに別枠で載せる）。`blockedPermissions` の `USE_BIOMETRIC`・`USE_FINGERPRINT` は

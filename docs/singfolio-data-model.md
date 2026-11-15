@@ -104,7 +104,7 @@ UIの表示名「My Key」は、モデル・DBでは `keyOffset` / `key_offset` 
 
 | カラム | 型 | 内容 |
 |---|---|---|
-| `key` | TEXT PK | 設定の名前。現在は `appearance` / `language` / `suggestions` |
+| `key` | TEXT PK | 設定の名前。現在は `appearance` / `language` / `suggestions` / `local_data_id` |
 | `value` | TEXT NOT NULL | 値（文字列） |
 
 -   値の意味・検証はService層（`settingsService`）で行う。DBには制約を置かない
@@ -118,6 +118,11 @@ UIの表示名「My Key」は、モデル・DBでは `keyOffset` / `key_offset` 
     追加した言語など）でも、エラーにせず、端末の言語から決め直して書き込む（起動を止めない）。
 -   `suggestions`: `on` / `off`。曲名・アーティストの候補を外部の楽曲検索から出すか。
     未保存、または `off` 以外の値は `on`（既定）として読む。
+-   `local_data_id`: このローカルDBの識別子（UUID）。利用者の設定ではなく、画面に出さず、公開用データにも含めない。
+    DBを新しく作ったあとの最初の `settings.ensureLocalDataId()` で作る（未保存・空なら作る。同時に呼んでも1つに決まる）。
+    DBの外に置くセッション（SecureStore）が、このDBに属するかを確かめるために、セッションと一緒に保存する
+    （`singfolio-publishing-backend.md` §8「アプリ側の認証の土台」）。バックアップでDBが戻れば、同じ値も戻る。
+    消したり作り直したりする処理を足さない（セッションが、サインイン中として扱われなくなる）。
 
 ## Repository / Service層
 
@@ -162,7 +167,8 @@ expo-sqliteの `withTransactionAsync` は排他ではなく、トランザクシ
     Readyの曲に付いているものだけ。読み取りだけ）
 -   `settings`: `getAppearance` / `setAppearance`（`system` / `light` / `dark`）、
     `ensureLanguage`（保存した言語。未保存なら、端末の言語から決めて保存して返す）/ `setLanguage`（`en` / `ja`）、
-    `getSuggestionsEnabled` / `setSuggestionsEnabled`（候補の外部検索のオン / オフ。既定はオン）
+    `getSuggestionsEnabled` / `setSuggestionsEnabled`（候補の外部検索のオン / オフ。既定はオン）、
+    `ensureLocalDataId`（ローカルDBの識別子。なければ作って保存して返す。`account` が使う）
 -   `suggestions`: `available`（外部の検索が組み込まれているか）/ `localArtists` /
     `catalogArtists` / `catalogSongs`（「候補検索」。外部の検索は、探せなかったとき `null`）
 -   `artists`: `listArtists`（全アーティストを、読みの五十音順に、曲数つきで）/ `updateArtist`
@@ -170,7 +176,8 @@ expo-sqliteの `withTransactionAsync` は排他ではなく、トランザクシ
     曲の保存（`songs`。「artists」テーブル）。
 -   `account`: `getSignedInProvider`（サインイン中のログイン手段か `null`）/ `signIn(provider)` / `signOut`
     （端末の値を先に捨てる。サーバーでの失効を確認できたかを返す）。失敗は `AuthError`（`ServiceError` とは別。`code` は
-    `singfolio-publishing-backend.md` §8「アプリ側の認証の土台」）。SQLiteには触れない。
+    `singfolio-publishing-backend.md` §8「アプリ側の認証の土台」）。セッションはSQLiteではなくSecureStoreに置き、SQLiteからは
+    `settings.local_data_id` だけを読む。
 -   `tags`: `listTags` / `getOrCreateTag`（同じ名前のタグがあればそれを返し、なければ作る。
     タグだけを作る操作で、曲の編集画面は使わない。「曲の入力」の `newTagNames`）/
     `renameTag` / `deleteTag`
@@ -394,8 +401,10 @@ UI → `suggestions`（Service）→ `songCatalogRepository`（外部の楽曲�
     マイグレーションが終わってから画面を出す。
 -   DBを新しく作るとき（`user_version` が 0。初回起動・再インストール）だけ、最初のマイグレーションの**前に**
     `onNewDatabase` を呼ぶ。DBの外に残る状態（iOSのKeychainに残ったセッション）を捨てるための口で、呼ぶのは
-    `services/index.ts`（`singfolio-publishing-backend.md` §8「アプリ側の認証の土台」）。投げたらマイグレーションを
-    実行せずに起動の失敗にし、次の起動でもう一度呼ぶ。何度呼んでも同じ結果になる処理にする。
+    `services/index.ts`（`singfolio-publishing-backend.md` §8「アプリ側の認証の土台」）。`runMigrations` は、
+    投げられたらマイグレーションを実行せずにそのまま投げる（次の起動でもう一度呼ぶ）。何度呼んでも同じ結果になる
+    処理にする。アプリが渡す処理は後始末で、**失敗を握りつぶして、起動を止めない**（正しさは、セッションと
+    `settings.local_data_id` の結びつきが守る）。
 
 ### テーブルの作り直し
 
