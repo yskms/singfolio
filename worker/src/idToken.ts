@@ -103,7 +103,12 @@ export function createIdTokenVerifier(
   const cache = new Map<IdTokenProvider, CachedKeys>();
   // 最後に取得を試みた時刻（失敗を含む）。鍵が無くても持つ（冷却のため）。取得の完了のあとに書く
   // （試みの最中に書くと、同時に来た別のリクエストが、取得の途中なのに `unavailable` になる）。
+  // 同時の取得が前後して終わると、少し古い時刻が残りうるが、冷却が数秒ずれるだけなので、後勝ちにする。
   const attemptedAt = new Map<IdTokenProvider, number>();
+  // 取得を始めた順番。遅れて終わった取得が、あとから始めた取得の鍵を上書きしないために使う。
+  // 時刻（`now`）で比べない: 時計が戻ったとき、新しい鍵がいつまでも保存されなくなる。
+  let fetchCount = 0;
+  const appliedFetch = new Map<IdTokenProvider, number>();
 
   async function fetchKeys(provider: IdTokenProvider, now: number): Promise<CachedKeys> {
     const response = await fetchFunction(providers[provider].jwksUrl, {
@@ -121,6 +126,7 @@ export function createIdTokenVerifier(
 
   // 取得し直す。失敗したら、使える前の鍵があればそれを返し、無ければ例外にする。成功も失敗も、試みた時刻を残す。
   async function refresh(provider: IdTokenProvider, previous: CachedKeys | undefined, now: number): Promise<CachedKeys> {
+    const ticket = ++fetchCount;
     let next: CachedKeys | undefined;
     try {
       next = await fetchKeys(provider, now);
@@ -129,7 +135,12 @@ export function createIdTokenVerifier(
     }
     attemptedAt.set(provider, now);
     if (next !== undefined) {
-      cache.set(provider, next);
+      // あとから始めた取得がすでに反映されていたら、遅れて終わったこの結果では上書きしない（このリクエストは、
+      // 自分が取った鍵をそのまま使う）。失敗した取得は反映の順番を進めないので、先に始めた取得の成功は捨てない。
+      if (ticket > (appliedFetch.get(provider) ?? 0)) {
+        appliedFetch.set(provider, ticket);
+        cache.set(provider, next);
+      }
       return next;
     }
     if (previous === undefined) throw new KeysUnavailable();

@@ -377,6 +377,57 @@ describe('公開鍵(JWKS)の取得とキャッシュ', () => {
     assert.equal(issuer.state.calls.length, calls);
   });
 
+  it('同時の取得が前後して終わっても、あとから始めた取得の鍵を、遅れて終わった取得で上書きしない', async () => {
+    // A（先に始めて遅く終わる。鍵は keyA だけ）と B（あとに始めて先に終わる。keyA と keyB）。
+    // 最後に A が終わっても、B の鍵が残る。時刻でなく、取得を始めた順番で決める。
+    const { issuer, verify } = setup();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let responses = 0;
+    issuer.state.respond = async () => {
+      if (++responses === 1) {
+        await gate;
+        return Response.json({ keys: [keyA.jwk] });
+      }
+      return Response.json({ keys: [keyA.jwk, keyB.jwk] });
+    };
+    const pendingA = verify(await sign(), { now: NOW });
+    while (issuer.state.calls.length < 1) await new Promise((resolve) => setImmediate(resolve));
+    assert.equal((await verify(await sign({}, { key: keyB }), { now: NOW + 1000 })).ok, true);
+    release();
+    assert.equal((await pendingA).ok, true); // A のリクエスト自身は、自分の鍵で通る
+    // A が終わったあとも、B の鍵（keyB を含む）が残っている。取り直しは起きない。
+    assert.equal((await verify(await sign({}, { key: keyB }), { now: NOW + 2000 })).ok, true);
+    assert.equal(issuer.state.calls.length, 2);
+  });
+
+  it('先に始めた取得の成功は、あとに始めた取得が失敗しても、捨てない', async () => {
+    const { issuer, verify } = setup();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let responses = 0;
+    issuer.state.respond = async () => {
+      if (++responses === 1) {
+        await gate;
+        return Response.json({ keys: [keyA.jwk] });
+      }
+      return new Response('', { status: 500 });
+    };
+    const pendingA = verify(await sign(), { now: NOW });
+    while (issuer.state.calls.length < 1) await new Promise((resolve) => setImmediate(resolve));
+    // B は失敗する（鍵がまだ無いので unavailable）
+    assert.deepEqual(await verify(await sign(), { now: NOW + 1000 }), failure('unavailable'));
+    release();
+    assert.equal((await pendingA).ok, true);
+    // A の鍵が保存されている（B の失敗で捨てられていない）
+    assert.equal((await verify(await sign(), { now: NOW + 2000 })).ok, true);
+    assert.equal(issuer.state.calls.length, 2);
+  });
+
   it('取り直した鍵が壊れていたら、前の鍵を捨てない', async () => {
     const { issuer, verify } = setup();
     await verify(await sign());
