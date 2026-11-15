@@ -375,7 +375,7 @@ AppleとGoogleの仕様は、各社の公式資料で確かめた（Appleは、I
         認証なしで外部（Apple）を呼ばせる経路とは違う。
 -   **`POST /auth/logout`**: `Authorization: Bearer <セッションの値>` のセッションの行を削除して、204（本文なし）。行が無い（すでに
     失効している）値でも204（何度呼んでも同じ。ログアウトは、値を持っている側だけが呼べる）。ヘッダーが無い・形が違うときだけ401
-    （何も消さない）。405（`POST` 以外）。アプリは、204でも401でも、端末の値を捨てる。通信できないときの扱いは、7.3.6 で決める。
+    （何も消さない）。405（`POST` 以外）。アプリは、204でも401でも、端末の値を捨てる。通信できないときの扱いは「アプリ側の認証の土台」。
 -   確かめたこと: 模擬の発行元とローカルのD1で、成功・各検査での拒否（D1に何も書かない）・リプレイ・503・形の不備をテストした
     （`worker/test/login.test.ts`・`session.test.ts`）。workerd（`wrangler dev`）で、本物のGoogleのJWKSを取得して知らない `kid` を
     401にすること、Appleの公開鍵がローカルからは取得できない（既知。本番からは取得できる）ときの503と、直後の2回目が冷却で
@@ -407,6 +407,84 @@ AppleとGoogleの仕様は、各社の公式資料で確かめた（Appleは、I
     すると、ローカルDBは空なのに、セッションだけ生きている状態になる。そこで、ローカルDBを新しく作ったとき
     （初回起動）に、保存済みのセッションを捨てる。これだけでは、空のローカルからのPublishで公開内容が空に
     置き換わるのは防げない（再インストール後の正規のログインでも起きる）ので、Publish側の保護を「実装時に決めること」に置く。
+    アプリ側の実装は、次の「アプリ側の認証の土台」。
+
+**アプリ側の認証の土台**（実装済み。7.3.6。`src/repositories/authRepository.ts`・`sessionRepository.ts`・`authError.ts`、`src/services/accountService.ts`）
+
+ログイン手段そのもの（Apple・Googleのサインインの画面）は 7.3.7 以降。ここは、その下の、通信・保存・状態の土台。
+**ログインを要求しない**: サインインしていなくても、使えなくても（SecureStoreが読めない、`account` を注入しない）、v1.0の機能は
+何も変わらない。画面がサインインを呼ぶまで、何も送らない。
+
+-   **構成。** UI → `account`（Service。`getSignedInProvider`・`signIn(provider)`・`signOut`）→ `authRepository`（HTTP）・
+    `sessionRepository`（SecureStore）。各社のサインインは `IdTokenProvider`（`getIdToken(hashedNonce)`）として、7.3.7 以降の
+    Repository が実装し、`createServices` の `auth.idTokenProviders` に注入する。組み込んでいない手段の `signIn` は
+    `provider-unavailable`。画面・Serviceは、URL・レスポンスの形・SDKの呼び出しを知らない（候補検索の `songCatalogRepository` と同じ）。
+    `fetch`・`SecureStorage`・SHA-256 は注入する（Nodeのテストは偽物で動かす）。画面には、セッションの値を渡さない
+    （`getSignedInProvider` はログイン手段だけを返す）。
+-   **`signIn` の流れ。** `POST /auth/nonce`（`native`）で `T` を得る → `SHA-256(T)` の base64url（43字）を各社のサインインの
+    `nonce` に渡す → IDトークンを `T` と一緒に `POST /auth/login` へ → 返ったセッションを SecureStore に保存する。サインイン済みなら
+    `already-signed-in`（先にログアウトする。別の手段は別のアカウントになるため、黙って置き換えない）。保存に失敗したら、サーバーの
+    セッションを失効させて（失敗は無視）`storage-failed`。取りやめは `cancelled`（各社のRepositoryが投げる。何も保存せず、`T` は
+    使い切りにならない）。各社の画面を5分以上開いたままにすると `T` が切れて 401 になる（やり直す）。
+-   **保存。** SecureStore（iOSはKeychain、Androidは Keystore で暗号化）の1つのキー `singfolio.session` に、JSON
+    `{"v":1,"session":"<値>","provider":"apple"|"google"}`。SQLite・settings・ログには置かない。ユーザーID・メール・名前は端末に持たない。
+    `provider` を持つのは、アカウントの削除（7.3.10）が、どの手段で再認証するかを知るため。iOSは
+    `WHEN_UNLOCKED_THIS_DEVICE_ONLY`（ロックが解けている間だけ読める。バックアップ・端末の引っ越しで別の端末へ移らない。移った先は
+    ログアウトから始まる）。**読めない・壊れた・知らない版の値は、ログアウトの扱い**（読み取りの失敗も投げない。値は消さない。次の
+    `set` で上書きされる）。
+-   **初回起動で、保存済みのセッションを捨てる。** DBを新しく作るとき（`user_version` が 0。初回起動・再インストール）、
+    `runMigrations` の `onNewDatabase` が、**最初のマイグレーションの前に**呼ぶ（`services/index.ts` が `sessionRepository.clear()` を渡す）。
+    前に呼ぶのは、後に呼ぶと、間でアプリが終わったとき、次の起動は「新しくない」DBで、二度と呼ばれないため（前なら、途中で終わっても、
+    次の起動でもう一度呼ばれる。削除は何度やっても同じ）。**捨てられなければ、起動の失敗にする**（マイグレーションは実行されず、
+    エラー画面の「もう一度試す」でやり直す）。ローカルが空なのに、前のアカウントのセッションだけが生きている状態を許さないため。
+    iOSの `deleteItemAsync` は、Keychainの削除の結果を捨てて失敗しても投げない（expo-secure-store のソース）ので、`clear()` は消したあとに
+    読み戻して、残っていれば失敗にする。通常の起動（DBがある）では呼ばない。Androidは、アンインストールでSecureStoreも消えるので、
+    これが効くのは主にiOS。
+-   **ログアウト。** 端末の値を**先に**捨て（捨てられなければ投げる。このときサーバーへは送らない）、そのあとサーバーのセッションを
+    失効させる（`POST /auth/logout`）。サーバーへの要求の途中でアプリが終わっても、端末はログアウトした状態になる。通信できない・サーバーが
+    使えない（5xx）ときも、端末はログアウトする。結果の `serverRevoked: false` で、失効を確認できなかったと分かる。サーバーに残った
+    セッションは、値を持つ端末が無く使えない。最後の利用から90日で切れ、気になるときは別の端末から「ほかの端末をすべてログアウト」
+    （7.3.10）で消せる。401（ヘッダーの形が違うときだけ）は、失効するものが無いので、失効できた扱い。読めない値が残っていても消す。
+-   **直列化。** サインインとログアウトは、1本ずつ順に実行する。サインインの途中（各社の画面を開いている間）にログアウトが走ると、
+    ログアウトの後にセッションが保存されて、ログアウトできていないことになるため。
+-   **失敗の分類**（`AuthError.code`。`message` はログ用の英語で、トークン・応答の本文・例外の内容は載せない）。
+
+    | `code` | 起きるとき | 利用者に |
+    |---|---|---|
+    | `cancelled` | 各社のサインインを取りやめた | 何も出さない |
+    | `network` | 通信できない・10秒で応答が無い | やり直せる |
+    | `unavailable` | 5xx（JSONでないCloudflareのエラーページ 1101 を含む）、429（WAFの回数の制限 1015、日次の上限 1027） | やり直せる。トークンの問題ではない |
+    | `unauthorized` | 401（`T` の不備・期限切れ・使用済み、IDトークンの不備。理由は区別されない） | サインインに失敗した。やり直す |
+    | `invalid-request` | 400・403・405・413 など | アプリの不具合 |
+    | `invalid-response` | 200 なのに値が無い・形が違う、本文がJSONでない | アプリかサーバーの不具合 |
+    | `provider-unavailable`・`already-signed-in`・`storage-failed` | 上のとおり | |
+
+    5xx は本文を読まずに `unavailable` にする。再試行はしない（やり直しは利用者の操作）。`network` と `unavailable` が
+    一時的な失敗（`isTemporaryAuthError`）。利用者向けの文言への対応は、画面を足すとき（7.3.11）に作る。
+-   **認証が要る呼び出しを足すとき（7.3.10・7.4 以降）の規則。** 401 を受けたら、端末のセッションを捨てる（サーバーが認めない値は、
+    二度と通らない）。503・5xx・通信の失敗では捨てない（一時的な失敗。セッションは生きている）。
+-   **`expo-secure-store` の config plugin を `app.json` に足さない。** plugin は、Androidのバックアップ規則（`fullBackupContent`・
+    `dataExtractionRules`）に `<include domain="sharedpref" path=".">` を入れる。Androidの資料では、`<include>` が1つでもあると、
+    その指定だけがバックアップされ、既定の対象は外れる。入れると、v1.0で今バックアップされているSQLite（レパートリー）が、
+    Androidのバックアップと端末の引っ越しから外れる。plugin 無しでも、autolinking でネイティブは入る。plugin はほかに、使っていない
+    `NSFaceIDUsageDescription` をiOSに足す。SecureStoreのAndroidのファイルをバックアップから外したいときは、既定の対象を残したまま、
+    そのファイルだけを `<exclude>` する規則を自前で書く（今は不要と見ている。復元されても、Keystoreの鍵は移らないので読めない値になり、ログアウトの扱いになる、はずだが、復元は確かめていない）。
+-   **Androidの権限。** `expo-secure-store` の依存（`androidx.biometric`）が `USE_BIOMETRIC`・`USE_FINGERPRINT` を足す。生体認証は
+    使わない（`requireAuthentication` は使わない）ので、`blockedPermissions` に足した。マージ後のマニフェストは、`INTERNET`・`VIBRATE` と
+    アプリ内部用の1つだけ（`nativeConfig.test.ts` が固定）。
+-   確かめたこと（Androidエミュレータ（R8入りのrelease）と、iOS Simulator（iPhone 18 Pro。Release）。実際の `expo-secure-store`・
+    `expo-crypto`・RNの `fetch`。検証用の一時画面は、確認後に消した）: 保存と読み戻し、通常の再起動で値が残ること、DBを作り直した
+    あとの起動で捨てられること（その後の起動でも空のまま）、`expo-crypto` の SHA-256（base64）から作る base64url がWorkerと同じ形（既知の
+    入力 `abc` で一致）、本番の `POST /auth/nonce` が RN の `fetch` で通り、`T` が `v1.native.` で始まる91字であること、`signIn` が組み込み前に
+    `provider-unavailable` になること、Androidで `FATAL EXCEPTION`・R8のエラーが無く、権限が `INTERNET`・`VIBRATE` だけであること。
+    Node のテストは、通信・保存の形、各失敗の分類、直列化、`onNewDatabase` の順序。
+    **iOS Simulatorで、署名なしのビルド（`CODE_SIGNING_ALLOWED=NO`）は、Keychainへの保存が `errSecMissingEntitlement`（必要なエンタイトルメントが
+    存在しません）で失敗する。** アプリの不具合ではなく、検証のビルドの作り方の問題（署名あり（ad hoc）のビルドでは通る）。署名なしの
+    ビルドで起動すると、初回起動の破棄（`clear()`）は、読み戻しが投げても消えた扱いになるので失敗にならないが、保存は失敗する。
+-   未確認: 実機（Pixel 11・iPhone 8）、TestFlight・Playの署名したビルド、iOSで、再インストールのあとにKeychainの値が残ること（Simulatorでは、
+    アンインストールで消えたのか、破棄で消えたのかを区別できていない。Appleは保証していない、という前提で破棄を入れた）、
+    `POST /auth/login`・`/auth/logout` を本物のWorkerへ送ること（本番のWorkerは 7.3.3 のままで、7.3.4・7.3.5 はデプロイしていない）、
+    各社のサインインとの結合（7.3.7 以降）。
 
 **アカウントの削除とAppleのトークン失効**
 

@@ -66,9 +66,15 @@ export function createSessionRepository(storage: SecureStorage) {
       );
     },
 
-    /** 消す。無くても成功。失敗したら投げる（消せていないことを黙って見逃さない）。 */
+    /**
+     * 消す。無くても成功。消せていなければ投げる（黙って見逃さない）。iOSの `deleteItemAsync` は、Keychainの
+     * 削除の結果を捨てて、失敗しても投げない（expo-secure-store のソース）。そこで、消したあとに読んで、
+     * 残っていれば失敗にする。読めない（投げた）ときは、残っているとは言えないので、消えた扱い。
+     */
     async clear(): Promise<void> {
       await storage.deleteItemAsync(SESSION_KEY);
+      const remaining = await storage.getItemAsync(SESSION_KEY).catch(() => null);
+      if (remaining !== null) throw new Error('The stored session could not be removed');
     },
   };
 }

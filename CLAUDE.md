@@ -117,6 +117,26 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     例外は `payload` を持つ。理由だけ取り出して捨てる）。`aud` は `T` の種別とログイン手段で1つに決め、両方を
     受け入れる形に「簡略化」しない。詳細は同じ docs の §8「IDトークンの検証」。
 
+### アカウント（アプリ側）
+
+詳細は `docs/singfolio-publishing-backend.md` §8「アプリ側の認証の土台」。
+
+-   **ログインを要求しない。** `account`（Service）が使えなくても（`createServices` に `auth` を注入しない、
+    SecureStoreが読めない）、v1.0の機能は変わらない。ログイン状態で機能を分けない。画面が `signIn` を呼ぶまで、
+    何も送らない。
+-   アカウントのHTTP（`/auth/*`）は `authRepository` に閉じ込める。画面・Serviceから、URL・レスポンスの形・
+    各社のSDKに触れない。セッションの値は画面に渡さない（`getSignedInProvider` はログイン手段だけ）。IDトークン・
+    nonce・セッションの値を、エラーの `message` にもログにも出さない。5xx（JSONでないエラーページを含む）は
+    本文を読まずに一時的な失敗（`unavailable`）にする。
+-   セッションは SecureStore にだけ置く（SQLite・settings に「簡略化」しない）。読めない・壊れた値は、ログアウトの扱い。
+-   **初回起動のセッションの破棄は、`runMigrations` の `onNewDatabase`（最初のマイグレーションの前）で行う。** マイグレーションの
+    後や、settings のフラグに「簡略化」しない（間でアプリが終わると、二度と破棄されない）。破棄できなければ起動の失敗にする。
+    `sessionRepository.clear()` の読み戻しも外さない（iOSの `deleteItemAsync` は、失敗しても投げない）。
+-   ログアウトは、端末の値を**先に**捨てる（通信できなくても、端末はログアウトする）。サインインとログアウトは直列に実行する。
+-   認証が要る呼び出しを足すときは、**401 のときだけ**端末のセッションを捨てる（503・5xx・通信の失敗では捨てない）。
+-   `expo-secure-store` の config plugin を `app.json` に足さない。Androidのバックアップ規則が `<include>` で、v1.0で今
+    バックアップされているSQLiteを外す。
+
 ### 曲名・アーティストの候補（サジェスト）
 
 詳細は `docs/singfolio-data-model.md`「候補検索」、`docs/singfolio-screen-flow.md`「候補（サジェスト）」。
@@ -407,7 +427,8 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     AAB・検証用APKは、消すと対応表が二度と手に入らない（クラッシュログを`retrace`で戻せない）。
     AABを消すのは、Playへ上げて対応表が登録されたことを確かめてから。
 -   `app.json` の `android.blockedPermissions` は、Expoの prebuild が既定で入れる、使っていない権限
-    （`SYSTEM_ALERT_WINDOW`・外部ストレージの読み書き）を外す。戻さない。保存は端末内で完結し、
+    （`SYSTEM_ALERT_WINDOW`・外部ストレージの読み書き）と、`expo-secure-store` の依存（`androidx.biometric`）が
+    足す `USE_BIOMETRIC`・`USE_FINGERPRINT` を外す。戻さない。保存は端末内で完結し、
     プライバシーポリシーもストアの申告も、それを前提にしている。
 -   ビルド番号（iOSの buildNumber・AndroidのversionCode）は、EAS が持つ（`eas.json` の
     `appVersionSource: "remote"`、`production` の `autoIncrement`）。`app.json` に書かない

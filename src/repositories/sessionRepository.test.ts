@@ -58,6 +58,24 @@ describe('sessionRepository', () => {
     }
   });
 
+  it('削除が黙って失敗して、値が残っているときは、clear が投げる（iOSの deleteItemAsync は投げない）', async () => {
+    const { storage, items } = memoryStorage({ 'singfolio.session': 'still here' });
+    const sessions = createSessionRepository({ ...storage, deleteItemAsync: async () => {} });
+    await assert.rejects(sessions.clear(), /could not be removed/);
+    assert.equal(items.size, 1);
+  });
+
+  it('削除のあとの読み取りが投げても、clear は成功する（残っているとは言えない）', async () => {
+    const sessions = createSessionRepository({
+      getItemAsync: async () => {
+        throw new Error('keychain error');
+      },
+      setItemAsync: async () => {},
+      deleteItemAsync: async () => {},
+    });
+    await sessions.clear();
+  });
+
   it('読み取りの失敗は null（投げない）。保存・削除の失敗は投げる', async () => {
     const failing: SecureStorage = {
       getItemAsync: async () => {

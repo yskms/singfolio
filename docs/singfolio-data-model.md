@@ -130,7 +130,7 @@ UI → Service → Repository → SQLite の一方向。UIはRepositoryとDBに�
 | 層 | 場所 | 役割 |
 |---|---|---|
 | モデル | `src/domain/types.ts` | `Song` / `Artist` / `Tag` / ステータス。各層が共有する。`Song` は `tags` と、アーティストの名前・読み（`artist` / `artistId` / `artistReading`）を持つ |
-| Repository | `src/repositories/` | SQLだけを持つ。IDと時刻の生成もここ（`RepositoryEnv`。テストで差し替える）。検証・正規化はしない。例外は `songCatalogRepository`（外部の楽曲検索のHTTP。「候補検索」） |
+| Repository | `src/repositories/` | SQLだけを持つ。IDと時刻の生成もここ（`RepositoryEnv`。テストで差し替える）。検証・正規化はしない。例外は `songCatalogRepository`（外部の楽曲検索のHTTP。「候補検索」）、`authRepository`（アカウントのHTTP）、`sessionRepository`（セッションのSecureStore。SQLiteではない）。`singfolio-publishing-backend.md` §8「アプリ側の認証の土台」 |
 | Service | `src/services/` | 入力の検証・正規化、トランザクション、`updated_at` の規則。失敗は `ServiceError`（`code` で区別） |
 | DB | `src/db/appDatabase.ts` | Repositoryが使うDBのインターフェース（expo-sqliteを包む） |
 
@@ -168,6 +168,9 @@ expo-sqliteの `withTransactionAsync` は排他ではなく、トランザクシ
 -   `artists`: `listArtists`（全アーティストを、読みの五十音順に、曲数つきで）/ `updateArtist`
     （名前と読みの変更。Artists 画面。重複する名前は `artist-name-duplicate`）。アーティストを作るのは
     曲の保存（`songs`。「artists」テーブル）。
+-   `account`: `getSignedInProvider`（サインイン中のログイン手段か `null`）/ `signIn(provider)` / `signOut`
+    （端末の値を先に捨てる。サーバーでの失効を確認できたかを返す）。失敗は `AuthError`（`ServiceError` とは別。`code` は
+    `singfolio-publishing-backend.md` §8「アプリ側の認証の土台」）。SQLiteには触れない。
 -   `tags`: `listTags` / `getOrCreateTag`（同じ名前のタグがあればそれを返し、なければ作る。
     タグだけを作る操作で、曲の編集画面は使わない。「曲の入力」の `newTagNames`）/
     `renameTag` / `deleteTag`
@@ -389,6 +392,10 @@ UI → `suggestions`（Service）→ `songCatalogRepository`（外部の楽曲�
     `singfolio-screen-flow.md`「起動時の例外」）。
 -   DBはアプリ起動時に `getDatabase()`（`src/db/database.ts`）を通して開き、
     マイグレーションが終わってから画面を出す。
+-   DBを新しく作るとき（`user_version` が 0。初回起動・再インストール）だけ、最初のマイグレーションの**前に**
+    `onNewDatabase` を呼ぶ。DBの外に残る状態（iOSのKeychainに残ったセッション）を捨てるための口で、呼ぶのは
+    `services/index.ts`（`singfolio-publishing-backend.md` §8「アプリ側の認証の土台」）。投げたらマイグレーションを
+    実行せずに起動の失敗にし、次の起動でもう一度呼ぶ。何度呼んでも同じ結果になる処理にする。
 
 ### テーブルの作り直し
 
