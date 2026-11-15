@@ -43,8 +43,10 @@ export type IdTokenResult = { ok: true; sub: string } | { ok: false; reason: IdT
 // - FRESH: この間は取り直さない。AppleとGoogleは鍵を入れ替えるが、古い鍵もしばらく残す。
 // - STALE: 取り直しに失敗しても、取得から（FRESH を超えて）この時間までは、前の鍵で検証を続ける。
 //   それを超えたら、古すぎる鍵は使わず `unavailable` にする。
-// - COOLDOWN: 取得を試みてから、この間は次の取得を試みない。知らない `kid` を付けた偽のトークンや、
-//   落ちている発行元への取得の連打で、外部への呼び出しが増えないようにする（認証の要らない経路なので）。
+// - COOLDOWN: 取得を試みてから、この間は次の取得を試みない（失敗した試みも数える）。知らない `kid` を付けた
+//   偽のトークンや、落ちている発行元への取得の連打で、外部への呼び出しが増えないようにする（認証の要らない経路
+//   なので）。鍵を一度も取れていない間（isolateの起動直後に発行元が落ちている）も同じで、冷却の間は、取りに行かず
+//   すぐ `unavailable` にする（毎回取りに行くと、そのたびに最大5秒待つ）。
 export const JWKS_FRESH_MS = 60 * 60 * 1000;
 export const JWKS_STALE_MS = 24 * 60 * 60 * 1000;
 export const JWKS_COOLDOWN_MS = 60 * 1000;
@@ -65,8 +67,6 @@ interface CachedKeys {
   keys: LocalKeys;
   /** 取得に成功した時刻。 */
   fetchedAt: number;
-  /** 最後に取得を試みた時刻（失敗を含む）。 */
-  attemptedAt: number;
 }
 
 // 公開鍵が使えないこと。IDトークンの問題ではないので、`unavailable` に分類する。
@@ -101,6 +101,9 @@ export function createIdTokenVerifier(
   const fetchFunction: FetchFunction = options.fetch ?? ((url, init) => fetch(url, init));
   const providers = options.providers ?? PROVIDERS;
   const cache = new Map<IdTokenProvider, CachedKeys>();
+  // 最後に取得を試みた時刻（失敗を含む）。鍵が無くても持つ（冷却のため）。取得の完了のあとに書く
+  // （試みの最中に書くと、同時に来た別のリクエストが、取得の途中なのに `unavailable` になる）。
+  const attemptedAt = new Map<IdTokenProvider, number>();
 
   async function fetchKeys(provider: IdTokenProvider, now: number): Promise<CachedKeys> {
     const response = await fetchFunction(providers[provider].jwksUrl, {
@@ -113,20 +116,24 @@ export function createIdTokenVerifier(
     if (response.status !== 200) throw new Error('unexpected status');
     // 形が不正なら、ここで例外になる（前の鍵を捨てない）。
     const keys = createLocalJWKSet(await response.json());
-    return { keys, fetchedAt: now, attemptedAt: now };
+    return { keys, fetchedAt: now };
   }
 
-  // 取得し直す。失敗したら、使える前の鍵があればそれを返し（試みた時刻だけ更新する）、無ければ例外にする。
+  // 取得し直す。失敗したら、使える前の鍵があればそれを返し、無ければ例外にする。成功も失敗も、試みた時刻を残す。
   async function refresh(provider: IdTokenProvider, previous: CachedKeys | undefined, now: number): Promise<CachedKeys> {
+    let next: CachedKeys | undefined;
     try {
-      const next = await fetchKeys(provider, now);
+      next = await fetchKeys(provider, now);
+    } catch {
+      next = undefined;
+    }
+    attemptedAt.set(provider, now);
+    if (next !== undefined) {
       cache.set(provider, next);
       return next;
-    } catch {
-      if (previous === undefined) throw new KeysUnavailable();
-      previous.attemptedAt = now;
-      return previous;
     }
+    if (previous === undefined) throw new KeysUnavailable();
+    return previous;
   }
 
   async function resolveKey(
@@ -139,10 +146,18 @@ export function createIdTokenVerifier(
     if (typeof header.kid !== 'string' || header.kid === '') throw new errors.JWSInvalid('missing kid');
 
     let cached = cache.get(provider);
-    const cooledDown = (entry: CachedKeys) => now - entry.attemptedAt >= JWKS_COOLDOWN_MS;
+    // 取得を試みたことが無い、または前の試みから冷却の時間がたっている。
+    const cooledDown = () => {
+      const attempted = attemptedAt.get(provider);
+      return attempted === undefined || now - attempted >= JWKS_COOLDOWN_MS;
+    };
 
-    // 無いときは、必ず取りに行く。古いだけのときは、冷却が済んでいれば取り直す。
-    if (cached === undefined || (now - cached.fetchedAt >= JWKS_FRESH_MS && cooledDown(cached))) {
+    if (cached === undefined) {
+      // 鍵を一度も取れていない。冷却の間は、取りに行かない（取りに行くと、落ちている発行元を毎回5秒待つ）。
+      if (!cooledDown()) throw new KeysUnavailable();
+      cached = await refresh(provider, undefined, now);
+    } else if (now - cached.fetchedAt >= JWKS_FRESH_MS && cooledDown()) {
+      // 古いときは、冷却が済んでいれば取り直す。
       cached = await refresh(provider, cached, now);
     }
     if (now - cached.fetchedAt >= JWKS_FRESH_MS + JWKS_STALE_MS) throw new KeysUnavailable();
@@ -151,7 +166,7 @@ export function createIdTokenVerifier(
       return await cached.keys(header);
     } catch (error) {
       // 知らない `kid` は、鍵が入れ替わったのかもしれないので、冷却が済んでいれば1回だけ取り直す。
-      if (!(error instanceof errors.JWKSNoMatchingKey) || !cooledDown(cached)) throw error;
+      if (!(error instanceof errors.JWKSNoMatchingKey) || !cooledDown()) throw error;
     }
     cached = await refresh(provider, cached, now);
     return cached.keys(header);

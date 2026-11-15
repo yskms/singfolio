@@ -283,16 +283,48 @@ describe('公開鍵(JWKS)の取得とキャッシュ', () => {
     assert.equal(issuer.state.calls.length, 2);
   });
 
-  it('取得が失敗し、前の鍵が無い: unavailable。次の呼び出しは、また取りに行く', async () => {
+  it('取得が失敗し、前の鍵が無い: unavailable。冷却の間は取りに行かず、すぐ返す。済んだら、また取りに行く', async () => {
     const { issuer, verify } = setup();
     issuer.state.respond = () => new Response('oops', { status: 500 });
     const token = await sign();
     assert.deepEqual(await verify(token), failure('unavailable'));
-    assert.deepEqual(await verify(token), failure('unavailable'));
+    assert.equal(issuer.state.calls.length, 1);
+    // 冷却の間は、何度来ても取りに行かない（落ちている発行元を、毎回最大5秒待たない）
+    for (let i = 0; i < 5; i++) {
+      assert.deepEqual(await verify(token, { now: NOW + JWKS_COOLDOWN_MS - 1 }), failure('unavailable'));
+    }
+    assert.equal(issuer.state.calls.length, 1);
+    // 冷却が済んだら、また試す（失敗は続く）
+    assert.deepEqual(await verify(token, { now: NOW + JWKS_COOLDOWN_MS }), failure('unavailable'));
     assert.equal(issuer.state.calls.length, 2);
-    // 復旧したら通る
+    // 復旧したあと、次の冷却が済んだ最初の呼び出しで通る
     issuer.state.respond = null;
-    assert.equal((await verify(token)).ok, true);
+    assert.deepEqual(await verify(token, { now: NOW + 2 * JWKS_COOLDOWN_MS - 1 }), failure('unavailable'));
+    assert.equal((await verify(token, { now: NOW + 2 * JWKS_COOLDOWN_MS })).ok, true);
+    assert.equal(issuer.state.calls.length, 3);
+  });
+
+  it('鍵が無いとき、取得の最中に来た別のリクエストは、unavailable にならず、自分で取得する', async () => {
+    // 試みた時刻は、取得の完了のあとに書く。始めに書くと、同時に来たリクエストが、取得の途中なのに
+    // 冷却の中として弾かれる（起動直後の同時のログインが、片方 503 になる）。取得中の Promise は共有しない。
+    const { issuer, verify } = setup();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    issuer.state.respond = async () => {
+      await gate;
+      return Response.json({ keys: [keyA.jwk] });
+    };
+    const token = await sign();
+    const pending = [verify(token), verify(token)];
+    // 2つとも、取得に入っている
+    while (issuer.state.calls.length < 2) await new Promise((resolve) => setImmediate(resolve));
+    release();
+    assert.deepEqual(
+      (await Promise.all(pending)).map((result) => result.ok),
+      [true, true],
+    );
   });
 
   it('取得の失敗の種類: 200以外・リダイレクト・不正なJSON・形が違う・通信エラー・タイムアウト', async () => {
