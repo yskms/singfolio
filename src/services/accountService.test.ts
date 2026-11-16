@@ -185,23 +185,102 @@ describe('signIn', () => {
   });
 
   it('別のローカルDBのセッション（再インストール前の残り）は、サインイン中として扱わず、上書きして入れる', async () => {
-    const { account, sessions, state } = setup();
+    let issued = 0;
+    const { account, sessions, state } = setup({
+      auth: { login: async () => `SESSION-${++issued}` },
+    });
     await account.signIn('apple');
     state.id = 'data-2'; // DBを新しく作った。DBの外のセッションは残っている
     assert.equal(await account.getSignedInProvider(), null);
     await account.signIn('apple'); // already-signed-in にならない
     assert.deepEqual(await sessions.read(), {
       kind: 'found',
-      value: { session: 'SESSION-1', provider: 'apple', localDataId: 'data-2' },
+      value: { session: 'SESSION-2', provider: 'apple', localDataId: 'data-2' },
     });
     assert.equal(await account.getSignedInProvider(), 'apple');
   });
 
-  it('読めない値が残っていても、サインインは進めて上書きする（読めないだけで止めると、二度と入れない）', async () => {
-    const { account, items } = setup();
+  it('上書きした別のDBのセッションは、新しいセッションの保存のあとに、サーバーで失効させる', async () => {
+    const { account, sessions, calls } = setup({
+      auth: { login: async () => 'SESSION-NEW' },
+    });
+    await sessions.set({ session: 'SESSION-OLD', provider: 'google', localDataId: 'data-0' });
+    await account.signIn('apple');
+    // 各社の画面を開く前には、通信しない。ログインと保存が済んでから失効させる
+    assert.deepEqual(calls, ['nonce', 'apple-sheet', 'logout:SESSION-OLD']);
+    assert.deepEqual(await sessions.read(), {
+      kind: 'found',
+      value: { session: 'SESSION-NEW', provider: 'apple', localDataId: 'data-1' },
+    });
+  });
+
+  it('別のDBのセッションの失効に失敗しても、サインインは成功する', async () => {
+    const { account, sessions, calls } = setup({
+      auth: {
+        login: async () => 'SESSION-NEW',
+        logout: async (session) => {
+          calls.push(`logout:${session}`);
+          throw new AuthError('network');
+        },
+      },
+    });
+    await sessions.set({ session: 'SESSION-OLD', provider: 'google', localDataId: 'data-0' });
+    await account.signIn('apple');
+    assert.ok(calls.includes('logout:SESSION-OLD'));
+    assert.equal(await account.getSignedInProvider(), 'apple');
+  });
+
+  it('サインインが取りやめ・失敗に終わったら、別のDBのセッションは失効させず、端末に残す（次のサインインで失効させる）', async () => {
+    const { account, sessions, calls } = setup({
+      providers: {
+        apple: {
+          getIdToken: async () => {
+            throw new AuthError('cancelled');
+          },
+        },
+      },
+    });
+    await sessions.set({ session: 'SESSION-OLD', provider: 'google', localDataId: 'data-0' });
+    await rejectsWith(account.signIn('apple'), 'cancelled');
+    assert.deepEqual(calls, ['nonce']);
+    assert.deepEqual(await sessions.read(), {
+      kind: 'found',
+      value: { session: 'SESSION-OLD', provider: 'google', localDataId: 'data-0' },
+    });
+  });
+
+  it('新しいセッションを保存できなかったときは、新しいほうだけを失効させる（別のDBのセッションは端末に残る）', async () => {
+    const { storage, items } = memoryStorage();
+    const failing: SecureStorage = {
+      ...storage,
+      setItemAsync: async () => {
+        throw new Error('disk full');
+      },
+    };
+    const sessions = createSessionRepository(failing);
+    items.set(
+      'singfolio.session',
+      JSON.stringify({ v: 1, session: 'SESSION-OLD', provider: 'google', localDataId: 'data-0' }),
+    );
+    const { auth, calls } = fakeAuth({ login: async () => 'SESSION-NEW' });
+    const account = createAccountService({
+      auth,
+      sessions,
+      sha256Base64Url,
+      localDataId: async () => 'data-1',
+      idTokenProviders: { apple: { getIdToken: async () => 'ID-TOKEN' } },
+    });
+    await rejectsWith(account.signIn('apple'), 'storage-failed');
+    assert.deepEqual(calls, ['nonce', 'logout:SESSION-NEW']);
+  });
+
+  it('読めない値が残っていても、サインインは進めて上書きする（読めないだけで止めると、二度と入れない）。失効はできない', async () => {
+    const { account, items, calls } = setup();
     items.set('singfolio.session', 'garbage');
     await account.signIn('apple');
     assert.equal(await account.getSignedInProvider(), 'apple');
+    // 失効させるものを特定できない
+    assert.deepEqual(calls, ['nonce', 'apple-sheet', 'login:apple:ID-TOKEN:T-1']);
   });
 });
 
@@ -247,6 +326,43 @@ describe('失敗は AuthError に包む（画面が code で分類できる）',
       idTokenProviders: { apple: { getIdToken: async () => 'ID-TOKEN' } },
     });
     await rejectsWith(account.signIn('apple'), 'unexpected');
+  });
+
+  it('getSignedInProvider も、DBの失敗は unexpected（null にはしない。「分からない」を「ログアウト中」に見せない）', async () => {
+    const { storage } = memoryStorage();
+    const sessions = createSessionRepository(storage);
+    await sessions.set({ session: 'SESSION-1', provider: 'apple', localDataId: 'data-1' });
+    const account = createAccountService({
+      auth: fakeAuth().auth,
+      sessions,
+      sha256Base64Url,
+      localDataId: async () => {
+        throw new Error('db closed');
+      },
+      idTokenProviders: {},
+    });
+    await assert.rejects(account.getSignedInProvider(), (error) => {
+      assert.ok(error instanceof AuthError);
+      assert.equal(error.code, 'unexpected');
+      assert.ok(!error.message.includes('db closed')); // 元の例外の内容は載せない
+      return true;
+    });
+  });
+
+  it('getSignedInProvider は、保存が空・読めない値なら、DBを見ずに null（識別子を取れなくても投げない）', async () => {
+    const { storage, items } = memoryStorage();
+    const account = createAccountService({
+      auth: fakeAuth().auth,
+      sessions: createSessionRepository(storage),
+      sha256Base64Url,
+      localDataId: async () => {
+        throw new Error('db closed');
+      },
+      idTokenProviders: {},
+    });
+    assert.equal(await account.getSignedInProvider(), null);
+    items.set('singfolio.session', 'garbage');
+    assert.equal(await account.getSignedInProvider(), null);
   });
 
   it('ログアウトで端末の値を消せなければ storage-failed。サーバーへは送らない。状態は変わらない', async () => {

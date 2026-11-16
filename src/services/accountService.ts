@@ -43,7 +43,12 @@ export interface SignOutResult {
 }
 
 export interface AccountService {
-  /** サインイン中のログイン手段。していなければ `null`。セッションの値は渡さない。 */
+  /**
+   * サインイン中のログイン手段。していなければ `null`。セッションの値は渡さない。ローカルDBが読めないなど、
+   * 判断できなかったときは `AuthError('unexpected')`（`null` にはしない: 「ログアウト中」と「分からない」を
+   * 画面が取り違えないため）。**画面は、これを捕まえて**「分からない」として扱い、アカウントの欄を隠すなどに
+   * とどめる（ErrorBoundaryまで伝えない。ログインを要求しないので、v1.0の機能はこの失敗に巻き込まない）。
+   */
   getSignedInProvider(): Promise<AuthProvider | null>;
   /**
    * サインインする。失敗・取りやめは、すべて `AuthError`（想定外の失敗は `unexpected`）。サインイン済みなら
@@ -96,16 +101,33 @@ export function createAccountService(deps: AccountServiceDeps | null): AccountSe
     }
   }
 
-  /** 今のローカルDBに属するサインイン中のセッション。無い・読めない・別のDBのものは `null`。 */
-  async function currentSession(): Promise<StoredSession | null> {
+  /**
+   * 保存済みのセッションを、今のローカルDBとの関係で分ける。`current` は今のDBに属するサインイン中のもの。
+   * `stale` は読めたが別のDBのもの（再インストール前の残り）。無い・読めない値は、どちらも `null`。
+   */
+  async function readSession(): Promise<{
+    current: StoredSession | null;
+    stale: StoredSession | null;
+  }> {
     const read = await sessions.read();
-    if (read.kind !== 'found') return null;
-    return read.value.localDataId === (await localDataId()) ? read.value : null;
+    if (read.kind !== 'found') return { current: null, stale: null };
+    return read.value.localDataId === (await localDataId())
+      ? { current: read.value, stale: null }
+      : { current: null, stale: read.value };
+  }
+
+  /** サーバー側のセッションを失効させる。失敗は無視する（呼び出し側は、結果に依らず進める）。 */
+  async function revokeQuietly(session: string): Promise<void> {
+    try {
+      await auth.logout(session);
+    } catch {
+      // 失効できなくても、サーバーのセッションは最後の利用から90日で切れる
+    }
   }
 
   return {
-    async getSignedInProvider() {
-      return (await currentSession())?.provider ?? null;
+    getSignedInProvider() {
+      return asAuthError(async () => (await readSession()).current?.provider ?? null);
     },
 
     signIn(provider) {
@@ -113,10 +135,12 @@ export function createAccountService(deps: AccountServiceDeps | null): AccountSe
         asAuthError(async () => {
           const idTokenProvider = idTokenProviders[provider];
           if (!idTokenProvider) throw new AuthError('provider-unavailable');
-          if (await currentSession()) throw new AuthError('already-signed-in');
+          const { current, stale } = await readSession();
+          if (current) throw new AuthError('already-signed-in');
           // 読めない・別のDBのセッションが残っていても、サインインは進める（上書きする）。読めないだけで
-          // 止めると、壊れた値が残る端末は、二度とサインインできない。上書きされたセッションは、サーバーに
-          // 残る（最後の利用から90日で切れる。ログアウトで失効を確認できない場合と同じ）。
+          // 止めると、壊れた値が残る端末は、二度とサインインできない。読めない値は、失効させるものを特定
+          // できず、サーバーに残る（最後の利用から90日で切れる。ログアウトで失効を確認できない場合と同じ）。
+          // 読めた別のDBのもの（`stale`）は、下で上書きしたあとに失効させる。
           const dataId = await localDataId();
 
           // nonce の元 `T` を得て、そのハッシュを各社のサインインに渡す（リプレイ対策。§8）。
@@ -130,9 +154,14 @@ export function createAccountService(deps: AccountServiceDeps | null): AccountSe
             await sessions.set({ session, provider, localDataId: dataId });
           } catch {
             // 保存できないと、端末はこのセッションを二度と使えない。サーバーに残さない（失敗は無視）。
-            await auth.logout(session).catch(() => {});
+            await revokeQuietly(session);
             throw new AuthError('storage-failed');
           }
+          // 上書きした別のDBのセッションは、端末のどこにも値が残らず、ログアウトの入口（サインイン中にしか
+          // 出ない）からも失効させられない。失効の機会は、ここだけ。保存のあとにするのは、各社の画面を開く前に
+          // 通信を待たせず（応答が無いと最大10秒）、直前のログインで通信できると分かっているため。取りやめや失敗
+          // で保存まで進まなければ、値は端末に残り、次のサインインで失効させる。
+          if (stale) await revokeQuietly(stale.session);
         }),
       );
     },

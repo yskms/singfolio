@@ -174,7 +174,7 @@ expo-sqliteの `withTransactionAsync` は排他ではなく、トランザクシ
 -   `artists`: `listArtists`（全アーティストを、読みの五十音順に、曲数つきで）/ `updateArtist`
     （名前と読みの変更。Artists 画面。重複する名前は `artist-name-duplicate`）。アーティストを作るのは
     曲の保存（`songs`。「artists」テーブル）。
--   `account`: `getSignedInProvider`（サインイン中のログイン手段か `null`）/ `signIn(provider)` / `signOut`
+-   `account`: `getSignedInProvider`（サインイン中のログイン手段か `null`。判断できないときは `AuthError`）/ `signIn(provider)` / `signOut`
     （端末の値を先に捨てる。サーバーでの失効を確認できたかを返す）。失敗は `AuthError`（`ServiceError` とは別。`code` は
     `singfolio-publishing-backend.md` §8「アプリ側の認証の土台」）。セッションはSQLiteではなくSecureStoreに置き、SQLiteからは
     `settings.local_data_id` だけを読む。
