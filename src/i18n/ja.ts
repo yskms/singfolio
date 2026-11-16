@@ -110,6 +110,10 @@ export const ja: Record<MessageKey, Message> = {
   'licenses.intro':
     'このアプリは、次のオープンソースソフトウェアとアイコンフォントを使っています。項目を押すと、ライセンスの全文を表示します。',
   'licenses.includes': '含まれるもの:\n{list}',
+  'licenses.termsHeading': 'Googleのライブラリ',
+  'licenses.termsNote':
+    '次のGoogleのライブラリは、オープンソースではなく、Android Software Development Kit License のもとで提供されています。項目を押すと、含まれるものを表示し、規約を読めます。',
+  'licenses.viewTerms': '規約を読む',
 
   'show.title': '何を歌おう？',
   'show.count': { other: '歌える曲は{count}曲' },

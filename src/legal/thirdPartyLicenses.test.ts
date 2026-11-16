@@ -24,28 +24,66 @@ const LICENSE_MARKERS: Record<string, RegExp> = {
   'BSD-3-Clause': /Redistribution and use in source and binary forms/,
   'BSL-1.0': /Boost Software License - Version 1\.0/,
   'IJG AND BSD-3-Clause AND Zlib': /Independent JPEG Group/,
+  // GoogleUtilities（iOS の Pod）。Apache-2.0 の全文に、MIT の全文が続く。
+  'Apache-2.0 AND MIT': /Apache License\s+Version 2\.0[\s\S]*Permission is hereby granted, free of charge/,
 };
+
+// 全文を載せず、規約のURLだけを載せる依存（Android Software Development Kit License で配布される Google の依存）。
+// ALLOWED_LICENSES には無く、生成のとき、groupId を個別に許可したものだけがここに入る。
+const ANDROID_SDK_LICENSE = 'Android Software Development Kit License';
+const ANDROID_SDK_LICENSE_URL = 'https://developer.android.com/studio/terms';
+const withText = THIRD_PARTY_PACKAGES.filter((entry) => entry.licenseUrl === undefined);
+const termsOnly = THIRD_PARTY_PACKAGES.filter((entry) => entry.licenseUrl !== undefined);
 
 describe('THIRD_PARTY_PACKAGES', () => {
   it('名前と版の組は重ならない。全文の添字は範囲内', () => {
     const keys = THIRD_PARTY_PACKAGES.map((entry) => `${entry.name}@${entry.version ?? ''}`);
     assert.equal(new Set(keys).size, keys.length);
-    for (const entry of THIRD_PARTY_PACKAGES) {
-      assert.ok(THIRD_PARTY_LICENSE_TEXTS[entry.text] !== undefined, entry.name);
+    for (const entry of withText) {
+      assert.ok(entry.text !== undefined && THIRD_PARTY_LICENSE_TEXTS[entry.text] !== undefined, entry.name);
     }
   });
 
   it('全文は、すべてどれかのパッケージから使われている（使われない全文が残らない）', () => {
-    const used = new Set(THIRD_PARTY_PACKAGES.map((entry) => entry.text));
+    const used = new Set(withText.map((entry) => entry.text));
     assert.equal(used.size, THIRD_PARTY_LICENSE_TEXTS.length);
   });
 
   it('ライセンスの種類は、全文と合っている', () => {
-    for (const entry of THIRD_PARTY_PACKAGES) {
+    for (const entry of withText) {
       const marker = LICENSE_MARKERS[entry.license];
       assert.ok(marker, `${entry.name}: 許可していないライセンス ${entry.license}`);
-      assert.match(THIRD_PARTY_LICENSE_TEXTS[entry.text] ?? '', marker, entry.name);
+      assert.match(THIRD_PARTY_LICENSE_TEXTS[entry.text ?? -1] ?? '', marker, entry.name);
     }
+  });
+
+  it('全文を載せないもの（licenseUrl）は、Android Software Development Kit License のAndroidの依存だけ。全文は持たない', () => {
+    assert.deepEqual(termsOnly.map((entry) => entry.name).sort(), ['Google Identity (googleid)', 'Google Play services']);
+    for (const entry of termsOnly) {
+      assert.equal(entry.license, ANDROID_SDK_LICENSE, entry.name);
+      assert.equal(entry.licenseUrl, ANDROID_SDK_LICENSE_URL, entry.name);
+      assert.equal(entry.text, undefined, entry.name);
+      assert.equal(entry.platform, 'android', entry.name);
+      assert.ok(entry.includes !== undefined && entry.includes.length > 0, entry.name);
+    }
+  });
+
+  it('Googleのサインインの依存が載っている（iOSのPodは全文つき、Androidは規約のURL）', () => {
+    const ios = ['GoogleSignIn', 'AppAuth', 'GTMAppAuth', 'GTMSessionFetcher', 'AppCheckCore', 'GoogleUtilities',
+      'PromisesObjC', 'PromisesSwift', 'RecaptchaInterop'];
+    for (const name of ios) {
+      const entry = THIRD_PARTY_PACKAGES.find((item) => item.name === name);
+      assert.ok(entry, name);
+      assert.equal(entry.platform, 'ios', name);
+      assert.ok(entry.version !== undefined, name);
+    }
+    // LICENSE が Apache-2.0 に MIT が続く形なのは GoogleUtilities だけ（MIT の著作権表示を載せる必要がある）。
+    const mixed = THIRD_PARTY_PACKAGES.filter((entry) => entry.license === 'Apache-2.0 AND MIT');
+    assert.deepEqual(mixed.map((entry) => entry.name), ['GoogleUtilities']);
+    assert.match(THIRD_PARTY_LICENSE_TEXTS[mixed[0].text ?? -1] ?? '', /Copyright \(c\) 2017 Landon J\. Fuller/);
+    // androidx.credentials は AndroidX（Apache-2.0）に含まれる。
+    const androidx = THIRD_PARTY_PACKAGES.find((entry) => entry.name === 'AndroidX');
+    assert.ok(androidx?.includes?.some((coordinate) => coordinate.startsWith('androidx.credentials:credentials:')));
   });
 
   it('npmのパッケージは、package-lock.json に、その名前と版で入っている（依存を更新したら作り直す）', () => {

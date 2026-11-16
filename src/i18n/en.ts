@@ -134,6 +134,11 @@ export const en = {
   'licenses.intro':
     'This app uses the open source software and icon fonts below. Tap an item to see its license.',
   'licenses.includes': 'Includes:\n{list}',
+  // 全文を載せない、Googleのライブラリ（Android。Android Software Development Kit License で配布される）の別枠。
+  'licenses.termsHeading': 'Google libraries',
+  'licenses.termsNote':
+    'These Google libraries are not open source. They are provided under the Android Software Development Kit License. Tap an item to see what it includes and to read the terms.',
+  'licenses.viewTerms': 'View terms',
 
   // Show Mode（app/show.tsx）。人に見せる画面。検索欄・「一致する曲がありません」の題・検索とタグの
   // クリアは、Songs の文言（songs.*）を使う。文言の中の機能名「Show Mode」は、日本語でも訳さない。

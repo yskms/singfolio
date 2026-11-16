@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack } from 'expo-router';
 import { useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Linking, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { reflowLicense } from '../src/legal/reflowLicense';
@@ -12,6 +12,7 @@ import {
 } from '../src/legal/thirdPartyLicenses';
 import { decorative } from '../ui/decorative';
 import { useI18n } from '../ui/i18n';
+import { SettingsRow } from '../ui/SettingsRow';
 import { Text } from '../ui/Text';
 import { useTheme } from '../ui/theme';
 
@@ -27,9 +28,13 @@ const SCREEN_OPTIONS = {
 // MIT などは、著作権表示と許諾表示を含めることを求める。一覧は、依存関係から生成したもの
 // （`scripts/generate-licenses.mjs`。`src/legal/thirdPartyLicenses.ts`）で、手で直さない。片方の OS
 // にだけ入るもの（AndroidX など）は、その OS でだけ出す。About の「Fonts」（自前で同梱した書体）とは別。
+// 全文を持たないもの（`licenseUrl`。Androidの Google Play services など、Android Software Development Kit
+// License で配布される依存）は、オープンソースではないので、別枠に出し、規約を開く行を付ける。
 const ITEMS = THIRD_PARTY_PACKAGES.filter(
   (item) => item.platform === undefined || item.platform === Platform.OS,
 );
+const OPEN_SOURCE_ITEMS = ITEMS.filter((item) => item.licenseUrl === undefined);
+const TERMS_ITEMS = ITEMS.filter((item) => item.licenseUrl !== undefined);
 
 export default function LicensesScreen() {
   const { colors } = useTheme();
@@ -44,9 +49,20 @@ export default function LicensesScreen() {
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
       >
         <Text style={[styles.intro, { color: colors.textSecondary }]}>{t('licenses.intro')}</Text>
-        {ITEMS.map((item) => (
+        {OPEN_SOURCE_ITEMS.map((item) => (
           <PackageItem key={`${item.name}@${item.version ?? ''}`} item={item} />
         ))}
+        {TERMS_ITEMS.length > 0 && (
+          <>
+            <Text role="heading" style={[styles.section, { color: colors.textSecondary }]}>
+              {t('licenses.termsHeading')}
+            </Text>
+            <Text style={[styles.intro, { color: colors.textSecondary }]}>{t('licenses.termsNote')}</Text>
+            {TERMS_ITEMS.map((item) => (
+              <PackageItem key={`${item.name}@${item.version ?? ''}`} item={item} />
+            ))}
+          </>
+        )}
       </ScrollView>
     </>
   );
@@ -58,6 +74,7 @@ function PackageItem({ item }: { item: ThirdPartyPackage }) {
   const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const detail = item.version === undefined ? item.license : `${item.version} · ${item.license}`;
+  const termsUrl = item.licenseUrl;
   return (
     <View style={[styles.item, { borderBottomColor: colors.border }]}>
       <Pressable
@@ -86,9 +103,20 @@ function PackageItem({ item }: { item: ThirdPartyPackage }) {
               {t('licenses.includes', { list: item.includes.join('\n') })}
             </Text>
           )}
-          <Text selectable style={[styles.licenseText, { color: colors.textSecondary }]}>
-            {reflowLicense(THIRD_PARTY_LICENSE_TEXTS[item.text] ?? '')}
-          </Text>
+          {termsUrl !== undefined && (
+            <SettingsRow
+              label={t('licenses.viewTerms')}
+              accessibilityHint={t('about.opensInBrowserHint')}
+              external
+              // ブラウザで開く（アプリの通信ではない）。開けなくても、アプリの動作には影響しない。
+              onPress={() => void Linking.openURL(termsUrl).catch(() => undefined)}
+            />
+          )}
+          {item.text !== undefined && (
+            <Text selectable style={[styles.licenseText, { color: colors.textSecondary }]}>
+              {reflowLicense(THIRD_PARTY_LICENSE_TEXTS[item.text] ?? '')}
+            </Text>
+          )}
         </>
       )}
     </View>
@@ -98,6 +126,7 @@ function PackageItem({ item }: { item: ThirdPartyPackage }) {
 const styles = StyleSheet.create({
   content: { paddingHorizontal: 16, paddingTop: 24 },
   intro: { marginBottom: 8, fontSize: 14, lineHeight: 21 },
+  section: { marginTop: 24, marginBottom: 8, fontSize: 13, lineHeight: 18, fontWeight: '700' },
   item: { borderBottomWidth: StyleSheet.hairlineWidth },
   header: {
     minHeight: 56,
