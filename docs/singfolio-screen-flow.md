@@ -688,6 +688,10 @@ About から開く画面。アプリに入る、npm の依存・取り込まれ�
         GoogleUtilities だけは、LICENSE が Apache-2.0 の全文に MIT の全文（Landon J. Fuller の著作権表示）が
         続く形なので、`Apache-2.0 AND MIT` として載せる。
         Android の Google の依存（上の別枠）は、全文ではなく、ライセンスの名前と規約のURLを持つ。
+        それとは別に、Play services の AAR が持つ OSS の表記のうち、載せると決めた20件（Protocol Buffers・Tink・Guava・
+        JSR 305 など）は、「<名前> (Google Play services)」として、Android の普通の一覧に、全文つきで載せる
+        （Googleの資料が、アプリが表示する一覧に含めるとしているもの。J2ObjC など、AndroidのAARに入らないものは載せない。
+        理由と決め方は `singfolio-publishing-backend.md` §8「Googleのサインイン」）。
 -   **載せていないもの**: OS・NDK が提供する実行時のライブラリ（libc++ など。LLVM の例外で、
     バイナリでの表記は要らない）、SQLite（パブリックドメイン）、OkHttp の public suffix のリスト
     （APK の中に、出典とライセンスの NOTICE がある）。Maven の成果物の中を、これ以上は掘り下げない。

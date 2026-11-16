@@ -3,7 +3,7 @@ import { CryptoDigestAlgorithm, CryptoEncoding, digestStringAsync, randomUUID } 
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
-import { signInWithGoogle } from '../../modules/singfolio-google-signin';
+import { signInWithGoogle } from '../../modules/singfolio-google-signin/index.ts';
 import { createDatabase } from '../db/appDatabase.ts';
 import { getDatabase } from '../db/database.ts';
 import { createAppleSignInRepository } from '../repositories/appleSignInRepository.ts';

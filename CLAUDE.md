@@ -416,7 +416,10 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
 -   Android Software Development Kit License（Google Play services・googleid）は、`ALLOWED_LICENSES` に足さない。groupId
     （`com.google.android.gms`・`com.google.android.libraries.identity.googleid`）だけを個別に許可し、全文は載せず、名前と
     規約のURLを About の別枠に出す（Androidだけ）。iOS の trunk の Pod は `IOS_TRUNK_PODS` にあるものだけを、入っている
-    Pod の LICENSE の全文で載せる。自前の `modules/` は第三者ではないので載せない（package.json も無い）。
+    Pod の LICENSE の全文で載せる（`Apache-2.0 AND MIT` は Pod にだけ許し、`ALLOWED_LICENSES` には足さない）。自前の
+    `modules/` は第三者ではないので載せない（package.json も無い）。Play services の AAR が持つ OSS の表記
+    （`third_party_licenses`）は、`GOOGLE_AAR_NOTICES` に挙げた名前だけを全文つきで載せ、知らない名前が増えたら失敗にする。
+    全部を機械的に載せる形に「簡略化」しない（J2ObjC の項目は GPL・APSL などの全文を持つが、Androidの AAR には入らない）。
 -   アイコンフォント（Ionicons・Material Symbols）は、npmパッケージのLICENSEとは別のライセンスなので、
     別の行にしている。上流から写した全文は `scripts/license-texts/` にある（取得元はスクリプトの設定）。
 -   About の「Fonts」（`fontLicenses.ts`）は、自前で同梱した書体だけで、この一覧とは別。

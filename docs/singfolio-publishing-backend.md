@@ -729,8 +729,13 @@ Googleの公式SDKだけを使う、自作の薄いExpoモジュールで実装�
         Googleアカウントが無く、Androidの成功経路は確かめていない。**
     -   **Open source licenses の画面**: iOSは、Pod 9個を全文つきで出す。Androidは、「Google libraries」の別枠に、2行（Google Identity・
         Google Play services）を出し、開くと含まれる成果物と「View terms」の行が出る（ブラウザで規約を開く行は、押していない）。
-    -   **未確認（7.3.13）**: Androidの成功経路（本番用のクライアントIDと、署名の鍵ごとのSHA-1。debug・EASのlocal build・
-        Play App Signing）、実機、TestFlight・Playの署名したビルド、プロジェクトの所有者でも、テストユーザーでもないアカウントで
+    -   **R8 とAndroidの成功経路について**: R8 入りの release で動かしたのは、リクエストの組み立てとシートの表示、取りやめまで。
+        `credentials-play-services-auth` の consumer rules が `CredentialProviderPlayServicesImpl` を keep していて
+        （mapping でも元の名前で残る）、シートが出た。googleid のクラスは R8 で改名される（`GoogleIdTokenCredential` は別名になる）が、
+        コードは `credential.type` の文字列と、Bundle の文字列のキーで読むので、名前には依らないはず。ただし、**結果を受け取って
+        `GoogleIdTokenCredential.createFrom` で解析し、トークンを返すところは、R8 を通した状態で動かしていない**。
+    -   **未確認（7.3.13）**: Androidの成功経路（R8 入りの release で、結果の解析とトークンの返却まで。本番用のクライアントIDと、
+        署名の鍵ごとのSHA-1（debug・EASのlocal build・Play App Signing）を含む）、実機、TestFlight・Playの署名したビルド、プロジェクトの所有者でも、テストユーザーでもないアカウントで
         入れるか（同意画面は「テスト中」）、異常系（通信断・アカウントの切り替え・連打）。
 -   実装の制約:
     -   iOSは、GoogleSignInの版を固定する（確認したのは10.1.0）。Swiftの依存（AppCheckCore）のために、Podfileで
@@ -738,6 +743,12 @@ Googleの公式SDKだけを使う、自作の薄いExpoモジュールで実装�
     -   Androidは、googleidを1.2.0に固定する。最新の1.2.1は、Kotlin 2.4のメタデータで、Expo SDK 57のKotlin 2.1.0
         ではコンパイルできない。依存に、Play services（alpha版を含む）が入る。
     -   Androidの依存が足す `USE_BIOMETRIC` と `USE_FINGERPRINT` は、`blockedPermissions` で外す（外してもログインは動く）。
+    -   iOSの `application(_:open:options:)` の購読者（`SingfolioGoogleSignInAppDelegateSubscriber`）は、SDK の説明どおり、
+        URL を `GIDSignIn.handle` に渡し、その結果を返す。ただし、**普段はここに URL は来ない**（AppAuth は
+        ASWebAuthenticationSession でリダイレクトを直接受け取る。`handleURL` が要るのは、iOS 10 の SFSafariViewController と、
+        Google Device Policy アプリのときだけ）。**戻り値は、配送を変えない**: `ExpoAppDelegateSubscriberManager` は戻り値に関わらず
+        すべての購読者を呼び、UIScene 採用後は、`SceneEventForwarder` が AppDelegate の戻り値を捨てて、RCTLinkingManager にも
+        通知する。`true` にして JS の Linking への到達を止める、という期待はしない。
     -   Androidは、2回目以降のログインでも、アカウント選択と確認の画面が出る（自動でログインはされない）。ログアウトで
         `clearCredentialState` を呼ぶかは、ログアウトの画面（7.3.11）で決める。
 -   **ライセンス一覧への載せ方（決定。7.3.8）。** Androidの依存（Google Play services 9個と googleid。POMのライセンスは
@@ -747,8 +758,21 @@ Googleの公式SDKだけを使う、自作の薄いExpoモジュールで実装�
     義務は書かれていないので、全文は載せず、ライセンスの名前と規約のURL（`https://developer.android.com/studio/terms`）を、
     About の Open source licenses の別枠（見出し「Google libraries」）に載せる（Androidだけ。画面は screen-flow
     「Open source licenses」）。`androidx.credentials` は Apache-2.0 で、AndroidX の行に入る。iOSの GoogleSignIn と
-    その依存の Pod 9個は、Apache-2.0（GoogleUtilities だけ、Apache-2.0 に MIT が続く）で、入っている Pod の LICENSE の
-    全文を載せる。
+    その依存の Pod 9個は、Apache-2.0（GoogleUtilities だけ、Apache-2.0 に MIT が続く。この複合の種類は、Pod にだけ許す）で、
+    入っている Pod の LICENSE の全文を載せる。
+-   **Play services の AAR が持つ OSS の表記（決定。7.3.8 のレビューで追加）。** 上の「表示義務は規約に無い」は、Android
+    Software Development Kit License そのものについて。別に、Play services の AAR は、直下に `third_party_licenses.json`・
+    `.txt` を持つ（Google の oss-licenses plugin の入力）。Googleの資料（Include open source notices）は、Play services が
+    OSS を含む、または依存することがあり、アプリが使う OSS の表記の責任は開発者にある、plugin の一覧には、Play services の
+    各ライブラリを作るのに使った OSS の全文も含まれる、としている。この一覧は、実際の同梱より広い（J2ObjC の項目は、iOS 向けの
+    runtime の GPL・APSL・ICU などの全文を持ち、Android の AAR には入らない）。classes.jar には、Guava 由来
+    （`com.google.common.base.Strings`）と protobuf-lite 由来のコードが、難読化名（`zz*`）で入っていることを確かめた（ほかは、
+    難読化名のため、同梱を確認できていない）。そこで、**名前ごとに決める**: AndroidX・Kotlin・kotlinx・JSpecify・Error Prone は、
+    すでに別の行がある（covered）。J2ObjC と、Android SDK License の全文そのもの（Android SDK Platforms）は載せない（skipped）。
+    残りの20件（Animal Sniffer・apksig・Checker Framework・chrome_sync・Dagger・Google Auto・Guava・gsfclient・HighwayHash・
+    JSR 250/305/330・JsInterop・mobiledatadownload・Protocol Buffers・SafeParcelable・Tink など）は、AAR の全文を、
+    「<名前> (Google Play services)」として、普通の一覧に載せる（Apache-2.0・MIT・BSD-3-Clause。種類は全文で確かめる）。
+    知らない名前が増えたら、生成が失敗する。載せすぎの側に倒した（同梱を確認できていないものも含む）。
 -   7.3で決着が要ること: Googleの同意画面（OAuthの公開状態とブランド）、ストアの申告とプライバシーポリシー
     （SDKのプライバシーマニフェストが、利用状況などの収集を宣言している。そのときの版のマニフェストを読み直して決める。
     7.3.12）。

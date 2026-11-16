@@ -68,6 +68,24 @@ describe('THIRD_PARTY_PACKAGES', () => {
     }
   });
 
+  it('Play services の AAR が持つ OSS の表記が、全文つきで載っている（Androidだけ。J2ObjC の GPL などは載せない）', () => {
+    // Google の oss-licenses plugin が一覧に含める、third_party_licenses のうち、載せると決めたもの
+    // （scripts/generate-licenses.mjs の GOOGLE_AAR_NOTICES）。
+    const notices = THIRD_PARTY_PACKAGES.filter((entry) => entry.name.endsWith(' (Google Play services)'));
+    assert.equal(notices.length, 20);
+    for (const name of ['Protocol Buffers for Java', 'JSR 305', 'Tink', 'Guava JDK7', 'SafeParcelable library']) {
+      assert.ok(names.has(`${name} (Google Play services)`), name);
+    }
+    for (const entry of notices) {
+      assert.equal(entry.platform, 'android', entry.name);
+      assert.ok(['Apache-2.0', 'MIT', 'BSD-3-Clause'].includes(entry.license), entry.name);
+      const text = THIRD_PARTY_LICENSE_TEXTS[entry.text ?? -1] ?? '';
+      assert.ok(text.length < 20000, `${entry.name}: 複数のライセンスの全文が混ざっている`);
+      assert.doesNotMatch(text, /GNU General Public License|Apple Public Source/, entry.name);
+    }
+    assert.ok(!names.has('J2ObjC (Google Play services)'));
+  });
+
   it('Googleのサインインの依存が載っている（iOSのPodは全文つき、Androidは規約のURL）', () => {
     const ios = ['GoogleSignIn', 'AppAuth', 'GTMAppAuth', 'GTMSessionFetcher', 'AppCheckCore', 'GoogleUtilities',
       'PromisesObjC', 'PromisesSwift', 'RecaptchaInterop'];

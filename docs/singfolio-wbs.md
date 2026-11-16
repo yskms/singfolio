@@ -219,7 +219,8 @@ v1.0より後（公開機能・Requests）の実装順序は、
         画面は持ち込まない）。`googleSignInRepository`（失敗の分類）を `IdTokenProvider` として、両OSに注入した。モジュールは、
         ネイティブ側が無いビルドでも、importでは落ちない。クライアントIDは本番用のプロジェクトのものにして、Workerの
         `GOOGLE_WEB_CLIENT_ID` との一致をテストで固定した。ライセンス一覧の生成を拡張した（iOSのPod 9個を全文つきで、Android Software
-        Development Kit Licenseの依存は、groupIdを個別に許可して、Aboutの別枠に名前と規約のURLだけ。自前の `modules/` は除く）。
+        Development Kit Licenseの依存は、groupIdを個別に許可して、Aboutの別枠に名前と規約のURLだけ。Play services の AAR が持つ OSS の表記は、
+        載せると決めた20件を全文つきで。自前の `modules/` は除く）。
         iOS Simulator（Release）とAndroidエミュレータ（R8入りのrelease）で確かめた。iOSは、取りやめ・成功（`nonce`・`aud`）・2回目の
         ログイン、Androidは、シートと取りやめまで。**Androidの成功経路（エミュレータにGoogleアカウントが無い）は、7.3.13 へ移した**。
         `blockedPermissions` の `USE_BIOMETRIC`・`USE_FINGERPRINT` は 7.3.6 で入れてある
@@ -241,7 +242,8 @@ v1.0より後（公開機能・Requests）の実装順序は、
         Appleの `sub` がiOSとAndroidで同じか、Services IDで得たトークンを失効させたときの連携、AndroidのWebのフロー全体、
         異常系（通信断・アカウントの切り替え・連打）。Googleは、Androidの成功経路（本番用のクライアントIDと、署名の鍵ごと
         （debug・EASのlocal build・Play App Signing）のSHA-1）、プロジェクトの所有者でもテストユーザーでもないアカウントで入れるか
-        （同意画面は「テスト中」）、実機
+        （同意画面は「テスト中」）。Androidの成功経路は、**R8 入りの release で**確かめる（結果の解析 `GoogleIdTokenCredential.createFrom` と
+        トークンの返却。googleid のクラスは R8 で改名される）。実機
 -   [ ] 7.4 Public ProfileとPublish（Auto Publishを含む）
 -   [ ] 7.5 公開Web（`singfolio.app/username`）。プライバシーポリシーを直す（視聴者のアクセス）
 -   [ ] 7.6 Requests（所有者がアプリ内の一覧で受け取る）。プライバシーポリシー・ストアの申告を直す
