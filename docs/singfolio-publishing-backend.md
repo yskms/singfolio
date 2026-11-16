@@ -351,7 +351,9 @@ AppleとGoogleの仕様は、各社の公式資料で確かめた（Appleは、I
     （検証に通らなかった `T` は、使い切りにならない）。`consumeNonce` のあとにD1が失敗しても、`T` は使い切りになる（アプリが新しい
     `T` で、やり直す）。D1が使えないときは、例外のまま（Cloudflareのエラーページ。JSONではない）。アプリは、JSONでない5xxも、
     一時的な失敗として扱う（日次の上限を超えたときの Error 1027 も同じ）。
-    `web` の `T`（`C` を含む）は、`V` との照合を 7.3.9 で足すまで、`signIn` が拒否する（照合を飛ばして通さない）。
+    `web` の `T`（`C` を含む）は、`signIn` の `web` の入力（認可コードと `V`）でだけ受け付ける。`V` の照合（`SHA-256(V)` が `T` の中の
+    `C` と一致する）が、Appleを呼ぶ前にあり、通らなければ呼ばない。通ったら、コードをAppleで交換してIDトークンを得て、以降は同じ
+    （「AndroidのAppleログイン（Web経由）」）。`/auth/login`（`native` 専用）は、`web` の `T` を受け付けない。
 -   確かめたこと: 模擬の発行元（テスト用のRSA鍵とJWKSを返す fetch）で、上の拒否の条件とキャッシュの動きをテストした。本物のApple・Googleの
     JWKSを、Node から取得して読めることを確かめた（鍵の形は、どちらも `kty: RSA`・`alg: RS256`・`use: sig`・`kid` 付き）。workerd
     （`wrangler dev`）で、模擬のJWKSとローカルのD1に対して、検証と `resolveIdentity` が動くことを確かめた。本物のトークンでの確認は、
@@ -362,7 +364,7 @@ AppleとGoogleの仕様は、各社の公式資料で確かめた（Appleは、I
 -   **`POST /auth/login`**
     -   リクエスト: JSON。`{"provider":"apple"|"google","idToken":"<IDトークン>","nonce":"<T>"}`。`T` は `POST /auth/nonce` の
         `native` のもの。本文は10KBまで（上限の扱いは `/auth/nonce` と同じ）。`web` の `T` は受け付けない（AndroidのAppleログインは
-        別のエンドポイント。7.3.9）。ユーザーIDは受け取らない。
+        別のエンドポイント `POST /auth/apple/login`。「AndroidのAppleログイン（Web経由）」）。ユーザーIDは受け取らない。
     -   レスポンス: 200 `{"session":"<値>"}`、`Cache-Control: no-store`。値はセッションの不透明な値で、中身を解釈しない。
         期限は返さない（最後の利用から数えて延びるため。端末は期限を知らなくてよく、切れていたら401で分かる）。
     -   エラー: 400（本文の不備。`{"error":"invalid_request"}`）、401（検証に通らない。`{"error":"unauthorized"}`。`T` の不備・
@@ -597,14 +599,15 @@ AppleとGoogleの仕様は、各社の公式資料で確かめた（Appleは、I
     作るとき（7.3.10）に確かめる。吸収できないなら、そのときに手段を決める。`account-deleted` は、`identities` の行が無くなるので、
     外部キーで `createSession` が失敗し、セッションは残らない（`consent-revoked` は、行が残るため、この保護が効かない）。
 
-**AndroidのAppleログイン（Web経由）**
+**AndroidのAppleログイン（Web経由）**（実装済み。7.3.9。実際のAppleでの確認は未了で、7.3.13。最後の「実装」の節）
 
 AndroidにはAppleのネイティブのサインインが無いので、Appleの認可のWebのフロー（`appleid.apple.com/auth/authorize`）を
 ブラウザで開く。
 
 -   アプリは、まず乱数の検証用の値 `V` を作り、そのハッシュ `C = SHA-256(V)` を `POST /auth/nonce` に送って、
     署名つきの値 `T`（乱数・期限・種別 `web`・`C` をWorkerの秘密鍵でHMAC署名したもの。D1に書かない）を受け取る。`V` と `T` は、
-    フローが終わるまで SecureStore に置く（ブラウザを開いている間にアプリが終了しても続けられるように）。
+    アプリのメモリにだけ置く（SecureStore には置かない。ブラウザを開いている間にアプリが終了したときの再開は、実装していない。
+    「実装」の節）。
 -   アプリは、`client_id` にServices ID、`redirect_uri` にWorkerのコールバック
     （`https://singfolio.app/auth/apple/callback`。`auth` は予約語なので、`username` のURLと衝突しない）、
     `response_type=code`、`state` と `nonce` に `SHA-256(T)`（同じ値）を付けて開く。名前とメールは要求しない
@@ -650,6 +653,68 @@ AndroidにはAppleのネイティブのサインインが無いので、Appleの
     登録し、このグループで1つ（TLS 1.2が要る）。
 -   `sub` が、iOS（バンドルID）とAndroid（Services ID）で同じになるか。同じグループなら資格情報は共有される
     （Appleの資料）が、実際のトークンで確かめる（7.3）。違うと、Appleでの、OSをまたぐ引き継ぎはできない。
+
+**AndroidのAppleログイン（Web経由）の実装**（7.3.9。Worker: `worker/src/appleWeb.ts`・`appleToken.ts`・`appleClientSecret.ts`、アプリ:
+`src/repositories/appleWebSignInRepository.ts`・`src/services/accountService.ts`・`app/+native-intent.tsx`）
+
+-   **`GET /auth/apple/callback`**（Services ID の Return URL）。`?code=…&state=…`、または取りやめの `?error=…&state=…` を、アプリのURL
+    スキームへの 302 で戻す（`Location: singfolio://auth/apple?code=…&state=…`）。何も保存せず、Appleを呼ばず、D1に触れない。戻り先は
+    コードに固定で、リクエストのパラメータからは決めない。渡すのは、形を確かめた `code`（印字できるASCII 1〜1024字）・`state`（`SHA-256(T)` の
+    43字）・`error`（小文字と `_` の64字まで）だけで、URLエンコードして付ける。`code` か `error` のどちらか1つが無い、形が違う、は 400
+    （Appleのリダイレクトではない）。HEAD は本文なしの 302、`GET`・`HEAD` 以外は 405。`Cache-Control: no-store`・`Referrer-Policy: no-referrer`。
+    本文には、戻れなかったとき用のリンクを添える。
+-   **`POST /auth/apple/login`**。JSON `{"code":"<認可コード>","nonce":"<T（web）>","verifier":"<V>"}`（本文は4KBまで）。200 `{"session":"<値>"}`。
+    失敗は `/auth/login` と同じ形: 400（形の不備。`verifier` は43字の base64url）、401（検証に通らない。理由は教えない）、503（Appleが使えない）、
+    405、413。順序: `T` の署名・種別（`web`）・期限 → **`SHA-256(V)` が `T` の中の `C` と一致するか（Appleを呼ぶ前。通らなければ呼ばない）** →
+    Appleの `POST https://appleid.apple.com/auth/token` で認可コードを交換 → IDトークンの検証（`aud` は Services ID、`nonce` は `SHA-256(T)`）→
+    `consumeNonce` → `resolveIdentity` → セッションの発行。D1に書くのは、IDトークンの検証が通ったあとだけ。
+-   **Appleとの通信**（`appleToken.ts`）。form で `client_id`（Services ID）・`client_secret`・`code`・`grant_type=authorization_code`・`redirect_uri`
+    （Return URL と同じ）を送る。リダイレクトには従わない、5秒で打ち切る、再試行しない（認可コードは1回限りで5分有効）。応答は、`id_token` だけを
+    使う。**`refresh_token`・`access_token` は、読まず、保存せず、ログにも出さない**（ログインには要らない。アカウントの削除（7.3.10）は、
+    再認証であらためて得る）。Appleの応答の本文・コード・IDトークンを、エラーにも結果にも載せない。**400 `invalid_grant`**（無効・期限切れ・
+    使用済みのコード）**は 401**。それ以外（通信の失敗・5xx・`invalid_client`（こちらの設定の不備）・`invalid_request` など）は 503
+    （どれも利用者にできることが無い。コードの問題と区別しても同じ）。
+-   **`client_secret`**（`appleClientSecret.ts`）。ES256のJWT（`kid` = Key ID、`iss` = Team ID、`sub` = Services ID、`aud` =
+    `https://appleid.apple.com`、`exp` は5分先）を、秘密鍵（`.p8`）でリクエストごとに署名する。Team ID・Key ID は `wrangler.jsonc` の `vars`
+    （秘密情報ではない）、**秘密鍵は `APPLE_PRIVATE_KEY`（必須の秘密情報。`wrangler secret put APPLE_PRIVATE_KEY`）**。鍵が無い・PKCS#8のEC鍵として
+    読めないのは設定の不備なので、利用者の失敗にせず投げる（Cloudflareのエラーページ。`NONCE_HMAC_KEY` と同じ扱い）。鍵・JWTは、エラーにもログにも
+    出さない。改行が `\n` の2文字で渡された値も読む（`.dev.vars` の1行表記）。workerd（`wrangler dev`）で作ったJWTが、公開鍵で検証できることを確かめた。
+-   **アプリ**。`account.signIn('apple')` は、Androidでは、IDトークンの経路ではなく、**認可コードの経路**（`authCodeProviders`）を使う（iOSは
+    IDトークンの経路）: `V`（32バイトの乱数の base64url）を作る → `C = SHA-256(V)` を入れた `web` の `T` を得る（`POST /auth/nonce`）→
+    `SHA-256(T)` を `state` と `nonce` にして、Custom Tab（`expo-web-browser` の `openBrowserAsync`）で認可の画面を開く → 戻りのURL
+    （`singfolio://auth/apple?...`）を Linking で受け取り、`code` を取り出す → `code`・`T`・`V` を `POST /auth/apple/login` へ。Appleには、`scope` を送らない
+    （名前もメールも要求しない。スコープが無いので `response_mode=query` でよい）。
+    -   **戻りのURLの扱い。** `state` が `SHA-256(T)` と違う・無い `code` のURLは、自分のフローのものではない（他のアプリが押し込んだものなど）ので、
+        受け取らず、待ち続ける。取りやめ（`error=user_cancelled_authorize`）は `cancelled`、ほかの `error` は `provider-failed`。ブラウザを開けなければ
+        `provider-failed`。上限は、`account` の5分（待つのをやめるだけで、Custom Tab は閉じられない）。
+    -   **ブラウザを閉じた（取りやめ）の判定。** Android には、Custom Tab が閉じたことを知らせる手段が無い。アプリが前面を離れたあとに前面
+        （`AppState` が `active`）へ戻ったとき、戻りのURLを待つ猶予（1.5秒）を置き、来なければ `cancelled` にする。戻りのURLでアプリが開くときは、前面への
+        復帰とURLの到着の順番が決まっていないため、猶予が要る（`expo-web-browser` の `openAuthSessionAsync` は、Androidでは、この2つを競わせるだけで、
+        リダイレクトで戻っても `dismiss` が勝ちうる、とソースを読んで判断した。実測はしていない。使わない）。
+    -   **`app/+native-intent.tsx` は外さない。** 戻りのURLを expo-router に渡すと「画面が見つかりません」（`+not-found`）へ遷移する。`redirectSystemPath` で、
+        このURLには、**起動中なら `null`（遷移しない）、起動時のURLなら `'/'`（ルートから始める）**を返す（判定は、サインインの処理と同じ `parseReturnUrl`。
+        `src/repositories/appleWebSignInRepository.ts` の `redirectSystemPath`）。**起動時に `null` を返してはいけない**: expo-router は、ディープリンクが
+        無い起動を、ルートのURLに直して Songs から始めるが、`null` はその処理を飛ばし、Stack の既定の先頭（`song/new`、Add Song）が開く
+        （Androidで確認して直した）。ほかのURLは、そのまま渡す。
+    -   **アプリが終了したときの再開は実装していない。** Custom Tab を開いている間にAndroidがアプリのプロセスを終了すると、戻りのURLで、アプリは新しく
+        起動し、`V` と `T`（メモリにだけある）は失われる。サインインは完了せず、先頭の画面が出る（戻りのURLは無視される）。利用者がやり直す。
+        SecureStore に置いて再開するには、起動時に戻りのURLを拾って完了させる処理と、その結果を伝える画面が要るので、アカウントの画面（7.3.11）で決める。
+-   **確かめたこと**: Nodeのテスト（Worker: コールバックの形と拒否、`client_secret` のJWT、コードの交換の成功・各失敗の分類と、`refresh_token` を
+    載せないこと、`POST /auth/apple/login` の成功・各拒否（`V` の不一致・`native` の `T`・期限切れ・署名違い・`invalid_grant`・Appleの不調・リプレイ・形の不備）で、
+    Appleを呼ぶ前に落ちるものはAppleを呼ばず、D1に何も書かないこと。アプリ: 認可のURL・戻りのURLの読み取り・`state` の照合・猶予・取りやめ・上限、
+    `account` の認可コードの経路）。workerd（`wrangler dev`）で、コールバックの 302、`T`（web）が131字、`V` の不一致が 401、形の不備が 400。
+    **Androidエミュレータ（R8入りのrelease。Chrome の Custom Tab）で確かめた**: ① Custom Tab で、ローカルの Worker のコールバック
+    （`http://localhost:8787/auth/apple/callback?...`。`adb reverse`）を開くと、Worker の 302（`singfolio://auth/apple?...`）でアプリが開き、
+    アプリが `code` を受け取る（画面は `+not-found` に遷移しない）。② 本物のAppleの認可の画面（`appleid.apple.com`。`client_id` に Services ID、
+    `redirect_uri` に Return URL、`response_type=code`、`response_mode=query`、スコープ無し）が、エラーなしで出る（「Use your Apple Account to sign in
+    to Singfolio.」。Services ID と Return URL の登録、スコープ無しの `query` を、Appleが受け付けた。資格情報は入れていない）。③ 戻りのURLを `adb` で
+    送ると `code` を受け取る。`state` が違うURL・`state` の無い `code` は受け取らない（偽のURLでは `code` は得られず、前面への復帰から1.5秒で
+    `cancelled`）。④ Custom Tab で戻ると `cancelled`。⑤ 実際の `account.signIn('apple')` が、本番の `POST /auth/nonce`（web）から Custom Tab の表示まで通る。
+    ⑥ 起動時（アプリが終了している状態）に戻りのURLが届くと、Songs が開く（直す前は Add Song）。FATAL なし、R8 の問題なし。DEX は 9,445,884 バイト。
+    権限は変わらない（`INTERNET`・`VIBRATE` のみ）。Androidのシステムのログ（`WindowManagerShell` の verbose）に、Custom Tab のURL
+    （コード・`state` を含む）が出うる（adb でだけ読める。コードは1回限りで5分有効、`V` が無いと使えないので、この設計で受け入れる）。
+    **本物のAppleでの確認（コードの交換、IDトークンの `nonce`、`sub` がiOSと同じか、`client_secret` をAppleが受け付けるか、Return URL からの 302 が実機の
+    Custom Tab でアプリを開くか）は、デプロイと、利用者のAppleアカウントでのサインインが要るので、7.3.13。**
 
 **Googleのサインイン（iOS・Android）**（実装済み。7.3.8。`modules/singfolio-google-signin`・`plugins/withGoogleSignIn.js`・`src/repositories/googleSignInRepository.ts`）
 
@@ -861,7 +926,16 @@ nonce・セッションの失効・Appleのトークン失効の方式は、「�
     先に、守るものを切り分ける。**決定（2026-11-15）: `POST /auth/nonce` には、Workerの中のレート制限を入れない。** このエンドポイントは
     D1に書かず、1回の呼び出しの費用はHMACの計算だけで、外部サービスも呼ばない（乱用で増える費用が無い）。日次のリクエスト上限は、まず残る
     リスクとして受け入れる。WAFのRate limiting rules（1ルール）は実測した（下）。
-    乱用の費用が生じる経路（7.3.9 のAppleのトークン交換を呼ぶコールバックなど）で、あらためて決める。
+    乱用の費用が生じる経路（7.3.9 のAppleのトークン交換を呼ぶエンドポイントなど）で、あらためて決める。
+    **決定（2026-11-17。7.3.9）: `POST /auth/apple/login`（Appleの `/auth/token` を呼ぶ、唯一の経路）に、WAFのRate limiting rulesの1ルールを
+    使う。** 条件は Path が `/auth/apple/login`（完全一致。`/auth/nonce` の実測と同じ形）、IPで数える、少ない件数（目安は5件/10秒）、
+    Block。ルールはリポジトリの外（Cloudflareのダッシュボード）にあり、デプロイのときに作る（利用者の作業）。Freeは1ルールなので、
+    ほかの経路（`/auth/nonce`・コールバックなど）の洪水には使わない（日次の上限のリスクは、上の判断のまま受け入れる）。**Workers の Rate
+    Limiting API は、設定に足さない:** Freeで使えるかが、資料（Rate Limiting の資料、Workersの料金・制限の資料）のどこにも書かれておらず、
+    Cloudflareのコミュニティにも、同じ質問の答えが無い（2026-11-17に確認）。宣言した設定でデプロイが失敗するかもしれない機能に、設定を
+    依存させない。使えると分かったら（デプロイして確かめる）、足すかを決める。Appleを呼ぶ前の検査（`T` の署名・種別・期限、`V` の照合）は、
+    D1にも外部にも触れず、でたらめな値は Apple に届かない。ただし、`T`（`V` の `C` を入れたもの）は `/auth/nonce` から誰でも作れるので、
+    それだけでは、Appleを呼ばせる乱用は防げない（WAFのルールが担う）。
     -   **乱用の抑止**（AndroidのAppleログインのコールバックが、Appleの `/auth/token` を呼ぶ費用など）。Workerの中で足りる
         （Workers の Rate Limiting API）。カウントは拠点ごとで、近似・結果整合のため、全世界での厳密な上限にはならない。
         `period` は10秒か60秒。キーは任意の文字列で、資料はIPアドレスを勧めていない（共有のIPがあるため）。キーが

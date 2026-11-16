@@ -74,6 +74,18 @@ export function parseReturnUrl(url: string): ReturnParams | null {
   return params;
 }
 
+/**
+ * `app/+native-intent.tsx` の `redirectSystemPath` の中身。アプリに渡されたURLを、expo-router に渡す前に直す。
+ * Appleからの戻りのURLは、サインインの処理（Linking を直接受け取る）が使うもので、画面ではない。そのまま渡すと
+ * 「画面が見つかりません」へ遷移するので、**起動中は `null`（遷移しない）**、**起動時のURLなら `'/'`**（ルートから始める）を返す。
+ * 起動時に `null` を返してはいけない: expo-router は、ディープリンクが無い起動を、ルートのURLに直して先頭の画面（Songs）から
+ * 始めるが、`null` はその処理を飛ばし、Stack の既定の先頭（`song/new`）が開く（Android で確認）。ほかのURLは、そのまま渡す。
+ */
+export function redirectSystemPath(path: string, initial: boolean): string | null {
+  if (parseReturnUrl(path) === null) return path;
+  return initial ? '/' : null;
+}
+
 /** ブラウザ・URLの受け取り・前面への復帰。実機では expo-web-browser・Linking・AppState（`services/index.ts`）。 */
 export interface AuthBrowser {
   /** URLをブラウザ（Custom Tab）で開く。開けたら解決する（ブラウザが閉じるのは待たない）。開けなければ失敗する。 */

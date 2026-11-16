@@ -117,6 +117,13 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     例外は `payload` を持つ。理由だけ取り出して捨てる）。`aud` は `T` の種別とログイン手段で1つに決め、両方を
     受け入れる形に「簡略化」しない。詳細は同じ docs の §8「IDトークンの検証」。
 
+-   AndroidのAppleログイン（Web経由。`worker/src/appleWeb.ts`）: `web` の `T`（`C = SHA-256(V)` を含む）は `POST /auth/apple/login` だけが
+    受け付ける。`/auth/login` は `native` 専用のまま（取り違えると `V` の照合が飛ばされる）。`V` の照合は、Appleを呼ぶ**前**に行い、通らなければ
+    呼ばない。Appleの `refresh_token`・`access_token` は、読まず、保存せず、ログにも出さない。`client_secret` は `APPLE_PRIVATE_KEY`
+    （必須の secret。`vars` に置かない）でリクエストごとに署名する。コールバックの戻り先 `singfolio://auth/apple` は固定で、パラメータから決めない
+    （オープンリダイレクトにしない）。Appleを呼ぶ `/auth/apple/login` のレート制限は、WAFの1ルール（デプロイのときに利用者が作る）。Workers の
+    Rate Limiting API は、Freeで使えるかが資料のどこにも無いので、設定に足さない。詳細は docs §8「AndroidのAppleログイン（Web経由）の実装」。
+
 ### アカウント（アプリ側）
 
 詳細は `docs/singfolio-publishing-backend.md` §8「アプリ側の認証の土台」。
@@ -156,6 +163,11 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     `webClientId` は、Workerの `GOOGLE_WEB_CLIENT_ID` と同じ値**（IDトークンの `aud`。ずれると全ログインが 401。
     `worker/test/config.test.ts` が固定）。検証用だった古いGoogle Cloudのプロジェクトのクライアントに戻さない。
     Googleはスコープを外せず、IDトークンに `email`・`name` なども入るが、使うのは `sub` だけ。詳細は docs §8「Googleのサインイン」。
+-   AndroidのAppleログインは、Custom Tab（`expo-web-browser` の `openBrowserAsync`）と Linking で、認可コードを得る。**`app/+native-intent.tsx` は
+    外さない**（戻りのURL `singfolio://auth/apple?...` を expo-router に渡すと `+not-found` へ遷移する。起動時のURLには `null` ではなく `'/'` を返す: `null` だと
+    ルートから始める処理が飛び、Add Song が開く）。`openAuthSessionAsync` は使わない（Androidでは、
+    リダイレクトとブラウザを閉じた判定を競わせるだけで、`dismiss` が勝ちうる）。`state` が `SHA-256(T)` と違う戻りのURLは受け取らない。`V`・`T` は
+    メモリにだけ置く（アプリが終了したときの再開は、7.3.11 で決める）。
 -   `expo-secure-store` の config plugin を `app.json` に足さない。Androidのバックアップ規則が `<include>` で、v1.0で今
     バックアップされているSQLiteを外す。
 

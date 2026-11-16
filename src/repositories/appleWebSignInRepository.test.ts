@@ -12,6 +12,7 @@ import {
   buildAuthorizeUrl,
   createAppleWebSignInRepository,
   parseReturnUrl,
+  redirectSystemPath,
   type AuthBrowser,
 } from './appleWebSignInRepository.ts';
 
@@ -110,6 +111,22 @@ describe('parseReturnUrl', () => {
       '',
     ]) {
       assert.equal(parseReturnUrl(url), null, url);
+    }
+  });
+});
+
+describe('redirectSystemPath（app/+native-intent.tsx）', () => {
+  it('Appleからの戻りのURLは、起動中は null（遷移しない）、起動時は "/"（ルートから始める。null だと Stack の既定の先頭が開く）', () => {
+    const url = `${APP_RETURN_URL}?code=x&state=${HASHED}`;
+    assert.equal(redirectSystemPath(url, false), null);
+    assert.equal(redirectSystemPath(url, true), '/');
+    assert.equal(redirectSystemPath(`${APP_RETURN_URL}?error=user_cancelled_authorize`, true), '/');
+  });
+
+  it('ほかのURLは、起動中も起動時も、そのまま渡す', () => {
+    for (const url of ['singfolio://song/1', 'singfolio://', 'singfolio://auth/applesauce?code=x', '/songs']) {
+      assert.equal(redirectSystemPath(url, false), url);
+      assert.equal(redirectSystemPath(url, true), url);
     }
   });
 });

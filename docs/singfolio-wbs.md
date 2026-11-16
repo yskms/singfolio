@@ -7,7 +7,7 @@ v1.0の作業（0〜6章。保存・管理は端末内で完結し、外部通�
 v1.0より後（公開機能・Requests）の実装順序は、
 `singfolio-publishing-backend.md` §9 を参照。進捗は「7. 公開機能」に書く。
 
-**現在地**：6. リリース準備（6.5・6.8が残り。6.1・6.2・6.3・6.4・6.6・6.7は完了。6.4は、iOS の 1.0 を審査に提出して、審査を通って公開された。Android は、6.8 の変更を含む AAB（versionCode 4）を作って、内部テストへアップロードして、Pixel 11 で確認した。Play Console の申告・掲載を入力して、製品版の審査へ送信し、審査を通って公開された。iOS も審査を通って公開され、紹介ページに両ストアのバッジを載せた。6.8は、アプリの変更・スクリーンショットの撮り直し・ストアの文の修正・両ストアへの入力・Android の実機での確認まで済んだ）。7. 公開機能（v1.0より後）は、7.1（バックエンドの技術検証と選定）が済み、7.2（実装前に確かめること）も済んだ（Appleの公開鍵の取得・`singfolio.app` の取得・認証の方式の決定・Freeプランでの放置後の再アクセス。ログイン手段はiOS・Androidとも、AppleとGoogleに決めた）。7.3 は、小さな作業（7.3.1 から 7.3.13）に分けた。7.3.1（利用者の前提の準備）は済んだ。7.3.2（Workerの土台）も済んだ（本番のD1とWorkerを作り、`singfolio.app` で404を返す状態）。7.3.3（nonce の発行・検証・使用済みの記録と HTTPS の検査）も済んだ（本番へデプロイして、HTTPが403、HTTPSが200になることを実測した。レート制限は Worker に入れない。WAFが Worker より前で効くことも実測した）。7.3.4（IDトークンの検証と、ログイン手段の引き当て）も済んだ（jose で検証し、模擬の発行元でテストした。本物のトークンでの確認は 7.3.7・7.3.8）。7.3.5（セッションとログイン・ログアウトのエンドポイント）も済んだ（模擬の発行元とローカルのD1でテストし、workerd でも動きを確かめた）。7.3.4・7.3.5 とも、本番へのデプロイはまだ。7.3.6（アプリ側の認証の土台）も済んだ（HTTP・SecureStore・初回起動での破棄・ログアウト。画面は無く、何も送らない。AndroidエミュレータとiOS Simulatorで確かめた）。7.3.7（Appleのサインイン）も済んだ（AppleのIDトークンの `nonce` の確認は、7.3.13 へ移した）。7.3.8（Googleのサインイン）も済んだ（iOS Simulatorで、取りやめ・成功・2回目のログインを確かめた。Androidの成功経路は、7.3.13 へ移した）。次は 7.3.9
+**現在地**：6. リリース準備（6.5・6.8が残り。6.1・6.2・6.3・6.4・6.6・6.7は完了。6.4は、iOS の 1.0 を審査に提出して、審査を通って公開された。Android は、6.8 の変更を含む AAB（versionCode 4）を作って、内部テストへアップロードして、Pixel 11 で確認した。Play Console の申告・掲載を入力して、製品版の審査へ送信し、審査を通って公開された。iOS も審査を通って公開され、紹介ページに両ストアのバッジを載せた。6.8は、アプリの変更・スクリーンショットの撮り直し・ストアの文の修正・両ストアへの入力・Android の実機での確認まで済んだ）。7. 公開機能（v1.0より後）は、7.1（バックエンドの技術検証と選定）が済み、7.2（実装前に確かめること）も済んだ（Appleの公開鍵の取得・`singfolio.app` の取得・認証の方式の決定・Freeプランでの放置後の再アクセス。ログイン手段はiOS・Androidとも、AppleとGoogleに決めた）。7.3 は、小さな作業（7.3.1 から 7.3.13）に分けた。7.3.1（利用者の前提の準備）は済んだ。7.3.2（Workerの土台）も済んだ（本番のD1とWorkerを作り、`singfolio.app` で404を返す状態）。7.3.3（nonce の発行・検証・使用済みの記録と HTTPS の検査）も済んだ（本番へデプロイして、HTTPが403、HTTPSが200になることを実測した。レート制限は Worker に入れない。WAFが Worker より前で効くことも実測した）。7.3.4（IDトークンの検証と、ログイン手段の引き当て）も済んだ（jose で検証し、模擬の発行元でテストした。本物のトークンでの確認は 7.3.7・7.3.8）。7.3.5（セッションとログイン・ログアウトのエンドポイント）も済んだ（模擬の発行元とローカルのD1でテストし、workerd でも動きを確かめた）。7.3.4・7.3.5 とも、本番へのデプロイはまだ。7.3.6（アプリ側の認証の土台）も済んだ（HTTP・SecureStore・初回起動での破棄・ログアウト。画面は無く、何も送らない。AndroidエミュレータとiOS Simulatorで確かめた）。7.3.7（Appleのサインイン）も済んだ（AppleのIDトークンの `nonce` の確認は、7.3.13 へ移した）。7.3.8（Googleのサインイン）も済んだ（iOS Simulatorで、取りやめ・成功・2回目のログインを確かめた。Androidの成功経路は、7.3.13 へ移した）。7.3.9（AndroidのAppleログイン。Web経由）も済んだ（Workerのコールバックと認可コードの交換、アプリのCustom Tabと戻りのURL。Androidエミュレータで、Custom Tab から Worker の302、アプリが `code` を受け取るまでを確かめた。本物のAppleでの交換は 7.3.13）。次は 7.3.10
 
 ## 0. 企画・設計
 
@@ -183,7 +183,7 @@ v1.0より後（公開機能・Requests）の実装順序は、
         HTTPSでないリクエストの拒否（§8「Workerの構成と運用」の「HTTPS」）を含む。`worker/` の `npm test` が通り、本番へデプロイして
         確かめた（HTTPが403、HTTPSが200、エッジの `request.url`・`X-Forwarded-Proto` がHTTPを反映する）。レート制限は、このエンドポイント
         には入れない（乱用の費用が無い。§8「実装時に決めること」）。WAFのRate limiting rules（1ルール）は、Workerより前で効くことを実測した
-        （弾いた分はWorkerを起動せず、Metricsの呼び出しにも数えられない。§8「実装時に決めること」）。日次の上限への手当て（ルールを残すか、有料プランか）は、7.3.9 などで決める
+        （弾いた分はWorkerを起動せず、Metricsの呼び出しにも数えられない。§8「実装時に決めること」）。日次の上限への手当て（ルールを残すか、有料プランか）は、7.3.9 で決めた（Appleを呼ぶ `/auth/apple/login` に、WAFの1ルール。§8「実装時に決めること」）
     -   [x] 7.3.4 IDトークンの検証（Apple・Google。公開鍵（JWKS）の取得とキャッシュ、`iss`・`aud`・`exp`・`nonce`）と、`sub` から
         `identities` を引く・作る処理。模擬の発行元で、拒否の条件を確かめる。jose（`jwtVerify`）で検証し、`alg` はRS256のみ、`kid`・`exp`・`sub`
         を必須にした。公開鍵はisolateのメモリにキャッシュし、取得に失敗しても25時間までは前の鍵で続ける（冷却60秒）。`aud` は、`T` の種別と
@@ -195,7 +195,7 @@ v1.0より後（公開機能・Requests）の実装順序は、
         `T` の検証 → IDトークンの検証 → 使用済みの記録 → ログイン手段の引き当て → セッションの発行の順で、D1に書くのは検証に通ったあと。
         つなぐときに決めた2点: 公開鍵を一度も取れていない間も冷却を守る（失敗した試みを記録し、60秒は取りに行かず、すぐ `unavailable`）、
         `audienceFor` が null の組み合わせ（Googleの `web`）は、公開鍵を取りに行く前に拒否する。`web` の `T` は、`V` の照合
-        （7.3.9）を足すまで拒否する。セッションの認証（`authenticateSession`）を使うエンドポイントは、まだ無い（7.3.10・7.4 以降）。
+        を 7.3.9 で足して、`POST /auth/apple/login` だけが受け付ける。セッションの認証（`authenticateSession`）を使うエンドポイントは、まだ無い（7.3.10・7.4 以降）。
         本番へのデプロイはまだ
     -   [x] 7.3.6 アプリ側の認証の土台。HTTPをRepositoryに閉じ込める、SecureStoreにセッション、初回起動でセッションを捨てる、
         失敗の扱い。ログインを要求しない（ログアウトのままでも、v1.0の機能はすべて使える）。`authRepository`（`/auth/nonce`・
@@ -224,8 +224,14 @@ v1.0より後（公開機能・Requests）の実装順序は、
         iOS Simulator（Release）とAndroidエミュレータ（R8入りのrelease）で確かめた。iOSは、取りやめ・成功（`nonce`・`aud`）・2回目の
         ログイン、Androidは、シートと取りやめまで。**Androidの成功経路（エミュレータにGoogleアカウントが無い）は、7.3.13 へ移した**。
         `blockedPermissions` の `USE_BIOMETRIC`・`USE_FINGERPRINT` は 7.3.6 で入れてある
-    -   [ ] 7.3.9 AndroidのAppleログイン（Web経由）。Custom Tab、Workerのコールバック（`/auth/apple/callback`）、`V`・`T` の
-        結びつけ、レート制限、アプリのURLスキームへの戻し
+    -   [x] 7.3.9 AndroidのAppleログイン（Web経由）。Worker: コールバック（`GET /auth/apple/callback`。アプリのURLスキームへの302）、
+        `POST /auth/apple/login`（`V` の照合 → Appleの認可コードの交換 → IDトークンの検証 → セッション。`client_secret` はES256のJWTを秘密鍵
+        `APPLE_PRIVATE_KEY` で署名）。アプリ: Custom Tab（`expo-web-browser`）、認可コードの経路（`authCodeProviders`）、戻りのURLの扱い
+        （`state` の照合・猶予つきの取りやめの判定・`app/+native-intent.tsx`）。レート制限は、WAFの1ルールに決めた（Workers の Rate Limiting API は、
+        Freeで使えるかが資料に無いので足さない）。Nodeのテストと、workerd・Androidエミュレータ（R8入りのrelease。Chrome の Custom Tab）で確かめた
+        （Custom Tab → Worker の302 → アプリが `code` を受け取る、本物のAppleの認可の画面が出る、取りやめ、起動時の戻りのURL。起動時は `null` を返すと
+        Add Song が開くのを直した）。**本物のAppleでの確認（コードの交換・IDトークンの `nonce`・`sub`）は、デプロイと利用者のAppleアカウントが
+        要るので、7.3.13**。アプリが終了したときの再開は実装していない（7.3.11 で決める）（§8「AndroidのAppleログイン（Web経由）の実装」）
     -   [ ] 7.3.10 アカウントの削除（アプリ内。再認証、Appleのトークンの失効、D1の行とR2のスナップショットの削除）と、Appleの
         サーバー間通知（`consent-revoked`・`account-deleted`）。通知のエンドポイントは、primary App IDに登録する。
         `consent-revoked` の処理と、直前に検証を通ったログインの競合（取り消し後にセッションが残らないか）を確かめる（§8「Appleのサーバー間通知」）。
@@ -240,7 +246,10 @@ v1.0より後（公開機能・Requests）の実装順序は、
         最初に、AppleのIDトークンの `nonce` が、渡した値（`SHA-256(T)` の base64url）そのままか（7.3.7 から移した。違うなら、Workerを直してから
         ほかを確かめる）。サインインの成功・取りやめ・失敗の、実際のエラーコード（`appleSignInRepository` の分類）。
         Appleの `sub` がiOSとAndroidで同じか、Services IDで得たトークンを失効させたときの連携、AndroidのWebのフロー全体、
-        異常系（通信断・アカウントの切り替え・連打）。Googleは、Androidの成功経路（本番用のクライアントIDと、署名の鍵ごと
+        異常系（通信断・アカウントの切り替え・連打）。**AndroidのApple（Web経由。7.3.9）は、デプロイのあとで**: 先に、利用者が
+        `wrangler secret put APPLE_PRIVATE_KEY`（`.p8` の中身）と、WAFのルール（Path が `/auth/apple/login`、IPで数える、5件/10秒 目安、Block）を
+        作る。そのうえで、Appleの認可コードの交換が通るか（Appleが `client_secret` と `redirect_uri` を受け付けるか）、IDトークンの `nonce` が `SHA-256(T)`
+        そのままか、`sub` がiOSと同じか、Return URL からの 302 が実機の Custom Tab でアプリを開くか、取りやめ（`user_cancelled_authorize`）を確かめる。Googleは、Androidの成功経路（本番用のクライアントIDと、署名の鍵ごと
         （debug・EASのlocal build・Play App Signing）のSHA-1）、プロジェクトの所有者でもテストユーザーでもないアカウントで入れるか
         （同意画面は「テスト中」）。Androidの成功経路は、**R8 入りの release で**確かめる（結果の解析 `GoogleIdTokenCredential.createFrom` と
         トークンの返却。googleid のクラスは R8 で改名される）。実機
