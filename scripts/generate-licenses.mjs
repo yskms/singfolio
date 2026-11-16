@@ -740,16 +740,16 @@ function googleAarNoticeEntries(resolved) {
     const family = MAVEN_FAMILIES.find((candidate) => candidate.match.test(group));
     if (!family?.androidSdkLicense) continue;
     const aar = findAar(group, artifact, version);
-    const read = (name) =>
-      execFileSync('unzip', ['-p', aar, name], { maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] });
-    let index;
-    let raw;
-    try {
-      index = JSON.parse(read('third_party_licenses.json').toString('utf8'));
-      raw = read('third_party_licenses.txt');
-    } catch {
-      continue; // この AAR は、表記を持たない
-    }
+    // 表記を「持たない」ことと、読めない（unzip の失敗・壊れた AAR・JSON が読めない）ことを区別する。
+    // 一覧を引けなければ、ここで投げる。片方のファイルだけがある形も、失敗にする。
+    const entries = execFileSync('unzip', ['-Z1', aar], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).split('\n');
+    const hasJson = entries.includes('third_party_licenses.json');
+    const hasText = entries.includes('third_party_licenses.txt');
+    if (hasJson !== hasText) throw new Error(`${coordinate}:${version}: third_party_licenses の json と txt の片方しか無い`);
+    if (!hasJson) continue; // この AAR は、表記を持たない
+    const read = (name) => execFileSync('unzip', ['-p', aar, name], { maxBuffer: 64 * 1024 * 1024 });
+    const index = JSON.parse(read('third_party_licenses.json').toString('utf8'));
+    const raw = read('third_party_licenses.txt');
     for (const [name, range] of Object.entries(index)) {
       if (GOOGLE_AAR_NOTICES_COVERED.test(name) || name in GOOGLE_AAR_NOTICES_SKIPPED) continue;
       if (!GOOGLE_AAR_NOTICES.some((notice) => notice.name === name)) {
@@ -774,8 +774,13 @@ function googleAarNoticeEntries(resolved) {
       throw new Error(`${notice.name}: 全文が、${notice.license} の想定した形ではない。内容を確かめる`);
     }
     checkAllowed(notice.name, notice.license);
+    // 名前の後ろの出どころは、その表記を持つ AAR の groupId で決める。Play services の AAR にも出るなら Play services、
+    // googleid（Google Identity）にだけ出るなら Google Identity（今の20件は、すべて Play services の AAR にも出る）。
+    const source = entry.from.some((coordinate) => coordinate.startsWith('com.google.android.gms:'))
+      ? 'Google Play services'
+      : 'Google Identity';
     return {
-      kind: 'native', name: `${notice.name} (Google Play services)`, license: notice.license, text: entry.text,
+      kind: 'native', name: `${notice.name} (${source})`, license: notice.license, text: entry.text,
       platform: 'android',
     };
   });
