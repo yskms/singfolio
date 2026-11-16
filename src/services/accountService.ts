@@ -16,6 +16,19 @@ export interface IdTokenProvider {
   getIdToken(hashedNonce: string): Promise<string>;
 }
 
+/**
+ * 各社のサインインのうち、IDトークンではなく**認可コード**を返すもの（AndroidのAppleログイン。Web経由）。
+ * IDトークンへの交換は、Workerがする（`client_secret` を持つため）。画面・Service は、ブラウザ・URLの扱いに触れない。
+ */
+export interface AuthCodeProvider {
+  /**
+   * 各社の認可の画面を開き、認可コードを返す。`hashedNonce` は、認可リクエストの `state` と `nonce` に入れる値
+   * （`SHA-256(T)` の base64url）。利用者が取りやめたら `AuthError('cancelled')`、それ以外の失敗も `AuthError`
+   * （コード・`state` の値は載せない）。
+   */
+  getAuthorizationCode(hashedNonce: string): Promise<string>;
+}
+
 export interface AccountServiceDeps {
   auth: AuthRepository;
   sessions: SessionRepository;
@@ -29,6 +42,16 @@ export interface AccountServiceDeps {
   localDataId(): Promise<string>;
   /** 組み込み済みのサインイン。無いものは `signIn` が `provider-unavailable` にする。 */
   idTokenProviders: Partial<Record<AuthProvider, IdTokenProvider>>;
+  /**
+   * 組み込み済みの、認可コードを返すサインイン（AndroidのApple）。同じ手段が `idTokenProviders` にもあれば、
+   * そちらを使う（OSごとに、どちらか1つだけを組み込む）。
+   */
+  authCodeProviders?: Partial<Record<AuthProvider, AuthCodeProvider>>;
+  /**
+   * 検証用の値 `V`（乱数の base64url。43字）を作る。認可コードの経路で、`T` に結びつける。`V` は、その `SHA-256` を
+   * `T` に入れてWorkerへ渡し、コードと一緒にWorkerへ送るまで、アプリの外に出さない。
+   */
+  randomVerifier?: () => string;
   /** 各社のサインインを待つ上限（ミリ秒）。既定は `PROVIDER_TIMEOUT_MS`。テスト用 */
   providerTimeoutMs?: number;
 }
@@ -90,6 +113,7 @@ export function createAccountService(deps: AccountServiceDeps | null): AccountSe
     };
   }
   const { auth, sessions, sha256Base64Url, localDataId, idTokenProviders } = deps;
+  const authCodeProviders = deps.authCodeProviders ?? {};
   const providerTimeoutMs = deps.providerTimeoutMs ?? PROVIDER_TIMEOUT_MS;
 
   // サインインとログアウトは1本ずつ順に実行する。サインインの途中（各社の画面を開いている間）に
@@ -167,7 +191,8 @@ export function createAccountService(deps: AccountServiceDeps | null): AccountSe
       return serialize(() =>
         asAuthError(async () => {
           const idTokenProvider = idTokenProviders[provider];
-          if (!idTokenProvider) throw new AuthError('provider-unavailable');
+          const authCodeProvider = idTokenProvider ? undefined : authCodeProviders[provider];
+          if (!idTokenProvider && !authCodeProvider) throw new AuthError('provider-unavailable');
           const { current, stale } = await readSession();
           if (current) throw new AuthError('already-signed-in');
           // 読めない・別のDBのセッションが残っていても、サインインは進める（上書きする）。読めないだけで
@@ -176,17 +201,34 @@ export function createAccountService(deps: AccountServiceDeps | null): AccountSe
           // 読めた別のDBのもの（`stale`）は、下で上書きしたあとに失効させる。
           const dataId = await localDataId();
 
-          // nonce の元 `T` を得て、そのハッシュを各社のサインインに渡す（リプレイ対策。§8）。
-          // `T` は5分で切れるので、各社の画面を開いたまま放置すると、ログインは 401 になる（やり直す）。
-          const nonce = await auth.requestNonce();
-          const hashedNonce = await sha256Base64Url(nonce);
-          const idToken = await withTimeout(
-            () => idTokenProvider.getIdToken(hashedNonce),
-            providerTimeoutMs,
-          );
-          if (typeof idToken !== 'string' || idToken === '') throw new AuthError('invalid-response');
+          let session: string;
+          if (idTokenProvider) {
+            // nonce の元 `T` を得て、そのハッシュを各社のサインインに渡す（リプレイ対策。§8）。
+            // `T` は5分で切れるので、各社の画面を開いたまま放置すると、ログインは 401 になる（やり直す）。
+            const nonce = await auth.requestNonce();
+            const hashedNonce = await sha256Base64Url(nonce);
+            const idToken = await withTimeout(
+              () => idTokenProvider.getIdToken(hashedNonce),
+              providerTimeoutMs,
+            );
+            if (typeof idToken !== 'string' || idToken === '') throw new AuthError('invalid-response');
+            session = await auth.login({ provider, idToken, nonce });
+          } else {
+            // 認可コードの経路（AndroidのApple）。検証用の値 `V` を作り、そのハッシュ `C` を入れた `web` の `T` を得る。
+            // 横取りされた `code` と `state`（`state` は `T` のハッシュ）だけでは、`T` も `V` も無いので、Workerは受け付けない。
+            if (!authCodeProvider || provider !== 'apple') throw new AuthError('provider-unavailable');
+            const verifier = deps.randomVerifier?.();
+            if (typeof verifier !== 'string' || verifier === '') throw new AuthError('unexpected');
+            const nonce = await auth.requestWebNonce(await sha256Base64Url(verifier));
+            const hashedNonce = await sha256Base64Url(nonce);
+            const code = await withTimeout(
+              () => authCodeProvider.getAuthorizationCode(hashedNonce),
+              providerTimeoutMs,
+            );
+            if (typeof code !== 'string' || code === '') throw new AuthError('invalid-response');
+            session = await auth.loginWithAppleCode({ code, nonce, verifier });
+          }
 
-          const session = await auth.login({ provider, idToken, nonce });
           try {
             await sessions.set({ session, provider, localDataId: dataId });
           } catch {

@@ -205,3 +205,63 @@ describe('logout', () => {
     );
   });
 });
+
+describe('requestWebNonce（AndroidのAppleログイン）', () => {
+  it('web の T を POST /auth/nonce で取る。本文は kind と challenge（C）だけ', async () => {
+    const { fetchImpl, calls } = fakeFetch(() => reply(200, { nonce: 'v1.web.1.abc.CCC.sig', expiresAt: 1 }));
+    const nonce = await createAuthRepository(fetchImpl).requestWebNonce('C'.repeat(43));
+    assert.equal(nonce, 'v1.web.1.abc.CCC.sig');
+    assert.equal(calls[0].url, 'https://singfolio.app/auth/nonce');
+    assert.equal(calls[0].init.credentials, 'omit');
+    assert.deepEqual(JSON.parse(calls[0].init.body ?? ''), { kind: 'web', challenge: 'C'.repeat(43) });
+  });
+
+  it('nonce が無い・不正な形の応答は invalid-response。400 は invalid-request', async () => {
+    for (const body of [{}, null, { nonce: 1 }, { nonce: '' }, { nonce: 'a b' }]) {
+      const { fetchImpl } = fakeFetch(() => reply(200, body));
+      await rejectsWith(createAuthRepository(fetchImpl).requestWebNonce('C'.repeat(43)), 'invalid-response');
+    }
+    const { fetchImpl } = fakeFetch(() => reply(400, { error: 'invalid_request' }));
+    await rejectsWith(createAuthRepository(fetchImpl).requestWebNonce('x'), 'invalid-request');
+  });
+});
+
+describe('loginWithAppleCode（AndroidのAppleログイン）', () => {
+  const request = { code: 'the-code', nonce: 'T-WEB', verifier: 'V'.repeat(43) };
+
+  it('code・nonce・verifier だけを POST /auth/apple/login に送り、session を返す', async () => {
+    const { fetchImpl, calls } = fakeFetch(() => reply(200, { session: SESSION }));
+    assert.equal(await createAuthRepository(fetchImpl).loginWithAppleCode(request), SESSION);
+    assert.equal(calls[0].url, 'https://singfolio.app/auth/apple/login');
+    assert.equal(calls[0].init.method, 'POST');
+    assert.equal(calls[0].init.credentials, 'omit');
+    assert.deepEqual(JSON.parse(calls[0].init.body ?? ''), request);
+  });
+
+  it('401 は unauthorized、503 と JSONでない 5xx・429 は unavailable、通信の失敗は network', async () => {
+    for (const [respond, code] of [
+      [() => reply(401, { error: 'unauthorized' }), 'unauthorized'],
+      [() => reply(503, { error: 'service_unavailable' }), 'unavailable'],
+      [() => reply(500, null), 'unavailable'],
+      [() => reply(429), 'unavailable'],
+      [() => new Error('offline https://singfolio.app/x'), 'network'],
+      [() => reply(400, { error: 'invalid_request' }), 'invalid-request'],
+    ] as const) {
+      const { fetchImpl } = fakeFetch(respond);
+      await rejectsWith(createAuthRepository(fetchImpl).loginWithAppleCode(request), code);
+    }
+  });
+
+  it('session が無い・不正な形の応答は invalid-response。エラーに、コード・V・T・セッションを載せない', async () => {
+    for (const body of [{}, null, { session: '' }, { session: 5 }]) {
+      const { fetchImpl } = fakeFetch(() => reply(200, body));
+      await rejectsWith(createAuthRepository(fetchImpl).loginWithAppleCode(request), 'invalid-response');
+    }
+    const { fetchImpl } = fakeFetch(() => new Error(`failed ${request.code} ${request.verifier} ${request.nonce}`));
+    await assert.rejects(createAuthRepository(fetchImpl).loginWithAppleCode(request), (error) => {
+      const message = error instanceof Error ? error.message : '';
+      for (const secret of [request.code, request.verifier, request.nonce]) assert.equal(message.includes(secret), false);
+      return true;
+    });
+  });
+});

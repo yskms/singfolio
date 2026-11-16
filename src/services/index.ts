@@ -1,15 +1,26 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
-import { CryptoDigestAlgorithm, CryptoEncoding, digestStringAsync, randomUUID } from 'expo-crypto';
+import {
+  CryptoDigestAlgorithm,
+  CryptoEncoding,
+  digestStringAsync,
+  getRandomBytes,
+  randomUUID,
+} from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
-import { Platform } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+import { AppState, Linking, Platform } from 'react-native';
 
 import { signInWithGoogle } from '../../modules/singfolio-google-signin/index.ts';
 import { createDatabase } from '../db/appDatabase.ts';
 import { getDatabase } from '../db/database.ts';
 import { createAppleSignInRepository } from '../repositories/appleSignInRepository.ts';
+import {
+  createAppleWebSignInRepository,
+  type AuthBrowser,
+} from '../repositories/appleWebSignInRepository.ts';
 import { createGoogleSignInRepository } from '../repositories/googleSignInRepository.ts';
 import { createSessionRepository, type SecureStorage } from '../repositories/sessionRepository.ts';
-import { base64ToBase64Url } from './base64url.ts';
+import { base64ToBase64Url, bytesToBase64Url } from './base64url.ts';
 import { createServices, type Services } from './createServices.ts';
 
 export type { Services } from './createServices.ts';
@@ -34,6 +45,29 @@ const secureStorage: SecureStorage = {
       keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
     }),
   deleteItemAsync: (key) => SecureStore.deleteItemAsync(key),
+};
+
+// AndroidのAppleログイン（Web経由）が使う、ブラウザ（Custom Tab）・URLの受け取り・前面への復帰。
+// ブラウザは、expo-web-browser の `openBrowserAsync`（Androidでは、開いた時点で解決する）。戻りのURLは、
+// `singfolio://auth/apple?...` でアプリが開き、Linking に届く（expo-router には `app/+native-intent.tsx` で、
+// 画面への遷移をさせない）。
+const authBrowser: AuthBrowser = {
+  open: async (url) => {
+    await WebBrowser.openBrowserAsync(url);
+  },
+  onUrl: (listener) => {
+    const subscription = Linking.addEventListener('url', ({ url }) => listener(url));
+    return () => subscription.remove();
+  },
+  onForeground: (listener) => {
+    // いったん前面を離れたあとに、前面（active）へ戻ったときだけ。購読の直後の、今の状態の通知は数えない。
+    let previous = AppState.currentState;
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && previous !== 'active') listener();
+      previous = state;
+    });
+    return () => subscription.remove();
+  },
 };
 
 let servicesPromise: Promise<Services> | null = null;
@@ -65,13 +99,18 @@ export function getServices(): Promise<Services> {
           // 曲名・アーティストの候補の外部検索。ここで渡さなければ無効になる。
           catalogFetch: fetch,
           // アカウントの通信・保存と、各社のサインイン（`idTokenProviders`）。画面が呼ぶまで、何も送らない。
-          // Appleのネイティブのサインインは iOS だけ（AndroidのAppleは Web 経由。7.3.9）。Googleは両OS
-          // （自作のExpoモジュール。ネイティブ側が無いビルドでも、importでは落ちず、呼んだときに失敗する）。
+          // Appleのネイティブのサインインは iOS だけ。AndroidのAppleは Web 経由（Custom Tab。認可コードを返し、
+          // IDトークンへの交換はWorkerがする）。Googleは両OS（自作のExpoモジュール。ネイティブ側が無いビルドでも、
+          // importでは落ちず、呼んだときに失敗する）。
           auth: {
             idTokenProviders: {
               google: createGoogleSignInRepository({ signInWithGoogle }),
               ...(Platform.OS === 'ios' ? { apple: createAppleSignInRepository(AppleAuthentication) } : {}),
             },
+            authCodeProviders:
+              Platform.OS === 'android' ? { apple: createAppleWebSignInRepository(authBrowser) } : {},
+            // 検証用の値 `V`（32バイトの乱数。43字の base64url）。
+            randomVerifier: () => bytesToBase64Url(getRandomBytes(32)),
             fetch,
             storage: secureStorage,
             sha256Base64Url: async (text) =>

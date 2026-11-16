@@ -14,6 +14,7 @@ import { createTagRepository } from '../repositories/tagRepository.ts';
 import {
   createAccountService,
   type AccountService,
+  type AuthCodeProvider,
   type IdTokenProvider,
 } from './accountService.ts';
 import { createArtistService, type ArtistService } from './artistService.ts';
@@ -46,6 +47,10 @@ export interface AuthOptions {
   sha256Base64Url(text: string): Promise<string>;
   /** 組み込み済みの各社のサインイン（7.3.7 以降）。無い手段は `provider-unavailable` */
   idTokenProviders?: Partial<Record<AuthProvider, IdTokenProvider>>;
+  /** 組み込み済みの、認可コードを返すサインイン（AndroidのApple。7.3.9） */
+  authCodeProviders?: Partial<Record<AuthProvider, AuthCodeProvider>>;
+  /** 検証用の値 `V`（乱数の base64url。43字）を作る。`authCodeProviders` を渡すときに要る */
+  randomVerifier?: () => string;
   /** APIの置き場（既定は本番）。テスト用 */
   origin?: string;
 }
@@ -111,6 +116,8 @@ export function createServices(
             sha256Base64Url: auth.sha256Base64Url,
             localDataId: () => settings.ensureLocalDataId(),
             idTokenProviders: auth.idTokenProviders ?? {},
+            authCodeProviders: auth.authCodeProviders ?? {},
+            randomVerifier: auth.randomVerifier,
           }
         : null,
     ),

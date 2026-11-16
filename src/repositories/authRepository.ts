@@ -1,4 +1,4 @@
-// アカウントのHTTP（POST /auth/nonce・/auth/login・/auth/logout）。Serviceからだけ使う。画面・Serviceは、
+// アカウントのHTTP（POST /auth/nonce・/auth/login・/auth/apple/login・/auth/logout）。Serviceからだけ使う。画面・Serviceは、
 // URLやレスポンスの形を知らない（候補検索の songCatalogRepository と同じ）。リクエスト・レスポンスの
 // 形は docs/singfolio-publishing-backend.md §8「認証の方式」が正で、Worker（worker/）とはコードを共有しない。
 //
@@ -53,6 +53,15 @@ export interface LoginRequest {
   idToken: string;
   /** `requestNonce` が返した `T`（IDトークンの `nonce` は、これのハッシュ） */
   nonce: string;
+}
+
+export interface AppleCodeLoginRequest {
+  /** Appleの認可コード（Custom Tab のリダイレクトで得たもの。1回限り。保存・ログ出力はしない） */
+  code: string;
+  /** `requestWebNonce` が返した `T`（web） */
+  nonce: string;
+  /** `T` の元にした `C = SHA-256(V)` の `V`（アプリだけが持つ乱数。フローが終わるまで、アプリの外に出さない） */
+  verifier: string;
 }
 
 export function createAuthRepository(
@@ -119,6 +128,30 @@ export function createAuthRepository(
         const data = await response.json();
         if (!isRecord(data) || !isOpaqueValue(data.nonce)) throw new AuthError('invalid-response');
         return data.nonce;
+      });
+    },
+
+    /**
+     * `POST /auth/nonce`（`web`）。AndroidのAppleログイン（Web経由）の前に呼ぶ。`challenge` は、検証用の値 `V` の
+     * ハッシュ `C = SHA-256(V)` の base64url（43字）。返す `T` は `C` を含む。Appleの認可リクエストには `SHA-256(T)` を渡す。
+     */
+    requestWebNonce(challenge: string): Promise<string> {
+      return post('/auth/nonce', { json: { kind: 'web', challenge } }, async (response) => {
+        const data = await response.json();
+        if (!isRecord(data) || !isOpaqueValue(data.nonce)) throw new AuthError('invalid-response');
+        return data.nonce;
+      });
+    },
+
+    /**
+     * `POST /auth/apple/login`。AndroidのAppleログイン（Web経由）。認可コード・`T`（web）・`V` を送る。Workerが、
+     * `V` を照合して、コードをAppleで交換し、セッションを返す。セッションの値（不透明）を返す。
+     */
+    loginWithAppleCode({ code, nonce, verifier }: AppleCodeLoginRequest): Promise<string> {
+      return post('/auth/apple/login', { json: { code, nonce, verifier } }, async (response) => {
+        const data = await response.json();
+        if (!isRecord(data) || !isOpaqueValue(data.session)) throw new AuthError('invalid-response');
+        return data.session;
       });
     },
 

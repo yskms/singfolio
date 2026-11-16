@@ -87,6 +87,16 @@ describe('wrangler.jsonc', () => {
     assert.equal(new URL(APP_RETURN_URL).protocol, `${app.expo.scheme}:`);
   });
 
+  it('AndroidのAppleログイン: アプリが持つ Services ID・Return URL・戻り先は、Workerの値と同じ（別々に書いてある）', () => {
+    // アプリ（src/repositories/appleWebSignInRepository.ts）は、Appleの認可のURLと、Custom Tab の戻りの判定に、
+    // これらを書き写している。Workerとコードは共有しない。ずれると、Appleの画面が出ない・戻れない・コードが交換できない。
+    const vars = (config.vars ?? {}) as Record<string, unknown>;
+    const source = readFileSync(path.join(workerDir, '..', 'src/repositories/appleWebSignInRepository.ts'), 'utf8');
+    assert.ok(source.includes(`APPLE_SERVICES_ID = '${vars.APPLE_SERVICES_ID}'`));
+    assert.ok(source.includes(`APPLE_CALLBACK_URL = '${APPLE_CALLBACK_URL}'`));
+    assert.ok(source.includes(`APP_RETURN_URL = '${APP_RETURN_URL}'`));
+  });
+
   it('HTTPS検査を迂回する設定を vars に置かない', () => {
     // 検査は、localhost のホスト名だけを通す。環境変数などで切る口は作らない（docs §8「HTTPS」）。
     for (const name of Object.keys(config.vars ?? {})) {

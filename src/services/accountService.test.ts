@@ -10,7 +10,7 @@ import { AuthError } from '../repositories/authError.ts';
 import type { AuthRepository } from '../repositories/authRepository.ts';
 import { createSessionRepository, type SecureStorage } from '../repositories/sessionRepository.ts';
 import { createTestServices } from '../testing/testDatabase.ts';
-import { createAccountService, type IdTokenProvider } from './accountService.ts';
+import { createAccountService, type AuthCodeProvider, type IdTokenProvider } from './accountService.ts';
 
 const sha256Base64Url = async (text: string) =>
   createHash('sha256').update(text).digest('base64url');
@@ -33,9 +33,17 @@ function fakeAuth(overrides: Partial<AuthRepository> = {}) {
       calls.push('nonce');
       return 'T-1';
     },
+    requestWebNonce: async (challenge) => {
+      calls.push(`web-nonce:${challenge}`);
+      return 'T-WEB-1';
+    },
     login: async ({ provider, idToken, nonce }) => {
       calls.push(`login:${provider}:${idToken}:${nonce}`);
       return 'SESSION-1';
+    },
+    loginWithAppleCode: async ({ code, nonce, verifier }) => {
+      calls.push(`apple-code-login:${code}:${nonce}:${verifier}`);
+      return 'SESSION-WEB-1';
     },
     logout: async (session) => {
       calls.push(`logout:${session}`);
@@ -49,6 +57,8 @@ function setup(
   options: {
     auth?: Partial<AuthRepository>;
     providers?: Partial<Record<AuthProvider, IdTokenProvider>>;
+    codeProviders?: Partial<Record<AuthProvider, AuthCodeProvider>>;
+    randomVerifier?: () => string;
     sha256?: (text: string) => Promise<string>;
     providerTimeoutMs?: number;
   } = {},
@@ -72,6 +82,8 @@ function setup(
     sha256Base64Url: options.sha256 ?? sha256Base64Url,
     localDataId: async () => state.id,
     idTokenProviders: options.providers ?? { apple },
+    authCodeProviders: options.codeProviders,
+    randomVerifier: options.randomVerifier ?? (() => 'V'.repeat(43)),
     providerTimeoutMs: options.providerTimeoutMs,
   });
   return { account, sessions, items, calls, hashed, state };
@@ -283,6 +295,127 @@ describe('signIn', () => {
     assert.equal(await account.getSignedInProvider(), 'apple');
     // 失効させるものを特定できない
     assert.deepEqual(calls, ['nonce', 'apple-sheet', 'login:apple:ID-TOKEN:T-1']);
+  });
+});
+
+describe('signIn（認可コードの経路。AndroidのApple）', () => {
+  const VERIFIER = 'V'.repeat(43);
+
+  function setupWeb(codeProvider?: Partial<AuthCodeProvider>, options: Parameters<typeof setup>[0] = {}) {
+    const codes: string[] = [];
+    const provider: AuthCodeProvider = {
+      getAuthorizationCode: async (hashedNonce) => {
+        codes.push(hashedNonce);
+        return 'AUTH-CODE';
+      },
+      ...codeProvider,
+    };
+    // Androidでは、AppleのIDトークンの経路は組み込まない（iOSのネイティブだけ）。
+    return { ...setup({ providers: {}, codeProviders: { apple: provider }, ...options }), codes };
+  }
+
+  it('V を作り、C=SHA-256(V) を入れた web の T を得て、SHA-256(T) で認可の画面を開き、コード・T・V でログインする', async () => {
+    const { account, sessions, calls, codes } = setupWeb();
+    await account.signIn('apple');
+    const challenge = createHash('sha256').update(VERIFIER).digest('base64url');
+    assert.deepEqual(calls, [
+      `web-nonce:${challenge}`,
+      `apple-code-login:AUTH-CODE:T-WEB-1:${VERIFIER}`,
+    ]);
+    // 画面に渡すのは T そのものではなく SHA-256(T)（state・nonce に入る）
+    assert.deepEqual(codes, [createHash('sha256').update('T-WEB-1').digest('base64url')]);
+    assert.equal(codes[0].length, 43);
+    assert.deepEqual(await sessions.read(), {
+      kind: 'found',
+      value: { session: 'SESSION-WEB-1', provider: 'apple', localDataId: 'data-1' },
+    });
+    assert.equal(await account.getSignedInProvider(), 'apple');
+  });
+
+  it('native の T（requestNonce）は取らない。V は、画面にも、ログインの前の通信にも出さない（ログインのときだけ送る）', async () => {
+    const { account, calls, codes } = setupWeb();
+    await account.signIn('apple');
+    assert.equal(calls.includes('nonce'), false);
+    assert.equal(codes.some((value) => value.includes(VERIFIER)), false);
+    // V そのものを送るのは、`loginWithAppleCode` だけ。C（ハッシュ）は、T を得るときに送る
+    assert.equal(calls.filter((call) => call.includes(VERIFIER)).length, 1);
+    assert.ok(calls.find((call) => call.includes(VERIFIER))?.startsWith('apple-code-login:'));
+  });
+
+  it('画面を取りやめたら cancelled。何も保存せず、ログインを呼ばない。やり直せる', async () => {
+    const { account, calls, items } = setupWeb({
+      getAuthorizationCode: async () => {
+        throw new AuthError('cancelled');
+      },
+    });
+    await rejectsWith(account.signIn('apple'), 'cancelled');
+    assert.equal(calls.some((call) => call.startsWith('apple-code-login')), false);
+    assert.equal(items.size, 0);
+    assert.equal(await account.getSignedInProvider(), null);
+  });
+
+  it('コードが空・文字列でなければ invalid-response（ログインを呼ばない）', async () => {
+    for (const code of ['', undefined, 5]) {
+      const { account, calls } = setupWeb({ getAuthorizationCode: async () => code as unknown as string });
+      await rejectsWith(account.signIn('apple'), 'invalid-response');
+      assert.equal(calls.some((call) => call.startsWith('apple-code-login')), false);
+    }
+  });
+
+  it('各社の画面が終わらなければ、上限で timeout（あとから返ったコードは使わない）', async () => {
+    const { account, calls } = setupWeb(
+      { getAuthorizationCode: () => new Promise((resolve) => setTimeout(() => resolve('LATE-CODE'), 40)) },
+      { providerTimeoutMs: 10 },
+    );
+    await rejectsWith(account.signIn('apple'), 'timeout');
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    assert.equal(calls.some((call) => call.startsWith('apple-code-login')), false);
+  });
+
+  it('Worker の失敗（401・503）は、そのまま AuthError で返る。何も保存しない', async () => {
+    for (const code of ['unauthorized', 'unavailable', 'network'] as const) {
+      const { account, items } = setupWeb(undefined, {
+        auth: {
+          loginWithAppleCode: async () => {
+            throw new AuthError(code);
+          },
+        },
+      });
+      await rejectsWith(account.signIn('apple'), code);
+      assert.equal(items.size, 0);
+    }
+  });
+
+  it('保存できなければ storage-failed で、サーバー側のセッションを失効させる', async () => {
+    const { account, calls, sessions } = setupWeb();
+    sessions.set = async () => {
+      throw new Error('keystore failed');
+    };
+    await rejectsWith(account.signIn('apple'), 'storage-failed');
+    assert.ok(calls.includes('logout:SESSION-WEB-1'));
+  });
+
+  it('V が作れなければ unexpected（Appleの画面を開く前）。Google は IDトークンの経路のまま', async () => {
+    const { account, calls, codes } = setupWeb(undefined, { randomVerifier: () => '' });
+    await rejectsWith(account.signIn('apple'), 'unexpected');
+    assert.deepEqual(codes, []);
+    assert.deepEqual(calls, []);
+
+    const google: IdTokenProvider = { getIdToken: async () => 'GOOGLE-ID-TOKEN' };
+    const both = setup({ providers: { google }, codeProviders: { apple: { getAuthorizationCode: async () => 'c' } } });
+    await both.account.signIn('google');
+    assert.ok(both.calls.includes('login:google:GOOGLE-ID-TOKEN:T-1'));
+  });
+
+  it('同じ手段が IDトークンの経路にもあれば、そちらを使う（OSごとに、どちらか1つ）。どちらにも無ければ provider-unavailable', async () => {
+    const both = setup({ codeProviders: { apple: { getAuthorizationCode: async () => 'c' } } });
+    await both.account.signIn('apple');
+    assert.ok(both.calls.includes('apple-sheet'));
+    assert.equal(both.calls.some((call) => call.startsWith('web-nonce')), false);
+
+    const none = setup({ providers: {}, codeProviders: {} });
+    await rejectsWith(none.account.signIn('apple'), 'provider-unavailable');
+    assert.deepEqual(none.calls, []);
   });
 });
 
