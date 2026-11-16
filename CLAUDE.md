@@ -445,6 +445,10 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     （`SYSTEM_ALERT_WINDOW`・外部ストレージの読み書き）と、`expo-secure-store` の依存（`androidx.biometric`）が
     足す `USE_BIOMETRIC`・`USE_FINGERPRINT` を外す。戻さない。保存は端末内で完結し、
     プライバシーポリシーもストアの申告も、それを前提にしている。
+-   `app.json` の `ios.infoPlist.CFBundleAllowMixedLocalizations: false` は消さない。`expo-apple-authentication` の
+    config plugin が、Appleのボタンの文言のために `true` を足す（`?? true` なので、`app.json` の値が残る）。`true` は
+    Info.plist 全体に効き、アプリが対応していない言語の端末で、OSの部品の文言の言語選びが変わりうる（v1.0は未設定）。
+    Appleのボタンを使う 7.3.11 で、必要なら見直す。`nativeConfig.test.ts` が検出する。
 -   ビルド番号（iOSの buildNumber・AndroidのversionCode）は、EAS が持つ（`eas.json` の
     `appVersionSource: "remote"`、`production` の `autoIncrement`）。`app.json` に書かない
     （書いても無視される）。`app.json` の `version`（ストアの表示版）は手で上げる。`eas init` は
