@@ -651,12 +651,33 @@ AndroidにはAppleのネイティブのサインインが無いので、Appleの
 -   `sub` が、iOS（バンドルID）とAndroid（Services ID）で同じになるか。同じグループなら資格情報は共有される
     （Appleの資料）が、実際のトークンで確かめる（7.3）。違うと、Appleでの、OSをまたぐ引き継ぎはできない。
 
-**Googleのサインイン（iOS・Android）**
+**Googleのサインイン（iOS・Android）**（実装済み。7.3.8。`modules/singfolio-google-signin`・`plugins/withGoogleSignIn.js`・`src/repositories/googleSignInRepository.ts`）
 
 Googleの公式SDKだけを使う、自作の薄いExpoモジュールで実装する。モジュールの口は `signInWithGoogle(nonce)` の
 1つで、IDトークンの文字列を返す（キャンセルや失敗は、コードの付いたエラーにする）。第三者のラッパーのライブラリは
 使わない。Androidでは、アカウント選択のシートを、アプリの上にそのまま出せる（Credential Manager）。画面・Service
 から、SDKの呼び出しやレスポンスの形に触れないよう、Repository / Service境界の内側に閉じ込める。
+
+-   **構成。** `googleSignInRepository`（`IdTokenProvider`）にモジュールを注入し、`services/index.ts` が**両OS**に
+    組み込む（Appleは iOS だけ）。`nonce` は、渡された `SHA-256(T)` の base64url をそのまま渡す。スコープは指定しない
+    （指定できない。下）。トークンの中身は読まない。
+-   **ネイティブ側が無くても、importでは落ちない。** モジュールの `index.ts` は `requireOptionalNativeModule` で読む
+    （`requireNativeModule` は、無いと import の時点で投げ、アプリの起動ごと止める）。ログインを要求しないので、
+    v1.0の機能を巻き込まない。無ければ `signInWithGoogle` が `ERR_UNAVAILABLE` で失敗し、`provider-unavailable` になる。
+-   **失敗の分類**（モジュールのコード → `AuthError.code`。SDKの例外の内容・トークンは載せない）:
+
+    | モジュールのコード | 起きるとき | `AuthError.code` |
+    |---|---|---|
+    | `ERR_CANCELED` | 利用者が取りやめた（両OSで確認） | `cancelled` |
+    | `ERR_NO_ACCOUNT` | Androidで、端末にGoogleアカウントが無い（`NoCredentialException`） | `provider-failed` |
+    | `ERR_FAILED` | 取りやめ以外のSDKの失敗すべて（Play services が使えない、通信できない、など） | `provider-failed` |
+    | `ERR_NO_PRESENTER` | 画面を出す先（Activity・ViewController）が無い | `provider-failed` |
+    | `ERR_NO_ID_TOKEN`、IDトークンが空・文字列でない | SDKは成功したのに、IDトークンを取り出せなかった | `invalid-response` |
+    | `ERR_UNAVAILABLE` | ネイティブ側が組み込まれていないビルド | `provider-unavailable` |
+    | `ERR_NOT_CONFIGURED`、知らないコード、コードの無い例外 | クライアントIDがビルドに入っていない（アプリの不具合）、想定外 | `unexpected` |
+
+    `provider-failed` は、Appleと同じく、原因を言い切らない文言にする（7.3.11）。Androidのアカウント無しも、端末の設定とは
+    限らない（Play services の状態、アプリの設定の不備でも同じ `ERR_FAILED` になりうる）。
 
 -   iOS: GoogleSignIn。`signIn(withPresenting:hint:additionalScopes:nonce:)` に `nonce` を渡す。Info.plistに、
     iOSのクライアントID（`GIDClientID`）、サーバー用（Web）のクライアントID（`GIDServerClientID`。IDトークンの
@@ -665,9 +686,16 @@ Googleの公式SDKだけを使う、自作の薄いExpoモジュールで実装�
 -   Android: Credential Managerの `GetSignInWithGoogleOption`（サーバー用のクライアントIDを指定し、`setNonce`）。
     AndroidのクライアントIDはコードに現れず、パッケージ名と署名のSHA-1で、Google側が照合する（鍵ごとに登録が要る:
     ローカルのビルド、EASのlocal build、Play App Signing）。
--   クライアントIDは3つ（Web・iOS・Android）。秘密情報ではない（アプリに埋め込まれる）。Webクライアントの
-    `client_secret` は使わない（Workerは、IDトークンをGoogleのJWKSで検証するだけ）。
--   確かめたこと（iOS SimulatorとAndroidエミュレータで、実際のトークンを使った）:
+-   クライアントIDは3種類（Web・iOS・Android）。秘密情報ではない（アプリに埋め込まれる）。Webクライアントの
+    `client_secret` は使わない（Workerは、IDトークンをGoogleのJWKSで検証するだけ）。**Web と iOS のIDは、`app.json` の
+    `./plugins/withGoogleSignIn.js` の設定（`webClientId`・`iosClientId`）に書く。AndroidのクライアントのIDはコードに
+    現れない**（署名の鍵ごとに別のクライアント。debug・EASのlocal build・Play App Signing）。**`webClientId` は、Workerの
+    `GOOGLE_WEB_CLIENT_ID`（`worker/wrangler.jsonc`）と同じ値でなければならない**（IDトークンの `aud` になるため。ずれると、
+    すべてのGoogleログインが 401 になる）。`worker/test/config.test.ts` が、この一致と、iOSのクライアントが同じ
+    Google Cloudのプロジェクトのものであること（IDの数字の部分）を固定している。検証のために作った別のプロジェクトの
+    クライアントIDは使わない（`aud` が合わず、すべてのログインが失敗する）。
+-   確かめたこと（検証のための別のクライアントIDで、iOS SimulatorとAndroidエミュレータで、実際のトークンを使った。
+    7.3.8 で本番用のクライアントIDに直したあとの再確認は、下の「7.3.8 で確かめたこと」）:
     -   IDトークンの `nonce` は、渡した値（`SHA-256(T)` の43字）そのまま。
     -   `aud` は、iOSもAndroidも、Web（サーバー用）のクライアントID。Workerは、これを `aud` として受け入れる。
     -   `azp` は、OSごとに違う（iOSはiOSのクライアント、AndroidはAndroidのクライアント）。Workerは、`azp` を
@@ -678,19 +706,52 @@ Googleの公式SDKだけを使う、自作の薄いExpoモジュールで実装�
         使う。Workerは、受け取ることは避けられないので、ログにも保存にも出さない（「認証」）。
     -   ログイン中のログ（iOSのアプリのプロセス、Androidのlogcat）に、トークンらしい文字列は、検証した範囲では
         見つからなかった。iOSは、ログイン後に、Googleの状態が端末のキーチェーンに残らない。
-    -   キャンセルは、Androidと、iOS（GoogleSignIn 9.2.0）で、キャンセルを表すエラーになる。iOSの10.1.0での
-        キャンセルと2回目のログインは、まだ確認していない。
+    -   キャンセルは、Androidと、iOS（GoogleSignIn 9.2.0）で、キャンセルを表すエラーになる（iOSの10.1.0でも
+        確認した。下の「7.3.8 で確かめたこと」）。
+-   **7.3.8 で確かめたこと**（本番用のクライアントID。実際のモジュール・SDKを、`googleSignInRepository` 経由で動かした。
+    確認用の一時画面は、IDトークンを復号して、`aud`・`azp`・`nonce` の一致・クレームの名前だけを出した。メール・名前の値は出していない。画面は消した）:
+    -   **iOS**（Simulator。iPhone 18 Pro。Release。Xcode 27。GoogleSignIn 10.1.0）: ビルドと起動ができる。Info.plist に
+        `GIDClientID`・`GIDServerClientID`・反転したクライアントIDのURL schemeが入る。OSの確認ダイアログ（「Singfolio が
+        accounts.google.com をサインインに使用しようとしています」）で「キャンセル」を押すと、`cancelled`。「続ける」を押すと、
+        Googleのアカウント選択（「Singfolio に移動」。`invalid_client` ではない）。アカウントを選んで同意すると成功し、IDトークンの
+        `nonce` は渡した値と一致、`aud` は Workerの `GOOGLE_WEB_CLIENT_ID` と一致、`azp` はiOSのクライアント、`sub` は21字、
+        `at_hash` あり。2回目のログインも成功した（iOS 10.1.0の2回目は、これまで未確認だった）。ログインしたのは、
+        Google Cloudのプロジェクトの所有者のアカウント。
+    -   **Googleの同意画面の文言（iOSのWebシート。初めて見えたもの）**: 初回は「Singfolio にログイン」と、名前とプロフィール写真・
+        メールアドレスの許可を求める（スコープの `profile`・`email`）。「Singfolio のプライバシー ポリシーと利用規約をご確認ください」
+        という一般の文も出る。2回目以降は、同意は求めず、「Singfolio に再ログインしようとしています」の確認が、毎回出る。
+        ストアの申告・同意画面の設定（7.3.12）で、この文言を前提にする。
+    -   **Android**（エミュレータ。arm64。R8入りの release。debug 署名）: ビルドと起動ができる。アカウント選択のシート
+        （「Choose an account to continue to Singfolio」）が出て、戻るで取りやめると `cancelled`。`FATAL EXCEPTION` は無く、
+        logcat にトークン様の文字列も無い。DEX は 9,422,152 バイト（10,000,000 未満）。マージ後のマニフェストの権限は
+        `INTERNET`・`VIBRATE` と、アプリ内部用の1つだけ（`USE_BIOMETRIC`・`USE_FINGERPRINT` は外れている）。
+        `lib/` の `.so` は22種、すべて把握しているもの。`generate-licenses.mjs --check --apk` が通る。**このエミュレータには
+        Googleアカウントが無く、Androidの成功経路は確かめていない。**
+    -   **Open source licenses の画面**: iOSは、Pod 9個を全文つきで出す。Androidは、「Google libraries」の別枠に、2行（Google Identity・
+        Google Play services）を出し、開くと含まれる成果物と「View terms」の行が出る（ブラウザで規約を開く行は、押していない）。
+    -   **未確認（7.3.13）**: Androidの成功経路（本番用のクライアントIDと、署名の鍵ごとのSHA-1。debug・EASのlocal build・
+        Play App Signing）、実機、TestFlight・Playの署名したビルド、プロジェクトの所有者でも、テストユーザーでもないアカウントで
+        入れるか（同意画面は「テスト中」）、異常系（通信断・アカウントの切り替え・連打）。
 -   実装の制約:
     -   iOSは、GoogleSignInの版を固定する（確認したのは10.1.0）。Swiftの依存（AppCheckCore）のために、Podfileで
         GoogleUtilitiesとRecaptchaInteropにmodular headersを指定する（外すと `pod install` が失敗する。config pluginで入れる）。
     -   Androidは、googleidを1.2.0に固定する。最新の1.2.1は、Kotlin 2.4のメタデータで、Expo SDK 57のKotlin 2.1.0
         ではコンパイルできない。依存に、Play services（alpha版を含む）が入る。
     -   Androidの依存が足す `USE_BIOMETRIC` と `USE_FINGERPRINT` は、`blockedPermissions` で外す（外してもログインは動く）。
-    -   Androidは、2回目以降のログインでも、アカウント選択と確認の画面が出る。ログアウトで `clearCredentialState` を
-        呼ぶかは、7.3で決める。
+    -   Androidは、2回目以降のログインでも、アカウント選択と確認の画面が出る（自動でログインはされない）。ログアウトで
+        `clearCredentialState` を呼ぶかは、ログアウトの画面（7.3.11）で決める。
+-   **ライセンス一覧への載せ方（決定。7.3.8）。** Androidの依存（Google Play services 9個と googleid。POMのライセンスは
+    Android Software Development Kit License）は、オープンソースではない。`ALLOWED_LICENSES` には**足さず**、対象の
+    groupId（`com.google.android.gms`・`com.google.android.libraries.identity.googleid`）だけを個別に許可する（その
+    groupId の成果物のPOMが別のライセンスなら、生成が失敗する）。規約（2021-07-27 版）に、アプリへの表示・帰属表示の
+    義務は書かれていないので、全文は載せず、ライセンスの名前と規約のURL（`https://developer.android.com/studio/terms`）を、
+    About の Open source licenses の別枠（見出し「Google libraries」）に載せる（Androidだけ。画面は screen-flow
+    「Open source licenses」）。`androidx.credentials` は Apache-2.0 で、AndroidX の行に入る。iOSの GoogleSignIn と
+    その依存の Pod 9個は、Apache-2.0（GoogleUtilities だけ、Apache-2.0 に MIT が続く）で、入っている Pod の LICENSE の
+    全文を載せる。
 -   7.3で決着が要ること: Googleの同意画面（OAuthの公開状態とブランド）、ストアの申告とプライバシーポリシー
-    （SDKのプライバシーマニフェストが、利用状況などの収集を宣言している。そのときの版のマニフェストを読み直して決める）、
-    Androidの依存（Android Software Development Kit Licenseで配布される）の、ライセンス一覧への載せ方。
+    （SDKのプライバシーマニフェストが、利用状況などの収集を宣言している。そのときの版のマニフェストを読み直して決める。
+    7.3.12）。
 -   Googleの同意画面を「本番環境」にするには、アプリ名・サポートメールのほかに、**ホームページのURLとプライバシー
     ポリシーのURL**が要る（Google Auth Platformの画面で確認した）。Googleの資料では、ホームページは「検証済みの、
     自分が所有するドメイン」に置き、プライバシーポリシーは同じドメインに置いて、ホームページからリンクする。

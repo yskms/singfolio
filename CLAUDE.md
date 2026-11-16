@@ -149,6 +149,13 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
 -   `signIn` が、読めたが別のDBのセッションを上書きするときは、新しいセッションの保存のあとに、サーバーで失効させる（失敗は無視）。
     ログアウトの入口が出ないので、機会はここだけ。「上書きの前」に動かさない（各社の画面を開く前に通信を待たせる）。
 -   認証が要る呼び出しを足すときは、**401 のときだけ**端末のセッションを捨てる（503・5xx・通信の失敗では捨てない）。
+-   Googleのサインインは、自作のExpoモジュール `modules/singfolio-google-signin`（公式SDKだけ。第三者のラッパーは使わない）。
+    その `index.ts` は `requireOptionalNativeModule` で読む。`requireNativeModule` に「簡略化」しない（ネイティブ側が無い
+    ビルドで、import の時点で投げ、アプリの起動ごと止まる。ログインを要求しない原則に反する）。呼んだときの失敗は
+    `ERR_UNAVAILABLE` で、Repositoryが `provider-unavailable` にする。**`app.json` の `withGoogleSignIn.js` の
+    `webClientId` は、Workerの `GOOGLE_WEB_CLIENT_ID` と同じ値**（IDトークンの `aud`。ずれると全ログインが 401。
+    `worker/test/config.test.ts` が固定）。検証用だった古いGoogle Cloudのプロジェクトのクライアントに戻さない。
+    Googleはスコープを外せず、IDトークンに `email`・`name` なども入るが、使うのは `sub` だけ。詳細は docs §8「Googleのサインイン」。
 -   `expo-secure-store` の config plugin を `app.json` に足さない。Androidのバックアップ規則が `<include>` で、v1.0で今
     バックアップされているSQLiteを外す。
 
@@ -406,6 +413,10 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     `.so` に埋め込むライブラリ（Fresco の libjpeg-turbo など）は `MAVEN_EMBEDDED_LIBS` に、APK の `.so`
     で確かめて足す。release のビルドでは `--check --apk <APK・AAB>` で、把握していない `.so` が
     入っていないかを確かめる。
+-   Android Software Development Kit License（Google Play services・googleid）は、`ALLOWED_LICENSES` に足さない。groupId
+    （`com.google.android.gms`・`com.google.android.libraries.identity.googleid`）だけを個別に許可し、全文は載せず、名前と
+    規約のURLを About の別枠に出す（Androidだけ）。iOS の trunk の Pod は `IOS_TRUNK_PODS` にあるものだけを、入っている
+    Pod の LICENSE の全文で載せる。自前の `modules/` は第三者ではないので載せない（package.json も無い）。
 -   アイコンフォント（Ionicons・Material Symbols）は、npmパッケージのLICENSEとは別のライセンスなので、
     別の行にしている。上流から写した全文は `scripts/license-texts/` にある（取得元はスクリプトの設定）。
 -   About の「Fonts」（`fontLicenses.ts`）は、自前で同梱した書体だけで、この一覧とは別。
@@ -426,6 +437,10 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
 
 -   `ios/`・`android/` は `expo prebuild` の生成物（gitignore）。直接直さず、
     app.json と `plugins/` で設定する。
+-   `plugins/withGoogleSignIn.js` は、GoogleのクライアントID（iOSの Info.plist、Androidの文字列リソース）と、Podfile の
+    modular headers（GoogleUtilities・RecaptchaInterop）を入れる。後者を外すと `pod install` が失敗する（GoogleSignIn が
+    Swift の Pod に依存するため）。GoogleSignIn（10.1.0）と googleid（1.2.0）の版は固定していて、googleid の 1.2.1 は
+    Kotlin 2.4 のメタデータで、Expo SDK 57 の Kotlin 2.1.0 では読めない。上げるときは、docs §8 の「実装の制約」を読む。
 -   `plugins/withIosSceneDelegate.js` は、iOS 27 SDK（Xcode 27）の UIScene 必須化
     （未対応だと起動直後にクラッシュする）への対応で、削除しない。Expo SDK 58 の
     テンプレートが同じ配線を持つので、SDK 58 へ上げるときにこのプラグインと

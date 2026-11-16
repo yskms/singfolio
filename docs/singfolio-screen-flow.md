@@ -653,9 +653,17 @@ About から開く画面。アプリに入る、npm の依存・取り込まれ�
     名前と、「版 · ライセンスの種類」（版が無いもの・1つに決まらないものは、種類だけ）を出す。行を
     押すと、全文（著作権表示を含む）を開閉する。全文の詰め方は About と同じ。共著の著作権表示は1行
     ずつ残す。
--   片方の OS にだけ入るもの（AndroidX など Android の Maven の依存、iOS の SocketRocket）は、その OS
-    でだけ出す。まとめた行（AndroidX など）は、開くと、全文の上に、含まれる成果物
-    （`group:artifact:version`）を並べる。
+-   片方の OS にだけ入るもの（AndroidX など Android の Maven の依存、iOS の SocketRocket・Googleの
+    サインインの Pod）は、その OS でだけ出す。まとめた行（AndroidX など）は、開くと、全文の上に、含まれる
+    成果物（`group:artifact:version`）を並べる。
+-   **別枠（Android だけ）。** Android Software Development Kit License で配布される Google の依存
+    （Google Play services と Google Identity（googleid）。Googleのサインインの依存）は、オープンソース
+    ではなく、ライセンスの全文も載せない。一覧の下に、見出し「Google libraries」と短い説明（オープン
+    ソースではなく、Android Software Development Kit License のもとで提供されている、という文）を置き、
+    その下に1行ずつ出す。行を押すと、含まれる成果物と、規約を開く行（ブラウザで開く。アプリの通信では
+    ない）を出す。iOS には、この枠は出ない。アプリへの表示・帰属表示の義務は、規約に書かれていない
+    （2021-07-27 版を読んだ）ので、名前と規約のURLにとどめている（理由と読み方は
+    `singfolio-publishing-backend.md` §8「Googleのサインイン」）。
 -   **載せているもの**（`src/legal/thirdPartyLicenses.ts`。生成物）:
     -   `npm`: JS バンドルに入るパッケージと、autolinking が取り込むネイティブのパッケージ
         （`dependencies` を機械的にたどるのではない。ビルドにしか使わないものが大量に入るため）。
@@ -674,6 +682,12 @@ About から開く画面。アプリに入る、npm の依存・取り込まれ�
         `releaseRuntimeClasspath`（制約は除く）を、POM のライセンスで、プロジェクトごとにまとめる。
         埋め込みのもの: Fresco の libjpeg-turbo・libwebp・giflib、zstd-kmp の Zstandard（APK の `.so` で、
         入っていることを確かめた。成果物の版が変わったら、生成が失敗する）。
+        iOS の Pod のうち、CocoaPods の trunk から入るもの（GoogleSignIn・AppAuth・GTMAppAuth・
+        GTMSessionFetcher・AppCheckCore・GoogleUtilities・PromisesObjC・PromisesSwift・RecaptchaInterop）は、
+        入っている Pod の `Pods/<名前>/LICENSE` の全文を、そのまま載せる（版は `Podfile.lock` から読む）。
+        GoogleUtilities だけは、LICENSE が Apache-2.0 の全文に MIT の全文（Landon J. Fuller の著作権表示）が
+        続く形なので、`Apache-2.0 AND MIT` として載せる。
+        Android の Google の依存（上の別枠）は、全文ではなく、ライセンスの名前と規約のURLを持つ。
 -   **載せていないもの**: OS・NDK が提供する実行時のライブラリ（libc++ など。LLVM の例外で、
     バイナリでの表記は要らない）、SQLite（パブリックドメイン）、OkHttp の public suffix のリスト
     （APK の中に、出典とライセンスの NOTICE がある）。Maven の成果物の中を、これ以上は掘り下げない。
@@ -685,12 +699,19 @@ About から開く画面。アプリに入る、npm の依存・取り込まれ�
     （インストール済みの依存を、新しく import したなど）、テストは気づけないので、`--check` を使う。
     次のときは、生成が失敗する（条件を確認してから、スクリプトの設定に足す）。
     -   許可していない種類のライセンス（MIT・ISC・Apache-2.0・BSD-3-Clause・BSL-1.0・libjpeg-turbo の
-        複合以外）、LICENSE の見つからないパッケージ
+        複合・GoogleUtilities の `Apache-2.0 AND MIT` 以外）、LICENSE の見つからないパッケージ。
+        Android Software Development Kit License は、許可する種類の一覧には足さず、Google の2つの
+        groupId（`com.google.android.gms`・`com.google.android.libraries.identity.googleid`）だけを個別に
+        許可している（その groupId の成果物のPOMが別のライセンスなら、失敗する。ほかの groupId が
+        この名前のライセンスなら、groupId が未知として失敗する）
     -   `vendor/`・`fork/`・`react-navigation/` の下のファイルがバンドルに入る（設定にない取り込み）
     -   Maven の groupId が知らないもの、Gradle の依存の行が読めない形、React Native の C++ の依存・
         埋め込み元の成果物の版が変わった
-    -   `ios/Podfile.lock` に、node_modules（と codegen の生成物）の外から入る Pod がある
-        （CocoaPods の trunk から入る Pod など）
+    -   `ios/Podfile.lock` に、node_modules・codegen の生成物・自前のローカルモジュール（`modules/`）の
+        外から入る Pod で、`IOS_TRUNK_PODS` に挙げていないものがある。挙げた Pod でも、LICENSE が
+        想定した形（標準の Apache-2.0、または Apache-2.0 に MIT が続く形）でなくなった、NOTICE ファイルが
+        現れた、場合は失敗する
+    -   （参考）自前のローカルモジュール（`modules/`）は、第三者のコードではないので、載せない
 
 ### Data
 
