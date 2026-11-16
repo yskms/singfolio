@@ -1,8 +1,11 @@
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { CryptoDigestAlgorithm, CryptoEncoding, digestStringAsync, randomUUID } from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 
 import { createDatabase } from '../db/appDatabase.ts';
 import { getDatabase } from '../db/database.ts';
+import { createAppleSignInRepository } from '../repositories/appleSignInRepository.ts';
 import { createSessionRepository, type SecureStorage } from '../repositories/sessionRepository.ts';
 import { base64ToBase64Url } from './base64url.ts';
 import { createServices, type Services } from './createServices.ts';
@@ -59,9 +62,13 @@ export function getServices(): Promise<Services> {
         {
           // 曲名・アーティストの候補の外部検索。ここで渡さなければ無効になる。
           catalogFetch: fetch,
-          // アカウントの通信・保存。各社のサインイン（`idTokenProviders`）は 7.3.7 以降で足す。
-          // 画面が呼ぶまで、何も送らない。
+          // アカウントの通信・保存と、各社のサインイン（`idTokenProviders`）。画面が呼ぶまで、何も送らない。
+          // Appleのネイティブのサインインは iOS だけ（AndroidのAppleは Web 経由。7.3.9）。Googleは 7.3.8。
           auth: {
+            idTokenProviders:
+              Platform.OS === 'ios'
+                ? { apple: createAppleSignInRepository(AppleAuthentication) }
+                : {},
             fetch,
             storage: secureStorage,
             sha256Base64Url: async (text) =>

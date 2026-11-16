@@ -50,6 +50,7 @@ function setup(
     auth?: Partial<AuthRepository>;
     providers?: Partial<Record<AuthProvider, IdTokenProvider>>;
     sha256?: (text: string) => Promise<string>;
+    providerTimeoutMs?: number;
   } = {},
 ) {
   const { storage, items } = memoryStorage();
@@ -71,6 +72,7 @@ function setup(
     sha256Base64Url: options.sha256 ?? sha256Base64Url,
     localDataId: async () => state.id,
     idTokenProviders: options.providers ?? { apple },
+    providerTimeoutMs: options.providerTimeoutMs,
   });
   return { account, sessions, items, calls, hashed, state };
 }
@@ -529,6 +531,51 @@ describe('直列化', () => {
     // ログアウトの後にセッションが残らない
     assert.equal(items.size, 0);
     assert.equal(await account.getSignedInProvider(), null);
+  });
+
+  it('各社のサインインが返らなくても、上限で timeout になり、後ろのログアウトが進む（保存も login もしない）', async () => {
+    const { account, calls, items } = setup({
+      providerTimeoutMs: 20,
+      providers: { apple: { getIdToken: () => new Promise<string>(() => {}) } },
+    });
+    const signingIn = account.signIn('apple');
+    const signingOut = account.signOut();
+    await rejectsWith(signingIn, 'timeout');
+    assert.deepEqual(await signingOut, { serverRevoked: true });
+    assert.deepEqual(calls, ['nonce']);
+    assert.equal(items.size, 0);
+    assert.equal(await account.getSignedInProvider(), null); // やり直せる
+  });
+
+  it('上限を過ぎてから返ったトークンは捨てる（login も保存もしない）。あとからの失敗も未処理の拒否にならない', async () => {
+    let finish: (token: string) => void = () => {};
+    let fail: (error: Error) => void = () => {};
+    const late = setup({
+      providerTimeoutMs: 10,
+      providers: { apple: { getIdToken: () => new Promise<string>((resolve) => (finish = resolve)) } },
+    });
+    await rejectsWith(late.account.signIn('apple'), 'timeout');
+    finish('LATE-ID-TOKEN');
+    const lateFailure = setup({
+      providerTimeoutMs: 10,
+      providers: {
+        apple: {
+          getIdToken: () => new Promise<string>((_resolve, reject) => (fail = reject)),
+        },
+      },
+    });
+    await rejectsWith(lateFailure.account.signIn('apple'), 'timeout');
+    fail(new Error('after the timeout'));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.deepEqual(late.calls, ['nonce']);
+    assert.equal(late.items.size, 0);
+    assert.equal(await late.account.getSignedInProvider(), null);
+  });
+
+  it('上限の前に返れば、タイマーを残さない（残ると、テストの実行が上限の分だけ終わらない）', async () => {
+    const { account } = setup(); // 上限は既定の5分
+    await account.signIn('apple');
+    assert.equal(await account.getSignedInProvider(), 'apple');
   });
 
   it('前の操作が失敗しても、次の操作は実行される', async () => {

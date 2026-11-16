@@ -45,6 +45,7 @@
         }
       ],
       "expo-sqlite",
+      "expo-apple-authentication",
       "./plugins/withIosSceneDelegate.js",
       "./plugins/withAndroidNightColors.js",
       "./plugins/withAndroidR8.js",

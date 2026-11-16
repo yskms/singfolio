@@ -29,7 +29,18 @@ export interface AccountServiceDeps {
   localDataId(): Promise<string>;
   /** 組み込み済みのサインイン。無いものは `signIn` が `provider-unavailable` にする。 */
   idTokenProviders: Partial<Record<AuthProvider, IdTokenProvider>>;
+  /** 各社のサインインを待つ上限（ミリ秒）。既定は `PROVIDER_TIMEOUT_MS`。テスト用 */
+  providerTimeoutMs?: number;
 }
+
+/**
+ * 各社のサインイン（OSの画面）を待つ上限。Workerが発行する `T` の期限（発行から5分。docs §8「認証の方式」）と
+ * 同じにしてある: これを過ぎて返ったIDトークンは、`T` が切れていて、どのみち 401 になる。
+ *
+ * 待つのをやめるだけで、OSの画面は閉じられない（Apple・Googleのどちらの SDK にも、画面を取り消す手段が無い）。
+ * 上限が要るのは、結果が返らないと、直列化（下）のせいで後ろのログアウトも待ち続けるため。
+ */
+export const PROVIDER_TIMEOUT_MS = 5 * 60_000;
 
 export interface SignOutResult {
   /**
@@ -79,16 +90,38 @@ export function createAccountService(deps: AccountServiceDeps | null): AccountSe
     };
   }
   const { auth, sessions, sha256Base64Url, localDataId, idTokenProviders } = deps;
+  const providerTimeoutMs = deps.providerTimeoutMs ?? PROVIDER_TIMEOUT_MS;
 
   // サインインとログアウトは1本ずつ順に実行する。サインインの途中（各社の画面を開いている間）に
   // ログアウトが走ると、ログアウトの後にセッションが保存されて、ログアウトできていないことになる。
-  // 各社のサインインが終わらないと、後ろのログアウトも待ち続ける（上限は、7.3.7 で `IdTokenProvider` を
-  // 実装するときに決める。WBS）。
+  // 各社のサインインが終わらないと後ろのログアウトも待つので、その待ちには上限を置く
+  // （`PROVIDER_TIMEOUT_MS`）。画面を取り消す手段は無く、サインイン中に呼べるログアウトの入口も無い
+  // （OSの画面が、アプリの操作を止めている）ので、取り消しの口は作らない。
   let tail: Promise<unknown> = Promise.resolve();
   function serialize<T>(task: () => Promise<T>): Promise<T> {
     const result = tail.then(task);
     tail = result.catch(() => {});
     return result;
+  }
+
+  /**
+   * `task` の結果を、`ms` 待つ。過ぎたら `timeout` で返す。`task` は止められないので動いたままで、あとで
+   * 返った結果・失敗は捨てる（どちらも受け取る側を付けてあるので、未処理の拒否にはならない）。
+   */
+  function withTimeout<T>(task: () => Promise<T>, ms: number): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new AuthError('timeout')), ms);
+      new Promise<T>((run) => run(task())).then(
+        (value) => {
+          clearTimeout(timer);
+          resolve(value);
+        },
+        (error) => {
+          clearTimeout(timer);
+          reject(error);
+        },
+      );
+    });
   }
 
   // 呼び出し側（画面）が `code` で分類できるよう、`AuthError` 以外の失敗は `unexpected` に包む。元の例外は
@@ -146,7 +179,11 @@ export function createAccountService(deps: AccountServiceDeps | null): AccountSe
           // nonce の元 `T` を得て、そのハッシュを各社のサインインに渡す（リプレイ対策。§8）。
           // `T` は5分で切れるので、各社の画面を開いたまま放置すると、ログインは 401 になる（やり直す）。
           const nonce = await auth.requestNonce();
-          const idToken = await idTokenProvider.getIdToken(await sha256Base64Url(nonce));
+          const hashedNonce = await sha256Base64Url(nonce);
+          const idToken = await withTimeout(
+            () => idTokenProvider.getIdToken(hashedNonce),
+            providerTimeoutMs,
+          );
           if (typeof idToken !== 'string' || idToken === '') throw new AuthError('invalid-response');
 
           const session = await auth.login({ provider, idToken, nonce });

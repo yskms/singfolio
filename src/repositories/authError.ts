@@ -20,6 +20,16 @@ export type AuthErrorCode =
   | 'invalid-response'
   /** この端末・この手段のサインインが、まだ組み込まれていない */
   | 'provider-unavailable'
+  /**
+   * 各社のサインインが、取りやめ以外で終わらなかった（Appleは、端末にAppleアカウントでサインインして
+   * いないときなどに起きる）。アプリの不具合とは限らず、端末の設定・状態が原因のことがある。やり直せる
+   */
+  | 'provider-failed'
+  /**
+   * 各社のサインインが、時間内（`T` の期限と同じ5分）に終わらなかった。待つのをやめた（OSの画面は閉じられない
+   * ので、出たままのことがある）。やり直せる
+   */
+  | 'timeout'
   /** すでにサインインしている。先にログアウトする */
   | 'already-signed-in'
   /**
@@ -42,5 +52,8 @@ export class AuthError extends Error {
 
 /** 一時的な失敗か（同じ操作をやり直せば通りうる）。 */
 export function isTemporaryAuthError(error: unknown): boolean {
-  return error instanceof AuthError && (error.code === 'network' || error.code === 'unavailable');
+  return (
+    error instanceof AuthError &&
+    (error.code === 'network' || error.code === 'unavailable' || error.code === 'timeout')
+  );
 }

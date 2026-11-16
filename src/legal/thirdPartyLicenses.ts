@@ -474,6 +474,13 @@ export const THIRD_PARTY_PACKAGES: readonly ThirdPartyPackage[] = [
   },
   {
     "kind": "npm",
+    "name": "expo-apple-authentication",
+    "version": "57.0.2",
+    "license": "MIT",
+    "text": 3
+  },
+  {
+    "kind": "npm",
     "name": "expo-asset",
     "version": "57.0.19",
     "license": "MIT",
