@@ -470,7 +470,7 @@ AppleとGoogleの仕様は、各社の公式資料で確かめた（Appleは、I
     すべてログアウト」（7.3.10）で消せる。401（ヘッダーの形が違うときだけ）は、失効するものが無いので、失効できた扱い。読めない値が残っていても消す。
 -   **直列化。** サインインとログアウトは、1本ずつ順に実行する。サインインの途中（各社の画面を開いている間）にログアウトが走ると、
     ログアウトの後にセッションが保存されて、ログアウトできていないことになるため。**各社のサインインが終わらないと（結果が返らない）、後ろの
-    ログアウトも待ち続ける**。`IdTokenProvider` の時間の上限と取り消しは、7.3.7 で実装するときに決める（WBS）。
+    ログアウトも待ち続ける**ので、待ちには上限を置く（次の「Appleのサインイン」の「時間の上限と取り消し」）。
 -   **失敗の分類**（`AuthError.code`。`message` はログ用の英語で、トークン・応答の本文・例外の内容は載せない）。`getSignedInProvider`・
     `signIn`・`signOut` の失敗は、すべて `AuthError`（`AuthError` 以外の失敗は、`unexpected` に包んで、元の例外は載せない。画面が `code` で
     分類できる）。`getSignedInProvider` は、ローカルDBの識別子を読めないとき（セッションが保存されているときだけ読む）に投げ、`null` にはしない
@@ -486,11 +486,13 @@ AppleとGoogleの仕様は、各社の公式資料で確かめた（Appleは、I
     | `invalid-request` | 400・403・405・413 など | アプリの不具合 |
     | `invalid-response` | 200 なのに値が無い・形が違う、本文がJSONでない、各社のサインインが空のIDトークンを返した | アプリかサーバーの不具合 |
     | `storage-failed` | 端末のセッションの保存先に書けなかった（サーバー側は失効させた）、または消せなかった（ログアウト。やり直せる） | やり直せる |
+    | `provider-failed` | 各社のサインインが、取りやめ以外で終わらなかった（Appleは、端末にAppleアカウントでサインインしていないときなど） | 端末の設定を確認して、やり直す |
+    | `timeout` | 各社のサインインが5分で終わらなかった（下の「時間の上限と取り消し」） | やり直せる |
     | `provider-unavailable`・`already-signed-in` | 上のとおり | |
     | `unexpected` | 各社のサインインが契約に反して投げた、ハッシュの計算・DBの失敗など | アプリの不具合 |
 
-    5xx は本文を読まずに `unavailable` にする。再試行はしない（やり直しは利用者の操作）。`network` と `unavailable` が
-    一時的な失敗（`isTemporaryAuthError`）。利用者向けの文言への対応は、画面を足すとき（7.3.11）に作る。
+    5xx は本文を読まずに `unavailable` にする。再試行はしない（やり直しは利用者の操作）。`network`・`unavailable`・`timeout` が
+    一時的な失敗（`isTemporaryAuthError`。`provider-failed` は、設定の確認が要るので含めない）。利用者向けの文言への対応は、画面を足すとき（7.3.11）に作る。
 -   **認証が要る呼び出しを足すとき（7.3.10・7.4 以降）の規則。** 401 を受けたら、端末のセッションを捨てる（サーバーが認めない値は、
     二度と通らない）。503・5xx・通信の失敗では捨てない（一時的な失敗。セッションは生きている）。
 -   **`expo-secure-store` の config plugin を `app.json` に足さない。** plugin は、Androidのバックアップ規則（`fullBackupContent`・
@@ -520,6 +522,33 @@ AppleとGoogleの仕様は、各社の公式資料で確かめた（Appleは、I
     アンインストールで消えたのか、破棄で消えたのかを区別できていない。Appleは保証していない、という前提で、結びつきと後始末を入れた）、
     Androidの Auto Backup の復元、`POST /auth/login`・`/auth/logout` を本物のWorkerへ送ること（本番のWorkerは 7.3.3 のままで、7.3.4・
     7.3.5 はデプロイしていない）、各社のサインインとの結合（7.3.7 以降）。
+
+**Appleのサインイン（iOS）**（実装済み。7.3.7。`src/repositories/appleSignInRepository.ts`。実際のトークンでの確認は、下の「確かめたこと」）
+
+-   `expo-apple-authentication`（`ASAuthorizationController`）で、IDトークンを得るところまで。`IdTokenProvider` として、`services/index.ts` が
+    **iOSのときだけ**注入する（`Platform.OS === 'ios'`。AndroidのAppleは Web 経由で、7.3.9）。SDKはRepositoryに注入する（`src/` はNodeのテストで
+    直接動かすため、ここでimportしない）。このモジュールはAndroidに実装が無いが、JSをimportしても落ちない（`requireOptionalNativeModule`）。
+-   `nonce` には、渡された `SHA-256(T)` の base64url をそのまま入れる（変換しない）。**スコープは空**（`requestedScopes: []`）。名前もメールも要求しない
+    （使うのは `sub` だけ。Googleは、スコープを外せない（「Googleのサインイン」））。`authorizationCode` は、
+    受け取っても使わない（アカウントの削除（7.3.10）が、再認証であらためて得る）。
+-   **config plugin**（`app.json` の `expo-apple-authentication`）は、iOSのエンタイトルメント `com.apple.developer.applesignin` を足し、
+    `CFBundleAllowMixedLocalizations` を `true` にする（Appleのボタンの文言のため。今は使っていない）。署名には、プロビジョニングプロファイルに
+    Sign in with Apple が入っている必要がある（primary App ID には設定済み。EASが、次の本番ビルドでプロファイルを作り直す）。
+-   **失敗の分類。** 取りやめ（`ERR_REQUEST_CANCELED`）は `cancelled`。SDKのそのほかの失敗（`ERR_REQUEST_UNKNOWN`・`FAILED`・`NOT_HANDLED`・
+    `NOT_INTERACTIVE`、`ERR_INVALID_RESPONSE`、`ERR_REQUEST_MATCHED_EXCLUDED_CREDENTIAL`）は `provider-failed`（端末にAppleアカウントが無いときの
+    `unknown` を含む。アプリの不具合ではない）。端末が対応していなければ `provider-unavailable`、IDトークンが空・無ければ `invalid-response`、
+    それ以外は `unexpected`。コードは、Expo Modules の例外のクラス名から決まる（ソースで確認。`InvalidResponseException` だけ `Request` が付かない）。
+    SDKの例外の内容・トークンは、エラーに載せない。
+-   **時間の上限と取り消し**（`account` Service。各社のRepositoryには持たせない: Googleの7.3.8も同じ場所で効く）。各社のサインインを待つ上限は
+    **5分**（`PROVIDER_TIMEOUT_MS`）で、Workerの `T` の期限（発行から5分）と同じ。これを過ぎて返ったIDトークンは `T` が切れていて、どのみち
+    401 になる。超えたら `timeout` で失敗にして、直列化の列を進める（後ろのログアウトが待ち続けない）。あとで返った結果・失敗は捨てる（login も保存もしない）。
+    **取り消しの口（AbortSignal など）は作らない。** Apple・GoogleのSDKに、出ているOSの画面を取り消す手段が無く、サインインの画面が出ている間は
+    アプリの操作が止まっていて、ログアウトを呼べる入口も無い（上限が要るのは、画面が閉じない・結果が返らない不具合への備え）。上限で待つのをやめても、
+    OSの画面が出たままのことはある（閉じられない）。その状態で次のサインインを始めたときの、OS側の振る舞いは確かめていない。
+-   確かめたこと: Node のテスト（偽のSDKで、`nonce` の受け渡し・スコープが空・各失敗の分類・内容を載せないこと、上限・あとから返った結果の破棄・
+    未処理の拒否が出ないこと）。`expo prebuild` で、エンタイトルメントが生成されることと、`pod install` が通ること。
+-   未確認: **実際のAppleのIDトークンの `nonce` が、渡した値そのままか**（7.3.7の最初の確認。端末にAppleアカウントでサインインしていないと試せない。
+    iOS Simulator の iPhone 18 Pro は、サインインしていない）、サインインの成功・取りやめ・失敗の実際のエラーコード、実機（iPhone 8）、署名したビルド。
 
 **アカウントの削除とAppleのトークン失効**
 
