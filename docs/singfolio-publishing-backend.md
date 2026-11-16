@@ -748,7 +748,11 @@ Googleの公式SDKだけを使う、自作の薄いExpoモジュールで実装�
         ASWebAuthenticationSession でリダイレクトを直接受け取る。`handleURL` が要るのは、iOS 10 の SFSafariViewController と、
         Google Device Policy アプリのときだけ）。**戻り値は、配送を変えない**: `ExpoAppDelegateSubscriberManager` は戻り値に関わらず
         すべての購読者を呼び、UIScene 採用後は、`SceneEventForwarder` が AppDelegate の戻り値を捨てて、RCTLinkingManager にも
-        通知する。`true` にして JS の Linking への到達を止める、という期待はしない。
+        通知する。`true` にして JS の Linking への到達を止める、という期待はしない。**実測（iOS Simulator）**: Googleの
+        リダイレクト用のスキームの URL（`com.googleusercontent.apps.<番号>-<ID>:/oauthredirect?...`）をアプリに開かせると、
+        expo-router は「画面が見つかりません」（`+not-found`）に遷移する（「曲の一覧へ」で戻れる。データには影響しない）。
+        届くのは EMM など特殊なときだけと見て、今は対応していない（対応するなら、`app/+native-intent.tsx` の
+        `redirectSystemPath` で、このスキームを無視する形が候補。未検証）。
     -   Androidは、2回目以降のログインでも、アカウント選択と確認の画面が出る（自動でログインはされない）。ログアウトで
         `clearCredentialState` を呼ぶかは、ログアウトの画面（7.3.11）で決める。
 -   **ライセンス一覧への載せ方（決定。7.3.8）。** Androidの依存（Google Play services 9個と googleid。POMのライセンスは
