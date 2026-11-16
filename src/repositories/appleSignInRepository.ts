@@ -63,6 +63,9 @@ export function createAppleSignInRepository(apple: AppleAuthenticationLike): App
         // 想定していない失敗（SDKが使えない、引数の不備など）。元の例外は載せない。
         throw new AuthError('unexpected');
       }
+      // 防御のための分岐。SDK（57.0.2）の `signInAsync` は、`identityToken`・`authorizationCode`・`user` の
+      // どれかが欠けると、自分で `ERR_REQUEST_FAILED`（上の `provider-failed`）を投げるので、実際にはここへ
+      // 届かない（SDKが変われば届きうる）。
       if (typeof identityToken !== 'string' || identityToken === '') {
         throw new AuthError('invalid-response');
       }

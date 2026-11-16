@@ -57,6 +57,18 @@ describe('app.json', () => {
   });
 });
 
+describe('app.json (Appleのサインイン)', () => {
+  it('expo-apple-authentication の plugin が登録されている（Sign in with Apple のエンタイトルメント）', () => {
+    assert.ok((expo.plugins as PluginEntry[]).includes('expo-apple-authentication'));
+  });
+
+  it('CFBundleAllowMixedLocalizations を false にしている（外すと、pluginが true にして、v1.0のiOS全体の挙動が変わる）', () => {
+    // plugin は、Appleのボタンの文言のために true を足す（`?? true`。app.json に値があればそれが残る）。
+    // 今はボタンを使っていない。true は Info.plist 全体に効き、OSの部品の文言の言語選びが変わりうる。
+    assert.equal(expo.ios.infoPlist.CFBundleAllowMixedLocalizations, false);
+  });
+});
+
 describe('plugins/withAndroidNightColors.js', () => {
   it('ダークのウィンドウ背景は、ダークの背景色', () => {
     const plugin = require('../../plugins/withAndroidNightColors.js');

@@ -486,7 +486,7 @@ AppleとGoogleの仕様は、各社の公式資料で確かめた（Appleは、I
     | `invalid-request` | 400・403・405・413 など | アプリの不具合 |
     | `invalid-response` | 200 なのに値が無い・形が違う、本文がJSONでない、各社のサインインが空のIDトークンを返した | アプリかサーバーの不具合 |
     | `storage-failed` | 端末のセッションの保存先に書けなかった（サーバー側は失効させた）、または消せなかった（ログアウト。やり直せる） | やり直せる |
-    | `provider-failed` | 各社のサインインが、取りやめ以外で終わらなかった（Appleは、端末にAppleアカウントでサインインしていないときなど） | 端末の設定を確認して、やり直す |
+    | `provider-failed` | 各社のサインインが、取りやめ以外で終わらなかった（Appleは、端末にAppleアカウントでサインインしていないときなど。アプリ側の設定の不備でも同じになりうる） | やり直せる。原因を言い切らない文言にする（7.3.11） |
     | `timeout` | 各社のサインインが5分で終わらなかった（下の「時間の上限と取り消し」） | やり直せる |
     | `provider-unavailable`・`already-signed-in` | 上のとおり | |
     | `unexpected` | 各社のサインインが契約に反して投げた、ハッシュの計算・DBの失敗など | アプリの不具合 |
@@ -532,25 +532,44 @@ AppleとGoogleの仕様は、各社の公式資料で確かめた（Appleは、I
     （使うのは `sub` だけ。Googleは、スコープを外せない（「Googleのサインイン」））。`authorizationCode` は、
     受け取っても使わない（アカウントの削除（7.3.10）が、再認証であらためて得る）。
 -   **config plugin**（`app.json` の `expo-apple-authentication`）は、iOSのエンタイトルメント `com.apple.developer.applesignin` を足し、
-    `CFBundleAllowMixedLocalizations` を `true` にする（Appleのボタンの文言のため。今は使っていない）。署名には、プロビジョニングプロファイルに
-    Sign in with Apple が入っている必要がある（primary App ID には設定済み。EASが、次の本番ビルドでプロファイルを作り直す）。
+    `CFBundleAllowMixedLocalizations` を `true` にする（Appleのボタンの文言のため。今はボタンを使っていない）。**後者は Info.plist 全体に効き、
+    アプリが対応していない言語の端末で、OSの部品の文言の言語選びが変わりうる**（Appleの資料の記述は「フレームワークのローカライズ文字列を取得できるか」だけ
+    で、既定値の記載は無い。端末の言語で実際にどう変わるかは測っていない）ので、`app.json` の `ios.infoPlist.CFBundleAllowMixedLocalizations` を
+    `false` にして、v1.0（未設定）に近い状態を保つ。plugin は `?? true` なので、`app.json` の値が残る（`expo prebuild` で、Info.plist が `false` に
+    なることを確かめた）。`nativeConfig.test.ts` が固定している。Appleのボタン（`AppleAuthenticationButton`）を使う 7.3.11 で、文言が足りなければ見直す。
+    署名には、プロビジョニングプロファイルに Sign in with Apple が入っている必要がある（primary App ID には設定済み。EASが、次の本番ビルドで
+    プロファイルを作り直す）。署名の失敗は、ストアに出すビルド（7.3.13）で初めて分かる。
 -   **失敗の分類。** 取りやめ（`ERR_REQUEST_CANCELED`）は `cancelled`。SDKのそのほかの失敗（`ERR_REQUEST_UNKNOWN`・`FAILED`・`NOT_HANDLED`・
     `NOT_INTERACTIVE`、`ERR_INVALID_RESPONSE`、`ERR_REQUEST_MATCHED_EXCLUDED_CREDENTIAL`）は `provider-failed`（端末にAppleアカウントが無いときの
-    `unknown` を含む。アプリの不具合ではない）。端末が対応していなければ `provider-unavailable`、IDトークンが空・無ければ `invalid-response`、
-    それ以外は `unexpected`。コードは、Expo Modules の例外のクラス名から決まる（ソースで確認。`InvalidResponseException` だけ `Request` が付かない）。
+    `unknown` を含む）。端末が対応していなければ `provider-unavailable`、それ以外は `unexpected`。**`provider-failed` は、端末の状態が原因とは限らない**:
+    エンタイトルメントやプロファイルの不備も、同じ `ERR_REQUEST_UNKNOWN`（`ASAuthorizationError.unknown`）になりうる。`ERR_INVALID_RESPONSE`・
+    `ERR_REQUEST_NOT_HANDLED` も、利用者の設定の問題とは限らない。利用者向けの文言（7.3.11）は、「設定を確認して」と言い切らない。
+    IDトークンが無いときは、SDKのJSが、`identityToken`・`authorizationCode`・`user` のどれかが欠けると自分で `ERR_REQUEST_FAILED` を投げる
+    ので、`provider-failed` になる（Repositoryの `invalid-response` の分岐は、SDKが変わったときのための防御で、実際には届かない）。
+    コードは、Expo Modules の例外のクラス名から決まる（ソースで確認。`InvalidResponseException` だけ `Request` が付かない）。
     SDKの例外の内容・トークンは、エラーに載せない。
 -   **時間の上限と取り消し**（`account` Service。各社のRepositoryには持たせない: Googleの7.3.8も同じ場所で効く）。各社のサインインを待つ上限は
     **5分**（`PROVIDER_TIMEOUT_MS`）で、Workerの `T` の期限（発行から5分）と同じ。これを過ぎて返ったIDトークンは `T` が切れていて、どのみち
-    401 になる。超えたら `timeout` で失敗にして、直列化の列を進める（後ろのログアウトが待ち続けない）。あとで返った結果・失敗は捨てる（login も保存もしない）。
+    401 になる。タイマーは `T` を得たあと（ハッシュの計算のあと）に始まるので、実際の上限は、`T` の期限より、`POST /auth/nonce` にかかった時間
+    （最大10秒）だけ後ろにずれる（実害は無い: その間に返ったIDトークンは、401 で落ちる）。超えたら `timeout` で失敗にして、直列化の列を進める（後ろのログアウトが待ち続けない）。あとで返った結果・失敗は捨てる（login も保存もしない）。
     **取り消しの口（AbortSignal など）は作らない。** Apple・GoogleのSDKに、出ているOSの画面を取り消す手段が無く、サインインの画面が出ている間は
     アプリの操作が止まっていて、ログアウトを呼べる入口も無い（上限が要るのは、画面が閉じない・結果が返らない不具合への備え）。上限で待つのをやめても、
     OSの画面が出たままのことはある（閉じられない）。その状態で次のサインインを始めたときの、OS側の振る舞いは確かめていない。
 -   確かめたこと: Node のテスト（偽のSDKで、`nonce` の受け渡し・スコープが空・各失敗の分類・内容を載せないこと、上限・あとから返った結果の破棄・
     未処理の拒否が出ないこと）。`expo prebuild` で、エンタイトルメントが生成されることと、`pod install` が通ること。
+    **iOS Simulator（iPhone 18 Pro。Release。Xcode 27）で、ビルドして起動した**: `ExpoAppleAuthentication` がビルドできる（Swift の警告は出る:
+    Xcode 27 の SDK で `ASAuthorizationError` に増えたケース（`.credentialImport` など）を `switch` が網羅していない。SDK の `@unknown default` が
+    `ERR_REQUEST_UNKNOWN` にする）、エンタイトルメント `com.apple.developer.applesignin` がバイナリに入る、`Info.plist` の
+    `CFBundleAllowMixedLocalizations` が `false`、`isAvailableAsync()` が `true`。**Appleアカウントでサインインしていない端末で**
+    `signInAsync` を呼ぶと、OSの「Apple Account にサインインしてください」のシートが出る（エンタイトルメントが通っている証拠）。そのシートの
+    「閉じる」を押すと、SDKは **`ERR_REQUEST_CANCELED` ではなく `ERR_REQUEST_UNKNOWN`** を返し、`account.signIn('apple')` は `provider-failed` で
+    失敗した（本番の `POST /auth/nonce` までは通っている）。**「閉じる」は、利用者の目には取りやめに見えるが、取りやめ扱い（`cancelled`）にならない。**
+    利用者向けの文言（7.3.11）は、`provider-failed` を、エラーとして強く出さない（再試行できる、程度）。
 -   未確認（7.3.13 で確かめる）: **実際のAppleのIDトークンの `nonce` が、渡した値そのままか**（端末にAppleアカウントでサインインしていないと
     試せない。iOS Simulator の iPhone 18 Pro は、サインインしていない）。そのままでなければ、Worker側の比べ方を直す必要がある（上の「nonce」）。
-    それまでは、Appleのログインが `POST /auth/login` を通るかは分からない。サインインの成功・取りやめ・失敗の実際のエラーコード、実機（iPhone 8）、
-    署名したビルド、ネイティブのビルド自体（Xcode 27 での iOS のビルドは、まだしていない）。
+    それまでは、Appleのログインが `POST /auth/login` を通るかは分からない。サインインに成功したときの動き、Appleアカウントでサインインした
+    端末での取りやめ（`ERR_REQUEST_CANCELED` になるか）、実機（iPhone 8）、署名したビルド（プロビジョニングプロファイルに Sign in with Apple が
+    入っているか。EASのビルドで初めて分かる）。
 
 **アカウントの削除とAppleのトークン失効**
 

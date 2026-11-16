@@ -210,7 +210,8 @@ v1.0より後（公開機能・Requests）の実装順序は、
     -   [x] 7.3.7 Appleのサインイン（iOS。`expo-apple-authentication`）。`IdTokenProvider` として注入した（`appleSignInRepository`。
         iOSだけ。スコープは空）。config plugin（エンタイトルメント）、失敗の分類（`provider-failed`・`timeout` を足した）。
         時間の上限と取り消しは決めた（`account` で5分。取り消しの口は作らない。Googleの7.3.8も同じ場所で効く。§8「Appleのサインイン（iOS）」）。
-        Nodeのテストと、`expo prebuild`・`pod install` までは確かめた。**AppleのIDトークンの `nonce` が、渡した値そのままかは未確認で、
+        Nodeのテストと、iOS Simulator（Release。Xcode 27）でのビルド・起動を確かめた（Appleアカウント無しの端末で、OSのサインインのシートが出る
+        ことと、`provider-failed` になることまで。シートの「閉じる」は `cancelled` にならず `provider-failed`。§8）。**AppleのIDトークンの `nonce` が、渡した値そのままかは未確認で、
         7.3.13 へ移した**（端末にAppleアカウントでサインインしている必要がある。iOS Simulator の iPhone 18 Pro は、サインインしていない）。
         そのままでないと分かったら、Worker側の比べ方（`worker/src/idToken.ts`）を、§8「nonce」の方針どおり直す。それまで、AppleのログインがWorkerを
         通るかは分からない（Appleの `nonce` の比較が 401 になりうる）
@@ -226,7 +227,7 @@ v1.0より後（公開機能・Requests）の実装順序は、
         あわせて「ほかの端末をすべてログアウト」（同じユーザーの、認証済みのセッション以外の削除。端末をなくしたときの失効の手段。
         絶対的なセッションの期限は置かない、と決めた代わり。§8「セッション」）を作る
     -   [ ] 7.3.11 アカウントの画面（ログイン・ログアウト・「ほかの端末をすべてログアウト」・削除の入口）。置き場所（ProfileかSettings）は、
-        画面設計で決める。サインイン済みから別のIDをつなぐ画面を、v1で用意するか決める。`getSignedInProvider` は、判断できないとき
+        画面設計で決める。サインイン済みから別のIDをつなぐ画面を、v1で用意するか決める。`provider-failed` の文言は、原因（端末の設定か、アプリ側の設定の不備か）を言い切らない（§8「Appleのサインイン（iOS）」）。`getSignedInProvider` は、判断できないとき
         `AuthError` を投げる（`null` ではない）ので、画面で捕まえて、アカウントの欄を隠すなどにとどめる（§8「アプリ側の認証の土台」の「失敗の分類」）
     -   [ ] 7.3.12 申告と文書。プライバシーポリシー、`docs/singfolio-store-listing.md`、App Store・Google Playの申告（SDKの
         プライバシーマニフェストを、そのときの版で読み直して決める）、Googleの同意画面（ブランド）、CLAUDE.mdの「スコープ」の節

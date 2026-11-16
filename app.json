@@ -10,6 +10,9 @@
     "backgroundColor": "#FFFFFF",
     "ios": {
       "bundleIdentifier": "com.yskms.singfolio",
+      "infoPlist": {
+        "CFBundleAllowMixedLocalizations": false
+      },
       "config": {
         "usesNonExemptEncryption": false
       }
