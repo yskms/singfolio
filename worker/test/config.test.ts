@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, it } from 'node:test';
 import { unstable_readConfig } from 'wrangler';
+import { APP_RETURN_URL, APPLE_CALLBACK_URL } from '../src/appleWeb.ts';
 import { workerDir } from './localDatabase.ts';
 
 const config = unstable_readConfig({ config: path.join(workerDir, 'wrangler.jsonc') });
@@ -66,6 +67,24 @@ describe('wrangler.jsonc', () => {
       scripts: Record<string, string>;
     };
     assert.match(pkg.scripts.dev ?? '', /--infer-origin-from-routes=false/);
+  });
+
+  it('AndroidのAppleログイン: 秘密鍵は秘密情報（必須）、Team ID・Key ID は形だけ確かめる', () => {
+    const vars = (config.vars ?? {}) as Record<string, unknown>;
+    assert.equal(config.secrets?.required?.includes('APPLE_PRIVATE_KEY'), true);
+    assert.equal('APPLE_PRIVATE_KEY' in vars, false);
+    // Apple の Team ID・Key ID は、どちらも英大文字と数字の10文字。
+    assert.match(String(vars.APPLE_TEAM_ID), /^[A-Z0-9]{10}$/);
+    assert.match(String(vars.APPLE_KEY_ID), /^[A-Z0-9]{10}$/);
+  });
+
+  it('AndroidのAppleログイン: コールバックのURLは本番のホスト、戻り先のスキームは app.json の scheme', () => {
+    // Services ID の Return URL に登録する値と、アプリのURLスキーム。ずれると、Appleのログインが戻れない。
+    const app = JSON.parse(readFileSync(path.join(workerDir, '..', 'app.json'), 'utf8')) as { expo: { scheme: string } };
+    const host = (config.routes as Array<{ pattern: string }>)[0]!.pattern;
+    assert.equal(new URL(APPLE_CALLBACK_URL).protocol, 'https:');
+    assert.equal(new URL(APPLE_CALLBACK_URL).host, host);
+    assert.equal(new URL(APP_RETURN_URL).protocol, `${app.expo.scheme}:`);
   });
 
   it('HTTPS検査を迂回する設定を vars に置かない', () => {

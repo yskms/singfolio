@@ -8,7 +8,6 @@ import { exportJWK, generateKeyPair, SignJWT, type CryptoKey, type JWK } from 'j
 import { handleLogin } from '../src/auth.ts';
 import worker from '../src/index.ts';
 import { createIdTokenVerifier, JWKS_COOLDOWN_MS, type FetchFunction, type IdTokenVerifier } from '../src/idToken.ts';
-import { signIn } from '../src/login.ts';
 import { issueNonce, NONCE_TTL_MS, nonceHash } from '../src/nonce.ts';
 import { authenticateSession, isSessionToken } from '../src/session.ts';
 import { openLocalDatabase, type LocalDatabase } from './localDatabase.ts';
@@ -318,16 +317,11 @@ describe('ログインとログアウト', () => {
       assert.equal(good.status, 200);
     });
 
-    it('web の T は、公開鍵を取りに行く前に拒否する（Appleでも、Googleでも）', async () => {
+    it('web の T は、/auth/login（native 専用）では、公開鍵を取りに行く前に拒否する（Appleでも、Googleでも）', async () => {
       const t = await issueT('web');
       for (const provider of ['apple', 'google'] as const) {
-        const result = await signIn(
-          env,
-          verifier,
-          { provider, kind: 'web', idToken: await signToken(t, { provider }), nonce: t },
-          NOW,
-        );
-        assert.deepEqual(result, { ok: false, reason: 'rejected' });
+        const response = await login({ provider, idToken: await signToken(t, { provider }), nonce: t });
+        assert.equal(response.status, 401);
       }
       assert.deepEqual(jwksCalls, []);
       assert.deepEqual(await counts(), NOTHING_WRITTEN);

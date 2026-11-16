@@ -13,7 +13,7 @@ import {
   serviceUnavailable,
   unauthorized,
 } from './http.ts';
-import { signIn } from './login.ts';
+import { signIn, type SignInResult } from './login.ts';
 import { isChallenge, issueNonce } from './nonce.ts';
 import { revokeSession, sessionTokenFromRequest } from './session.ts';
 
@@ -42,7 +42,7 @@ export async function handleNonce(request: Request, env: Env, now: number): Prom
 
 /**
  * POST /auth/login。`{"provider":"apple"|"google","idToken":"…","nonce":"<T>"}` を受け取り、
- * 200 `{"session":"<値>"}` を返す。`T` は `native` のものだけを受け付ける（AndroidのAppleログインは 7.3.9）。
+ * 200 `{"session":"<値>"}` を返す。`T` は `native` のものだけを受け付ける（AndroidのAppleログインは `/auth/apple/login`。src/appleWeb.ts）。
  * 失敗は、形の不備が400、検証に通らない（どの検査かは教えない）が401、公開鍵を取得できないが503。
  */
 export async function handleLogin(
@@ -59,7 +59,11 @@ export async function handleLogin(
     return invalidRequest();
   }
 
-  const result = await signIn(env, verifier, { provider, kind: 'native', idToken, nonce }, now);
+  return handleLoginResult(await signIn(env, verifier, { provider, kind: 'native', idToken, nonce }, now));
+}
+
+/** ログインの結果を応答にする（`/auth/login` と `/auth/apple/login` で同じ）。 */
+export function handleLoginResult(result: SignInResult): Response {
   if (result.ok) return json({ session: result.session });
   return result.reason === 'unavailable' ? serviceUnavailable() : unauthorized();
 }
