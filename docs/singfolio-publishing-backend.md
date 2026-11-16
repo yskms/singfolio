@@ -523,7 +523,7 @@ AppleとGoogleの仕様は、各社の公式資料で確かめた（Appleは、I
     Androidの Auto Backup の復元、`POST /auth/login`・`/auth/logout` を本物のWorkerへ送ること（本番のWorkerは 7.3.3 のままで、7.3.4・
     7.3.5 はデプロイしていない）、各社のサインインとの結合（7.3.7 以降）。
 
-**Appleのサインイン（iOS）**（実装済み。7.3.7。`src/repositories/appleSignInRepository.ts`。実際のトークンでの確認は、下の「確かめたこと」）
+**Appleのサインイン（iOS）**（実装済み。7.3.7。`src/repositories/appleSignInRepository.ts`。実際のトークンでの確認は未了で、7.3.13 で行う。下の「未確認」）
 
 -   `expo-apple-authentication`（`ASAuthorizationController`）で、IDトークンを得るところまで。`IdTokenProvider` として、`services/index.ts` が
     **iOSのときだけ**注入する（`Platform.OS === 'ios'`。AndroidのAppleは Web 経由で、7.3.9）。SDKはRepositoryに注入する（`src/` はNodeのテストで
@@ -547,8 +547,10 @@ AppleとGoogleの仕様は、各社の公式資料で確かめた（Appleは、I
     OSの画面が出たままのことはある（閉じられない）。その状態で次のサインインを始めたときの、OS側の振る舞いは確かめていない。
 -   確かめたこと: Node のテスト（偽のSDKで、`nonce` の受け渡し・スコープが空・各失敗の分類・内容を載せないこと、上限・あとから返った結果の破棄・
     未処理の拒否が出ないこと）。`expo prebuild` で、エンタイトルメントが生成されることと、`pod install` が通ること。
--   未確認: **実際のAppleのIDトークンの `nonce` が、渡した値そのままか**（7.3.7の最初の確認。端末にAppleアカウントでサインインしていないと試せない。
-    iOS Simulator の iPhone 18 Pro は、サインインしていない）、サインインの成功・取りやめ・失敗の実際のエラーコード、実機（iPhone 8）、署名したビルド。
+-   未確認（7.3.13 で確かめる）: **実際のAppleのIDトークンの `nonce` が、渡した値そのままか**（端末にAppleアカウントでサインインしていないと
+    試せない。iOS Simulator の iPhone 18 Pro は、サインインしていない）。そのままでなければ、Worker側の比べ方を直す必要がある（上の「nonce」）。
+    それまでは、Appleのログインが `POST /auth/login` を通るかは分からない。サインインの成功・取りやめ・失敗の実際のエラーコード、実機（iPhone 8）、
+    署名したビルド、ネイティブのビルド自体（Xcode 27 での iOS のビルドは、まだしていない）。
 
 **アカウントの削除とAppleのトークン失効**
 
@@ -715,7 +717,8 @@ Googleの公式SDKだけを使う、自作の薄いExpoモジュールで実装�
     （この書き込みは、Workerを通さず、`wrangler` から直接行った）。確かめたのは、1つのWorkerと1つのD1の、
     12日間の放置だけで、それより長い放置と、複数のデータセンターでは未確認。
 
-nonce・セッションの失効・Appleのトークン失効の方式は、「認証の方式」に決めた。次は、7.3の最初に、実機・実際の
+nonce・セッションの失効・Appleのトークン失効の方式は、「認証の方式」に決めた。次は、7.3の中で（7.3.13。Appleの
+`nonce` は、実装（7.3.7）のあとに試すつもりだったが、Appleアカウントでサインインした端末が無く、7.3.13へ移した）、実機・実際の
 トークンで確かめる：
 
 -   AppleのIDトークンの `nonce` が、渡した値そのままか。

@@ -7,7 +7,7 @@ v1.0の作業（0〜6章。保存・管理は端末内で完結し、外部通�
 v1.0より後（公開機能・Requests）の実装順序は、
 `singfolio-publishing-backend.md` §9 を参照。進捗は「7. 公開機能」に書く。
 
-**現在地**：6. リリース準備（6.5・6.8が残り。6.1・6.2・6.3・6.4・6.6・6.7は完了。6.4は、iOS の 1.0 を審査に提出して、審査を通って公開された。Android は、6.8 の変更を含む AAB（versionCode 4）を作って、内部テストへアップロードして、Pixel 11 で確認した。Play Console の申告・掲載を入力して、製品版の審査へ送信し、審査を通って公開された。iOS も審査を通って公開され、紹介ページに両ストアのバッジを載せた。6.8は、アプリの変更・スクリーンショットの撮り直し・ストアの文の修正・両ストアへの入力・Android の実機での確認まで済んだ）。7. 公開機能（v1.0より後）は、7.1（バックエンドの技術検証と選定）が済み、7.2（実装前に確かめること）も済んだ（Appleの公開鍵の取得・`singfolio.app` の取得・認証の方式の決定・Freeプランでの放置後の再アクセス。ログイン手段はiOS・Androidとも、AppleとGoogleに決めた）。7.3 は、小さな作業（7.3.1 から 7.3.13）に分けた。7.3.1（利用者の前提の準備）は済んだ。7.3.2（Workerの土台）も済んだ（本番のD1とWorkerを作り、`singfolio.app` で404を返す状態）。7.3.3（nonce の発行・検証・使用済みの記録と HTTPS の検査）も済んだ（本番へデプロイして、HTTPが403、HTTPSが200になることを実測した。レート制限は Worker に入れない。WAFが Worker より前で効くことも実測した）。7.3.4（IDトークンの検証と、ログイン手段の引き当て）も済んだ（jose で検証し、模擬の発行元でテストした。本物のトークンでの確認は 7.3.7・7.3.8）。7.3.5（セッションとログイン・ログアウトのエンドポイント）も済んだ（模擬の発行元とローカルのD1でテストし、workerd でも動きを確かめた）。7.3.4・7.3.5 とも、本番へのデプロイはまだ。7.3.6（アプリ側の認証の土台）も済んだ（HTTP・SecureStore・初回起動での破棄・ログアウト。画面は無く、何も送らない。AndroidエミュレータとiOS Simulatorで確かめた）。次は 7.3.7（実装は済み。IDトークンの `nonce` の確認が残り）
+**現在地**：6. リリース準備（6.5・6.8が残り。6.1・6.2・6.3・6.4・6.6・6.7は完了。6.4は、iOS の 1.0 を審査に提出して、審査を通って公開された。Android は、6.8 の変更を含む AAB（versionCode 4）を作って、内部テストへアップロードして、Pixel 11 で確認した。Play Console の申告・掲載を入力して、製品版の審査へ送信し、審査を通って公開された。iOS も審査を通って公開され、紹介ページに両ストアのバッジを載せた。6.8は、アプリの変更・スクリーンショットの撮り直し・ストアの文の修正・両ストアへの入力・Android の実機での確認まで済んだ）。7. 公開機能（v1.0より後）は、7.1（バックエンドの技術検証と選定）が済み、7.2（実装前に確かめること）も済んだ（Appleの公開鍵の取得・`singfolio.app` の取得・認証の方式の決定・Freeプランでの放置後の再アクセス。ログイン手段はiOS・Androidとも、AppleとGoogleに決めた）。7.3 は、小さな作業（7.3.1 から 7.3.13）に分けた。7.3.1（利用者の前提の準備）は済んだ。7.3.2（Workerの土台）も済んだ（本番のD1とWorkerを作り、`singfolio.app` で404を返す状態）。7.3.3（nonce の発行・検証・使用済みの記録と HTTPS の検査）も済んだ（本番へデプロイして、HTTPが403、HTTPSが200になることを実測した。レート制限は Worker に入れない。WAFが Worker より前で効くことも実測した）。7.3.4（IDトークンの検証と、ログイン手段の引き当て）も済んだ（jose で検証し、模擬の発行元でテストした。本物のトークンでの確認は 7.3.7・7.3.8）。7.3.5（セッションとログイン・ログアウトのエンドポイント）も済んだ（模擬の発行元とローカルのD1でテストし、workerd でも動きを確かめた）。7.3.4・7.3.5 とも、本番へのデプロイはまだ。7.3.6（アプリ側の認証の土台）も済んだ（HTTP・SecureStore・初回起動での破棄・ログアウト。画面は無く、何も送らない。AndroidエミュレータとiOS Simulatorで確かめた）。7.3.7（Appleのサインイン）も済んだ（AppleのIDトークンの `nonce` の確認は、7.3.13 へ移した）。次は 7.3.8
 
 ## 0. 企画・設計
 
@@ -207,11 +207,13 @@ v1.0より後（公開機能・Requests）の実装順序は、
         `expo-secure-store` を足し、config plugin は足さず（Androidのバックアップ規則がSQLiteを外すため）、`androidx.biometric` が足す
         `USE_BIOMETRIC`・`USE_FINGERPRINT` を `blockedPermissions` に足した。Androidエミュレータ（R8入りのrelease）とiOS Simulatorで確かめた
         （§8「アプリ側の認証の土台」）
-    -   [ ] 7.3.7 Appleのサインイン（iOS。`expo-apple-authentication`）。最初に、実機で、AppleのIDトークンの `nonce` が、渡した値
-        そのままかを確かめる（**未確認**: 端末にAppleアカウントでサインインしている必要がある）。実装は済み: `IdTokenProvider` として注入
-        （`appleSignInRepository`。iOSだけ。スコープは空）、config plugin（エンタイトルメント）、失敗の分類（`provider-failed`・`timeout` を足した）。
+    -   [x] 7.3.7 Appleのサインイン（iOS。`expo-apple-authentication`）。`IdTokenProvider` として注入した（`appleSignInRepository`。
+        iOSだけ。スコープは空）。config plugin（エンタイトルメント）、失敗の分類（`provider-failed`・`timeout` を足した）。
         時間の上限と取り消しは決めた（`account` で5分。取り消しの口は作らない。Googleの7.3.8も同じ場所で効く。§8「Appleのサインイン（iOS）」）。
-        `nonce` が渡した値そのままでないと分かったら、Worker側の比べ方（`worker/src/idToken.ts`）を、§8「nonce」の方針どおり直す
+        Nodeのテストと、`expo prebuild`・`pod install` までは確かめた。**AppleのIDトークンの `nonce` が、渡した値そのままかは未確認で、
+        7.3.13 へ移した**（端末にAppleアカウントでサインインしている必要がある。iOS Simulator の iPhone 18 Pro は、サインインしていない）。
+        そのままでないと分かったら、Worker側の比べ方（`worker/src/idToken.ts`）を、§8「nonce」の方針どおり直す。それまで、AppleのログインがWorkerを
+        通るかは分からない（Appleの `nonce` の比較が 401 になりうる）
     -   [ ] 7.3.8 Googleのサインイン（iOS・Android）。検証済みの自作モジュール（§8「Googleのサインイン」）を、mainから切った
         新しいブランチへ取り込む（検証用の画面は持ち込まない）。ライセンス一覧の生成の対応（Android Software Development Kit
         Licenseの依存を個別に許可し、Aboutに別枠で載せる）。`blockedPermissions` の `USE_BIOMETRIC`・`USE_FINGERPRINT` は
@@ -229,6 +231,8 @@ v1.0より後（公開機能・Requests）の実装順序は、
     -   [ ] 7.3.12 申告と文書。プライバシーポリシー、`docs/singfolio-store-listing.md`、App Store・Google Playの申告（SDKの
         プライバシーマニフェストを、そのときの版で読み直して決める）、Googleの同意画面（ブランド）、CLAUDE.mdの「スコープ」の節
     -   [ ] 7.3.13 確認。実機と署名したビルド（TestFlight・Playの内部テスト）で、ログイン・キャンセル・再ログイン・ログアウト・削除。
+        最初に、AppleのIDトークンの `nonce` が、渡した値（`SHA-256(T)` の base64url）そのままか（7.3.7 から移した。違うなら、Workerを直してから
+        ほかを確かめる）。サインインの成功・取りやめ・失敗の、実際のエラーコード（`appleSignInRepository` の分類）。
         Appleの `sub` がiOSとAndroidで同じか、Services IDで得たトークンを失効させたときの連携、AndroidのWebのフロー全体、
         異常系（通信断・アカウントの切り替え・連打）
 -   [ ] 7.4 Public ProfileとPublish（Auto Publishを含む）
