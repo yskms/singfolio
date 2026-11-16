@@ -44,6 +44,8 @@ expo-env.d.ts
 # Native（expo prebuild の生成物。設定は app.json / config plugin 側で行う）
 /ios
 /android
+# ローカルのExpoモジュール（modules/）のGradleビルド出力
+/modules/*/android/build/
 .kotlin/
 *.orig.*
 

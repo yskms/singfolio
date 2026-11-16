@@ -69,6 +69,33 @@ describe('app.json (Appleのサインイン)', () => {
   });
 });
 
+describe('app.json (Googleのサインイン)', () => {
+  const entry = (expo.plugins as PluginEntry[]).find(
+    (plugin): plugin is [string, Record<string, any>] =>
+      Array.isArray(plugin) && plugin[0] === './plugins/withGoogleSignIn.js',
+  );
+
+  it('plugins/withGoogleSignIn.js が登録され、iOS・Web のクライアントIDが、別の値で入っている', () => {
+    // 外すと、iOS の Info.plist（GIDClientID など）と Android の文字列リソースが入らず、ログインが
+    // ERR_NOT_CONFIGURED で失敗する。Web（サーバー用）は IDトークンの aud になり、Worker の GOOGLE_WEB_CLIENT_ID
+    // と同じ値でなければならない（worker/test/config.test.ts が照合する）。クライアントIDは秘密情報ではない
+    // （アプリに埋め込まれる）。
+    assert.ok(entry, 'app.json に plugins/withGoogleSignIn.js が無い');
+    const { iosClientId, webClientId } = entry[1];
+    const pattern = /^[0-9]+-[a-z0-9]+\.apps\.googleusercontent\.com$/;
+    assert.match(iosClientId, pattern);
+    assert.match(webClientId, pattern);
+    assert.notEqual(iosClientId, webClientId);
+  });
+
+  it('pluginは、クライアントIDの形が違えば失敗する（設定の写し間違いを、prebuild で止める）', () => {
+    const plugin = require('../../plugins/withGoogleSignIn.js');
+    const config = {};
+    assert.throws(() => plugin(config, { iosClientId: 'x', webClientId: entry?.[1].webClientId }), /iosClientId/);
+    assert.throws(() => plugin(config, { iosClientId: entry?.[1].iosClientId }), /webClientId/);
+  });
+});
+
 describe('plugins/withAndroidNightColors.js', () => {
   it('ダークのウィンドウ背景は、ダークの背景色', () => {
     const plugin = require('../../plugins/withAndroidNightColors.js');

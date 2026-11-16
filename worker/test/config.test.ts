@@ -34,7 +34,11 @@ describe('wrangler.jsonc', () => {
   it('IDトークンの aud（vars）は、アプリ・Appleの設定と食い違っていない', () => {
     const vars = (config.vars ?? {}) as Record<string, unknown>;
     const app = JSON.parse(readFileSync(path.join(workerDir, '..', 'app.json'), 'utf8')) as {
-      expo: { ios: { bundleIdentifier: string }; android: { package: string } };
+      expo: {
+        ios: { bundleIdentifier: string };
+        android: { package: string };
+        plugins: Array<string | [string, Record<string, string>]>;
+      };
     };
     // Appleのネイティブのトークンの aud は、アプリのバンドルID（iOS）。ずれると、すべてのAppleログインが拒否される。
     assert.equal(vars.APPLE_BUNDLE_ID, app.expo.ios.bundleIdentifier);
@@ -43,6 +47,16 @@ describe('wrangler.jsonc', () => {
     assert.notEqual(vars.APPLE_SERVICES_ID, vars.APPLE_BUNDLE_ID);
     // Googleの aud は、サーバー用（Web）のクライアントID。iOS・Androidのクライアントではない。
     assert.match(String(vars.GOOGLE_WEB_CLIENT_ID), /^\d+-[a-z0-9]+\.apps\.googleusercontent\.com$/);
+    // アプリ（plugins/withGoogleSignIn.js）が SDK に渡すサーバー用（Web）のクライアントID。これが IDトークンの
+    // aud になるので、ずれると、すべてのGoogleログインが拒否される（別のGoogle Cloudのプロジェクトのクライアントを
+    // 取り違えた例がある）。iOSのクライアントは、同じプロジェクトのもの（番号の部分が同じ）でなければならない。
+    const google = app.expo.plugins.find(
+      (plugin): plugin is [string, Record<string, string>] =>
+        Array.isArray(plugin) && plugin[0] === './plugins/withGoogleSignIn.js',
+    );
+    assert.ok(google, 'app.json に plugins/withGoogleSignIn.js が無い');
+    assert.equal(vars.GOOGLE_WEB_CLIENT_ID, google[1].webClientId);
+    assert.equal(google[1].iosClientId.split('-')[0], google[1].webClientId.split('-')[0]);
   });
 
   it('npm run dev は、実際のローカルのオリジンを保つ（HTTPS検査が localhost を通すため）', () => {

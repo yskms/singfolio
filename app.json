@@ -52,6 +52,13 @@
       "./plugins/withIosSceneDelegate.js",
       "./plugins/withAndroidNightColors.js",
       "./plugins/withAndroidR8.js",
+      [
+        "./plugins/withGoogleSignIn.js",
+        {
+          "iosClientId": "432571830797-3u1o89qhfenak4kkhr4vjtd15tgclvt0.apps.googleusercontent.com",
+          "webClientId": "432571830797-0b95abaac13gs6dkhcunkpni8d74lt6c.apps.googleusercontent.com"
+        }
+      ],
       "expo-router",
       [
         "expo-font",

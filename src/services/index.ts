@@ -3,9 +3,11 @@ import { CryptoDigestAlgorithm, CryptoEncoding, digestStringAsync, randomUUID } 
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
+import { signInWithGoogle } from '../../modules/singfolio-google-signin';
 import { createDatabase } from '../db/appDatabase.ts';
 import { getDatabase } from '../db/database.ts';
 import { createAppleSignInRepository } from '../repositories/appleSignInRepository.ts';
+import { createGoogleSignInRepository } from '../repositories/googleSignInRepository.ts';
 import { createSessionRepository, type SecureStorage } from '../repositories/sessionRepository.ts';
 import { base64ToBase64Url } from './base64url.ts';
 import { createServices, type Services } from './createServices.ts';
@@ -63,12 +65,13 @@ export function getServices(): Promise<Services> {
           // 曲名・アーティストの候補の外部検索。ここで渡さなければ無効になる。
           catalogFetch: fetch,
           // アカウントの通信・保存と、各社のサインイン（`idTokenProviders`）。画面が呼ぶまで、何も送らない。
-          // Appleのネイティブのサインインは iOS だけ（AndroidのAppleは Web 経由。7.3.9）。Googleは 7.3.8。
+          // Appleのネイティブのサインインは iOS だけ（AndroidのAppleは Web 経由。7.3.9）。Googleは両OS
+          // （自作のExpoモジュール。ネイティブ側が無いビルドでも、importでは落ちず、呼んだときに失敗する）。
           auth: {
-            idTokenProviders:
-              Platform.OS === 'ios'
-                ? { apple: createAppleSignInRepository(AppleAuthentication) }
-                : {},
+            idTokenProviders: {
+              google: createGoogleSignInRepository({ signInWithGoogle }),
+              ...(Platform.OS === 'ios' ? { apple: createAppleSignInRepository(AppleAuthentication) } : {}),
+            },
             fetch,
             storage: secureStorage,
             sha256Base64Url: async (text) =>

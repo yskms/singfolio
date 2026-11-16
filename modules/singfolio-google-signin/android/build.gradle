@@ -1,0 +1,28 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.yskms.singfolio.googlesignin'
+version = '1.0.0'
+
+android {
+  namespace "com.yskms.singfolio.googlesignin"
+  defaultConfig {
+    versionCode 1
+    versionName "1.0.0"
+  }
+  lintOptions {
+    abortOnError false
+  }
+}
+
+dependencies {
+  // Google 公式の Credential Manager 経由の Sign in with Google だけを使う。
+  // 版は固定する（更新は、差分を確かめてから手で上げる）。
+  // googleid は 1.2.0 止まり。最新の 1.2.1 は Kotlin 2.4 のメタデータで、Expo SDK 57 の Kotlin 2.1.0
+  // （読めるのは 2.2 まで）ではコンパイルできない（"incompatible version of Kotlin"）。
+  implementation "androidx.credentials:credentials:1.6.0"
+  implementation "androidx.credentials:credentials-play-services-auth:1.6.0"
+  implementation "com.google.android.libraries.identity.googleid:googleid:1.2.0"
+}
