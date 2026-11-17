@@ -97,6 +97,15 @@ describe('wrangler.jsonc', () => {
     assert.ok(source.includes(`APP_RETURN_URL = '${APP_RETURN_URL}'`));
   });
 
+  it('未使用のアカウントの自動削除: Cron Trigger は毎日1回の1つだけ（Freeは5つまで）、scheduled を持つ', async () => {
+    const crons = config.triggers?.crons ?? [];
+    assert.equal(crons.length, 1);
+    // 分 時 * * *（毎日1回）。1日に何度も走らせると、D1の読み取りと、Cronの実行回数を使う。
+    assert.match(crons[0]!, /^\d{1,2} \d{1,2} \* \* \*$/);
+    const worker = (await import('../src/index.ts')).default;
+    assert.equal(typeof worker.scheduled, 'function');
+  });
+
   it('HTTPS検査を迂回する設定を vars に置かない', () => {
     // 検査は、localhost のホスト名だけを通す。環境変数などで切る口は作らない（docs §8「HTTPS」）。
     for (const name of Object.keys(config.vars ?? {})) {

@@ -72,11 +72,11 @@ export function handleLoginResult(result: SignInResult): Response {
  * POST /auth/logout。`Authorization: Bearer <セッションの値>` のセッションの行を削除して、204 を返す。
  * 行が無い（すでに失効している）値でも204（何度呼んでも同じ）。ヘッダーが無い・形が違うときだけ401。
  */
-export async function handleLogout(request: Request, env: Env): Promise<Response> {
+export async function handleLogout(request: Request, env: Env, now: number): Promise<Response> {
   if (request.method !== 'POST') return methodNotAllowed('POST');
   const token = sessionTokenFromRequest(request);
   if (token === null) return unauthorized();
-  await revokeSession(env.DB, token);
+  await revokeSession(env.DB, token, now);
   return noContent();
 }
 

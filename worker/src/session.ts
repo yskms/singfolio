@@ -3,6 +3,7 @@
 // セッションの値は、不透明なランダム値（32バイト = base64url の43字。JWTにしない）。D1の `sessions` には
 // ハッシュ（SHA-256 の base64url）だけを置き、値そのものは端末のSecureStoreにだけある。値は
 // `Authorization: Bearer <値>` で送る（URLに載せない）。ログにも出さない。
+import { markUserActiveStatement } from './account.ts';
 import type { IdTokenProvider } from './idToken.ts';
 import { toBase64Url } from './nonce.ts';
 
@@ -97,7 +98,11 @@ export async function authenticateSession(
   }
   if (idle >= SESSION_TOUCH_INTERVAL_MS) {
     // 同時の2つのリクエストが両方書いても、同じ値になる。時計が戻る値は書かない。
-    await db.prepare('UPDATE sessions SET last_used_at = ?1 WHERE token_hash = ?2 AND last_used_at < ?1').bind(now, hash).run();
+    // アカウントの最後に使った時刻（未使用のアカウントの自動削除の基準）も、セッションと同じ頻度（24時間に1回）で進める。
+    await db.batch([
+      db.prepare('UPDATE sessions SET last_used_at = ?1 WHERE token_hash = ?2 AND last_used_at < ?1').bind(now, hash),
+      markUserActiveStatement(db, row.user_id, now),
+    ]);
   }
   return { userId: row.user_id, identityId: row.identity_id, sub: row.sub, provider: row.provider };
 }
@@ -105,10 +110,22 @@ export async function authenticateSession(
 /**
  * セッションを失効させる（行の削除）。無い値でも成功にする（何度呼んでも結果が同じ。ログアウトは、
  * 値を持っている側だけが呼べる）。
+ * 消す前に、そのセッションのアカウントの最後に使った時刻を進める（同じバッチ。消すと、アカウントを引けなくなる）。
+ * ログアウトは、アプリを使った操作で、これで「ログアウトの1か月後に、未使用1年として消える」穴を塞ぐ。
  */
-export async function revokeSession(db: D1Database, token: string): Promise<void> {
+export async function revokeSession(db: D1Database, token: string, now: number): Promise<void> {
   if (!isSessionToken(token)) return;
-  await db.prepare('DELETE FROM sessions WHERE token_hash = ?1').bind(await hashToken(token)).run();
+  const hash = await hashToken(token);
+  await db.batch([
+    db
+      .prepare(
+        `UPDATE users SET last_active_at = ?1
+         WHERE id = (SELECT i.user_id FROM sessions s JOIN identities i ON i.id = s.identity_id WHERE s.token_hash = ?2)
+           AND (last_active_at IS NULL OR last_active_at < ?1)`,
+      )
+      .bind(now, hash),
+    db.prepare('DELETE FROM sessions WHERE token_hash = ?1').bind(hash),
+  ]);
 }
 
 /**

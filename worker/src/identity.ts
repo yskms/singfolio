@@ -18,7 +18,8 @@ export interface ResolvedIdentity {
  * 1つのバッチ（トランザクション）で行う。「引いてから作る」を2回のクエリに分けると、同じ人の
  * 同時の初回ログインで、`identities` の一意制約に当たるか、`identities` の無いユーザーが残る。
  * 各文の条件（`NOT EXISTS`・`EXISTS`）は、バッチの中で順に評価されるので、競合しない。
- * 書き込みの行数は、既存のログインで1行（`last_sign_in_at` の更新。索引の列ではない）、初回で2行（と索引）。
+ * 書き込みの行数は、既存のログインで2行（`identities.last_sign_in_at` と `users.last_active_at` の更新。どちらも索引の列ではない）、
+ * 初回で2行（と索引）。
  * Provider が違えば、`sub` が同じでも別のログイン手段（別のユーザー）。自動ではつながない。
  */
 export async function resolveIdentity(
@@ -29,12 +30,12 @@ export async function resolveIdentity(
 ): Promise<ResolvedIdentity> {
   const userId = crypto.randomUUID();
   const identityId = crypto.randomUUID();
-  const [userInsert, , , lookup] = await db.batch<{ id: string; user_id: string }>([
-    // その手段がまだ無いときだけ、ユーザーを作る。
+  const [userInsert, , , , lookup] = await db.batch<{ id: string; user_id: string }>([
+    // その手段がまだ無いときだけ、ユーザーを作る。最後に使った時刻（`last_active_at`。未使用のアカウントの自動削除の基準）も入れる。
     db
       .prepare(
-        `INSERT INTO users (id, created_at)
-         SELECT ?1, ?2 WHERE NOT EXISTS (SELECT 1 FROM identities WHERE provider = ?3 AND sub = ?4)`,
+        `INSERT INTO users (id, created_at, last_active_at)
+         SELECT ?1, ?2, ?2 WHERE NOT EXISTS (SELECT 1 FROM identities WHERE provider = ?3 AND sub = ?4)`,
       )
       .bind(userId, now, provider, sub),
     // 上でユーザーを作ったときだけ（userId の行があるときだけ）、ログイン手段を作る。
@@ -48,6 +49,15 @@ export async function resolveIdentity(
     // 時計がずれて後戻りする値も書かない）。
     db
       .prepare('UPDATE identities SET last_sign_in_at = ?1 WHERE provider = ?2 AND sub = ?3 AND last_sign_in_at < ?1')
+      .bind(now, provider, sub),
+    // 既にあったアカウントの、最後に使った時刻も進める（作ったばかりのユーザーは同じ時刻なので書かない）。
+    // ユーザーIDは、ログイン手段から引く（既存のログイン手段の `user_id` は、上で作った `userId` とは限らない）。
+    db
+      .prepare(
+        `UPDATE users SET last_active_at = ?1
+         WHERE id = (SELECT user_id FROM identities WHERE provider = ?2 AND sub = ?3)
+           AND (last_active_at IS NULL OR last_active_at < ?1)`,
+      )
       .bind(now, provider, sub),
     db.prepare('SELECT id, user_id FROM identities WHERE provider = ?1 AND sub = ?2').bind(provider, sub),
   ]);

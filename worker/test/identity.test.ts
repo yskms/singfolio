@@ -36,7 +36,7 @@ describe('resolveIdentity', () => {
       consent_revoked_at: null,
     });
     const user = await db.prepare('SELECT * FROM users WHERE id = ?').bind(result.userId).first();
-    assert.deepEqual(user, { id: result.userId, created_at: NOW });
+    assert.deepEqual(user, { id: result.userId, created_at: NOW, last_active_at: NOW });
   });
 
   it('同じ sub: 同じユーザー・ログイン手段を返し、増やさない。最後のサインインだけ進める', async () => {

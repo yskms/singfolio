@@ -13,6 +13,10 @@
   "preview_urls": false,
   "routes": [{ "pattern": "singfolio.app", "custom_domain": true }],
 
+  // 未使用のアカウントの自動削除（src/inactiveAccounts.ts）。毎日1回、UTCの03:17（混みやすい正時を避ける）。
+  // Freeは1アカウントに5つまで。Cron Trigger は、次の `wrangler deploy` で登録される。
+  "triggers": { "crons": ["17 3 * * *"] },
+
   // ログに認証の値（セッション、nonce、Appleのコールバックの code・state、IDトークン）を出さない。
   // Workers Logs は無効のままにする。理由と、有効にするときの条件は docs/singfolio-publishing-backend.md §8「Workerの構成と運用」。
   // redact_query_string は、有効にしたときの安全弁（無効の間は効かない）。

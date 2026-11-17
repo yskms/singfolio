@@ -235,7 +235,7 @@ describe('セッション', () => {
       const { identityId } = await newIdentity();
       const first = await createSession(db, identityId, NOW);
       const second = await createSession(db, identityId, NOW);
-      await revokeSession(db, first);
+      await revokeSession(db, first, NOW);
       assert.equal(await authenticateSession(db, first, NOW), null);
       assert.notEqual(await authenticateSession(db, second, NOW), null);
       assert.equal(await sessionCount(identityId), 1);
@@ -244,10 +244,10 @@ describe('セッション', () => {
     it('何度呼んでも同じ。無い値・形が違う値でも落ちない', async () => {
       const { identityId } = await newIdentity();
       const token = await createSession(db, identityId, NOW);
-      await revokeSession(db, token);
-      await revokeSession(db, token);
-      await revokeSession(db, 'A'.repeat(43));
-      await revokeSession(db, 'short');
+      await revokeSession(db, token, NOW);
+      await revokeSession(db, token, NOW);
+      await revokeSession(db, 'A'.repeat(43), NOW);
+      await revokeSession(db, 'short', NOW);
       assert.equal(await sessionCount(identityId), 0);
     });
   });
