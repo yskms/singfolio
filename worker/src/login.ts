@@ -80,6 +80,8 @@ export async function signIn(
   if (!(await consumeNonce(env.DB, verifiedNonce.nonceHash, verifiedNonce.expiresAt, now))) return rejected;
 
   // 5. ログイン手段の引き当て（無ければユーザーごと作る）、6. セッションの発行。
+  //    セッションを作らないことがある（`createSession`。Appleの通知との競合を吸収する）。理由は教えず、401にする。
   const { identityId } = await resolveIdentity(env.DB, provider, verified.sub, now);
-  return { ok: true, session: await createSession(env.DB, identityId, now) };
+  const session = await createSession(env.DB, identityId, now);
+  return session === null ? rejected : { ok: true, session };
 }

@@ -1,0 +1,11 @@
+-- Appleの `consent-revoked`（サーバー間通知）を処理した時刻（Appleの `event_time`。ミリ秒）。
+-- 方式は docs/singfolio-publishing-backend.md §8「Appleのサーバー間通知」。
+--
+-- 使い道は1つ: 通知の処理と、同時に進んでいたログインの競合を吸収する。ログインは、検証を通ったあと
+-- セッションを作るまでの間に、他のリクエスト（この通知）が入りうる。通知を先に処理した場合、そのログインの
+-- セッションは、`consent_revoked_at` が、そのログインの開始時刻より後なら、作らない（createSession の INSERT が、
+-- 条件つきで1文で行う。通知の処理（削除と記録）も1バッチなので、どちらが先でも、取り消し後のセッションは残らない）。
+-- 通知を後に処理した場合は、通知が、そのセッションを消す。
+--
+-- identities は親テーブルなので、作り直さず、ADD COLUMN で足す（0001 の注意）。NULL は、取り消されたことが無い。
+ALTER TABLE identities ADD COLUMN consent_revoked_at INTEGER;

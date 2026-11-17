@@ -34,21 +34,33 @@ export function sessionTokenFromRequest(request: Request): string | null {
  * 同じログイン手段（`identity`）の、期限を過ぎたセッションを、同じバッチで消す（Cron Triggerは使わない）。
  * 全体を掃除しない（`identity_id` の索引で引けるので、件数が増えても、ログインの費用が増えない）。
  * 二度とログインしない人の、期限を過ぎた行は残る（1行は小さく、認証には使えない）。
+ *
+ * **発行しないことがある（null）**: ログイン手段の行が無い（直前にAppleの `account-deleted` で消えた）、または
+ * `consent_revoked_at`（Appleの `consent-revoked` の `event_time`）が、このログインの開始時刻（`now`）より後。
+ * ログインは、検証を通ったあと、ここへ来るまでの間に、通知の処理が入りうる。通知を先に処理した場合のセッションを、
+ * ここで作らない（通知を後に処理した場合は、通知が消す）。条件は INSERT の1文の中で見るので、通知の処理
+ * （削除と記録の1バッチ）と、どちらが先でも、取り消し後のセッションは残らない（migrations/0002）。
  */
-export async function createSession(db: D1Database, identityId: string, now: number): Promise<string> {
+export async function createSession(db: D1Database, identityId: string, now: number): Promise<string | null> {
   const token = toBase64Url(crypto.getRandomValues(new Uint8Array(32)));
-  await db.batch([
+  const [, insert] = await db.batch([
     db.prepare('DELETE FROM sessions WHERE identity_id = ?1 AND last_used_at <= ?2').bind(identityId, now - SESSION_TTL_MS),
     db
-      .prepare('INSERT INTO sessions (token_hash, identity_id, created_at, last_used_at) VALUES (?1, ?2, ?3, ?3)')
+      .prepare(
+        `INSERT INTO sessions (token_hash, identity_id, created_at, last_used_at)
+         SELECT ?1, ?2, ?3, ?3
+         WHERE EXISTS (SELECT 1 FROM identities WHERE id = ?2 AND (consent_revoked_at IS NULL OR consent_revoked_at <= ?3))`,
+      )
       .bind(await hashToken(token), identityId, now),
   ]);
-  return token;
+  return insert!.meta.changes === 1 ? token : null;
 }
 
 export interface AuthenticatedSession {
   userId: string;
   identityId: string;
+  /** このセッションを作ったログイン手段の `sub`（アカウントの削除の再認証で、同じアカウントか確かめる）。 */
+  sub: string;
   /** このセッションを作ったログイン手段。 */
   provider: IdTokenProvider;
 }
@@ -68,12 +80,12 @@ export async function authenticateSession(
   const hash = await hashToken(token);
   const row = await db
     .prepare(
-      `SELECT s.last_used_at AS last_used_at, s.identity_id AS identity_id, i.user_id AS user_id, i.provider AS provider
+      `SELECT s.last_used_at AS last_used_at, s.identity_id AS identity_id, i.user_id AS user_id, i.provider AS provider, i.sub AS sub
        FROM sessions s JOIN identities i ON i.id = s.identity_id
        WHERE s.token_hash = ?1`,
     )
     .bind(hash)
-    .first<{ last_used_at: number; identity_id: string; user_id: string; provider: IdTokenProvider }>();
+    .first<{ last_used_at: number; identity_id: string; user_id: string; provider: IdTokenProvider; sub: string }>();
   if (row === null) return null;
 
   const idle = now - row.last_used_at;
@@ -85,7 +97,7 @@ export async function authenticateSession(
     // 同時の2つのリクエストが両方書いても、同じ値になる。時計が戻る値は書かない。
     await db.prepare('UPDATE sessions SET last_used_at = ?1 WHERE token_hash = ?2 AND last_used_at < ?1').bind(now, hash).run();
   }
-  return { userId: row.user_id, identityId: row.identity_id, provider: row.provider };
+  return { userId: row.user_id, identityId: row.identity_id, sub: row.sub, provider: row.provider };
 }
 
 /**
@@ -95,4 +107,21 @@ export async function authenticateSession(
 export async function revokeSession(db: D1Database, token: string): Promise<void> {
   if (!isSessionToken(token)) return;
   await db.prepare('DELETE FROM sessions WHERE token_hash = ?1').bind(await hashToken(token)).run();
+}
+
+/**
+ * 同じユーザーの、`currentToken`（認証済みのセッションの値）以外のセッションを、すべて失効させる（行の削除）。
+ * ユーザーに複数のログイン手段（AppleとGoogle）がつながっていれば、手段をまたいで消す
+ * （`sessions` は `identity_id` を持つので、`identities` を `user_id` で引く）。期限を過ぎた行も、ここで消える。
+ * 端末をなくしたとき、残っている端末から、なくした端末の値を失効させる手段（絶対的なセッションの期限は置かない代わり）。
+ * `userId` は、`authenticateSession` で得たものを渡す（クライアントから受け取らない）。
+ */
+export async function revokeOtherSessions(db: D1Database, userId: string, currentToken: string): Promise<void> {
+  await db
+    .prepare(
+      `DELETE FROM sessions
+       WHERE token_hash <> ?1 AND identity_id IN (SELECT id FROM identities WHERE user_id = ?2)`,
+    )
+    .bind(await hashToken(currentToken), userId)
+    .run();
 }

@@ -160,4 +160,23 @@ describe('D1のスキーマ（migrations/）', () => {
       /cannot store TEXT value in INTEGER column/,
     );
   });
+
+  it('identities.consent_revoked_at（0002）: 既定は NULL（取り消されたことが無い）。整数だけ入る', async () => {
+    const userId = id('user');
+    const identityId = id('identity');
+    await db.prepare('INSERT INTO users (id, created_at) VALUES (?, ?)').bind(userId, 1).run();
+    await db
+      .prepare('INSERT INTO identities (id, user_id, provider, sub, created_at, last_sign_in_at) VALUES (?, ?, ?, ?, ?, ?)')
+      .bind(identityId, userId, 'apple', id('sub'), 1, 1)
+      .run();
+    const read = () =>
+      db.prepare('SELECT consent_revoked_at FROM identities WHERE id = ?').bind(identityId).first<{ consent_revoked_at: number | null }>();
+    assert.deepEqual(await read(), { consent_revoked_at: null });
+    await db.prepare('UPDATE identities SET consent_revoked_at = ? WHERE id = ?').bind(123, identityId).run();
+    assert.deepEqual(await read(), { consent_revoked_at: 123 });
+    await assert.rejects(
+      db.prepare('UPDATE identities SET consent_revoked_at = ? WHERE id = ?').bind('yesterday', identityId).run(),
+      /cannot store TEXT value in INTEGER column/,
+    );
+  });
 });

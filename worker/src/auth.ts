@@ -1,4 +1,4 @@
-// 認証のエンドポイント（POST /auth/nonce・/auth/login・/auth/logout）。リクエスト・レスポンスの形は
+// 認証のエンドポイント（POST /auth/nonce・/auth/login・/auth/logout・/auth/logout-others）。リクエスト・レスポンスの形は
 // docs/singfolio-publishing-backend.md §8「認証の方式」。
 //
 // /auth/nonce はログイン前の経路なので、D1に書かない（nonce は無状態で発行する。src/nonce.ts）。
@@ -15,7 +15,7 @@ import {
 } from './http.ts';
 import { signIn, type SignInResult } from './login.ts';
 import { isChallenge, issueNonce } from './nonce.ts';
-import { revokeSession, sessionTokenFromRequest } from './session.ts';
+import { authenticateSession, revokeOtherSessions, revokeSession, sessionTokenFromRequest } from './session.ts';
 
 // 受け付ける本文の上限。`web` の本文でも 100 バイトほど。
 const MAX_NONCE_BODY_BYTES = 1024;
@@ -77,5 +77,21 @@ export async function handleLogout(request: Request, env: Env): Promise<Response
   const token = sessionTokenFromRequest(request);
   if (token === null) return unauthorized();
   await revokeSession(env.DB, token);
+  return noContent();
+}
+
+/**
+ * POST /auth/logout-others。「ほかの端末をすべてログアウト」。`Authorization: Bearer <セッションの値>` で認証して、
+ * そのセッション以外の、同じユーザーのセッションを、すべて失効させる（ログイン手段をまたぐ）。204（本文なし）。
+ * 消すものが無くても204（何度呼んでも同じ）。ヘッダーが無い・形が違う・セッションが無効（無い・期限切れ）は401
+ * （何も消さない。ログアウトと違い、認証が要る）。アプリは、401 のとき端末のセッションを捨てる。
+ */
+export async function handleLogoutOthers(request: Request, env: Env, now: number): Promise<Response> {
+  if (request.method !== 'POST') return methodNotAllowed('POST');
+  const token = sessionTokenFromRequest(request);
+  if (token === null) return unauthorized();
+  const session = await authenticateSession(env.DB, token, now);
+  if (session === null) return unauthorized();
+  await revokeOtherSessions(env.DB, session.userId, token);
   return noContent();
 }

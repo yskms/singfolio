@@ -4,12 +4,13 @@
 // （D1に書くのは検証が通ってから）、リプレイ、失敗の応答、セッションの発行を見る。
 import assert from 'node:assert/strict';
 import { after, before, beforeEach, describe, it } from 'node:test';
+import { createHash } from 'node:crypto';
 import { exportJWK, generateKeyPair, SignJWT, type CryptoKey, type JWK } from 'jose';
-import { handleLogin } from '../src/auth.ts';
+import { handleLogin, handleLogoutOthers } from '../src/auth.ts';
 import worker from '../src/index.ts';
 import { createIdTokenVerifier, JWKS_COOLDOWN_MS, type FetchFunction, type IdTokenVerifier } from '../src/idToken.ts';
 import { issueNonce, NONCE_TTL_MS, nonceHash } from '../src/nonce.ts';
-import { authenticateSession, isSessionToken } from '../src/session.ts';
+import { authenticateSession, createSession, isSessionToken } from '../src/session.ts';
 import { openLocalDatabase, type LocalDatabase } from './localDatabase.ts';
 
 const NOW = 1_800_000_000_000;
@@ -134,6 +135,16 @@ describe('ログインとログアウト', () => {
       env,
     );
 
+  const logoutOthers = (authorization?: string, method = 'POST') =>
+    handleLogoutOthers(
+      new Request('https://singfolio.app/auth/logout-others', {
+        method,
+        headers: authorization === undefined ? {} : { authorization },
+      }),
+      env,
+      NOW,
+    );
+
   describe('POST /auth/login: 成功', () => {
     it('Apple: セッションの値だけを返し、ユーザー・ログイン手段・使用済みの記録・セッションを作る', async () => {
       const t = await issueT();
@@ -157,6 +168,7 @@ describe('ログインとログアウト', () => {
       assert.deepEqual(await authenticateSession(db, body.session, NOW), {
         userId: (await db.prepare('SELECT id FROM users').first<{ id: string }>())!.id,
         identityId: (await db.prepare('SELECT id FROM identities').first<{ id: string }>())!.id,
+        sub: 'apple-sub-1',
         provider: 'apple',
       });
 
@@ -432,6 +444,121 @@ describe('ログインとログアウト', () => {
         assert.equal(response.headers.get('allow'), 'POST');
       }
       assert.notEqual(await authenticateSession(db, session, NOW), null);
+    });
+  });
+
+  describe('POST /auth/logout-others（ほかの端末をすべてログアウト）', () => {
+    it('認証済みのセッション以外を消して 204。認証済みのものは残る', async () => {
+      const current = await loginOk();
+      const second = await loginOk();
+      const third = await loginOk();
+      const response = await logoutOthers(`Bearer ${current}`);
+      assert.equal(response.status, 204);
+      assert.equal(response.headers.get('cache-control'), 'no-store');
+      assert.equal(await response.text(), '');
+      assert.notEqual(await authenticateSession(db, current, NOW), null);
+      assert.equal(await authenticateSession(db, second, NOW), null);
+      assert.equal(await authenticateSession(db, third, NOW), null);
+      assert.deepEqual(await counts(), { users: 1, identities: 1, sessions: 1, used_nonces: 3 });
+    });
+
+    it('ほかのユーザーのセッションは消さない', async () => {
+      const mine = await loginOk({ sub: 'apple-sub-mine' });
+      const mineOther = await loginOk({ sub: 'apple-sub-mine' });
+      const theirs = await loginOk({ sub: 'apple-sub-theirs' });
+      assert.equal((await logoutOthers(`Bearer ${mine}`)).status, 204);
+      assert.equal(await authenticateSession(db, mineOther, NOW), null);
+      assert.notEqual(await authenticateSession(db, theirs, NOW), null);
+    });
+
+    it('同じユーザーにつながった別のログイン手段（Google）のセッションも消す', async () => {
+      const apple = await loginOk({ sub: 'apple-sub-1' });
+      const userId = (await db.prepare('SELECT id FROM users').first<{ id: string }>())!.id;
+      const googleIdentity = crypto.randomUUID();
+      await db
+        .prepare(
+          `INSERT INTO identities (id, user_id, provider, sub, created_at, last_sign_in_at) VALUES (?1, ?2, 'google', 'g-1', ?3, ?3)`,
+        )
+        .bind(googleIdentity, userId, NOW)
+        .run();
+      const google = await createSession(db, googleIdentity, NOW);
+      assert.notEqual(google, null);
+      assert.equal((await logoutOthers(`Bearer ${apple}`)).status, 204);
+      assert.equal(await authenticateSession(db, google!, NOW), null);
+      assert.notEqual(await authenticateSession(db, apple, NOW), null);
+    });
+
+    it('消すものが無くても、何度呼んでも 204', async () => {
+      const session = await loginOk();
+      assert.equal((await logoutOthers(`Bearer ${session}`)).status, 204);
+      assert.equal((await logoutOthers(`Bearer ${session}`)).status, 204);
+      assert.notEqual(await authenticateSession(db, session, NOW), null);
+    });
+
+    it('ヘッダーが無い・形が違う・無効なセッションは 401（何も消さない）', async () => {
+      const current = await loginOk();
+      const other = await loginOk();
+      const revoked = await loginOk();
+      await db.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(createHash('sha256').update(revoked).digest('base64url')).run();
+      for (const header of [undefined, '', current, `Basic ${current}`, `Bearer ${current.slice(1)}`, `Bearer ${'A'.repeat(43)}`, `Bearer ${revoked}`]) {
+        const response = await logoutOthers(header);
+        assert.equal(response.status, 401, String(header));
+        assert.deepEqual(await response.json(), { error: 'unauthorized' });
+      }
+      assert.notEqual(await authenticateSession(db, current, NOW), null);
+      assert.notEqual(await authenticateSession(db, other, NOW), null);
+    });
+
+    it('期限切れのセッションでは消せない（401）', async () => {
+      const stale = await loginOk();
+      const other = await loginOk();
+      const response = await handleLogoutOthers(
+        new Request('https://singfolio.app/auth/logout-others', {
+          method: 'POST',
+          headers: { authorization: `Bearer ${stale}` },
+        }),
+        env,
+        NOW + 90 * 24 * 60 * 60 * 1000,
+      );
+      assert.equal(response.status, 401);
+      assert.notEqual(await authenticateSession(db, other, NOW), null);
+    });
+
+    it('POST 以外は 405 で、Allow を返す。消さない', async () => {
+      const current = await loginOk();
+      const other = await loginOk();
+      for (const method of ['GET', 'DELETE']) {
+        const response = await logoutOthers(`Bearer ${current}`, method);
+        assert.equal(response.status, 405, method);
+        assert.equal(response.headers.get('allow'), 'POST');
+      }
+      assert.notEqual(await authenticateSession(db, other, NOW), null);
+    });
+
+    it('入口（worker.fetch）から届く。HTTPSでなければ 403', async () => {
+      const post = (url: string) => worker.fetch(new Request(url, { method: 'POST' }), env);
+      assert.equal((await post('https://singfolio.app/auth/logout-others')).status, 401);
+      assert.equal((await post('http://singfolio.app/auth/logout-others')).status, 403);
+    });
+  });
+
+  describe('通知との競合（consent_revoked_at。migrations/0002）', () => {
+    it('取り消しの時刻が、ログインの開始より後なら、検証を通っても、セッションを作らず 401', async () => {
+      await loginOk({ sub: 'apple-sub-race' });
+      await db.prepare('UPDATE identities SET consent_revoked_at = ?').bind(NOW + 1).run();
+      const t = await issueT();
+      const response = await login({ provider: 'apple', idToken: await signToken(t, { sub: 'apple-sub-race' }), nonce: t });
+      assert.equal(response.status, 401);
+      assert.deepEqual(await response.json(), { error: 'unauthorized' });
+      assert.deepEqual(await counts(), { users: 1, identities: 1, sessions: 1, used_nonces: 2 });
+    });
+
+    it('取り消しのあとにあらためてログインすれば（開始が取り消しの時刻以降）、セッションを作る', async () => {
+      await loginOk({ sub: 'apple-sub-race' });
+      await db.prepare('UPDATE identities SET consent_revoked_at = ?').bind(NOW).run();
+      const t = await issueT();
+      const response = await login({ provider: 'apple', idToken: await signToken(t, { sub: 'apple-sub-race' }), nonce: t });
+      assert.equal(response.status, 200);
     });
   });
 });

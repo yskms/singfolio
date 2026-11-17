@@ -5,8 +5,9 @@ import { after, before, describe, it } from 'node:test';
 import { resolveIdentity } from '../src/identity.ts';
 import {
   authenticateSession,
-  createSession,
+  createSession as tryCreateSession,
   isSessionToken,
+  revokeOtherSessions,
   revokeSession,
   SESSION_TOUCH_INTERVAL_MS,
   SESSION_TTL_MS,
@@ -16,6 +17,13 @@ import { openLocalDatabase, type LocalDatabase } from './localDatabase.ts';
 
 const NOW = 1_800_000_000_000;
 const DAY = 24 * 60 * 60 * 1000;
+
+// 発行できるはずの場面で使う（発行しない場合は、`tryCreateSession` を直接呼ぶ）。
+async function createSession(db: D1Database, identityId: string, now: number): Promise<string> {
+  const token = await tryCreateSession(db, identityId, now);
+  assert.notEqual(token, null);
+  return token!;
+}
 
 describe('セッション', () => {
   let local: LocalDatabase;
@@ -30,8 +38,10 @@ describe('セッション', () => {
 
   let counter = 0;
   // テストごとに別のログイン手段（互いに影響しない）。
-  const newIdentity = async (provider: 'apple' | 'google' = 'apple') =>
-    resolveIdentity(db, provider, `session-test-${counter++}`, NOW);
+  const newIdentity = async (provider: 'apple' | 'google' = 'apple') => {
+    const sub = `session-test-${counter++}`;
+    return { ...(await resolveIdentity(db, provider, sub, NOW)), sub };
+  };
   const hashOf = (token: string) => createHash('sha256').update(token).digest('base64url');
   const row = (token: string) =>
     db
@@ -81,6 +91,47 @@ describe('セッション', () => {
     });
   });
 
+  describe('発行しない場合（Appleの通知との競合。migrations/0002）', () => {
+    const setRevokedAt = (identityId: string, at: number | null) =>
+      db.prepare('UPDATE identities SET consent_revoked_at = ? WHERE id = ?').bind(at, identityId).run();
+
+    it('取り消しの時刻が、ログインの開始時刻より後なら、発行しない（行も作らない）', async () => {
+      const { identityId } = await newIdentity();
+      await setRevokedAt(identityId, NOW + 1);
+      assert.equal(await tryCreateSession(db, identityId, NOW), null);
+      assert.equal(await sessionCount(identityId), 0);
+    });
+
+    it('取り消しの時刻が、開始時刻と同じか前なら、発行する（取り消しのあとに、あらためてサインインした場合）', async () => {
+      const { identityId } = await newIdentity();
+      await setRevokedAt(identityId, NOW);
+      assert.notEqual(await tryCreateSession(db, identityId, NOW), null);
+      await setRevokedAt(identityId, NOW - DAY);
+      assert.notEqual(await tryCreateSession(db, identityId, NOW), null);
+      assert.equal(await sessionCount(identityId), 2);
+    });
+
+    it('取り消しの記録が無ければ（NULL）、発行する', async () => {
+      const { identityId } = await newIdentity();
+      assert.notEqual(await tryCreateSession(db, identityId, NOW), null);
+    });
+
+    it('ログイン手段の行が無ければ、例外にせず発行しない（直前に account-deleted で消えた場合）', async () => {
+      const { identityId } = await newIdentity();
+      await db.prepare('DELETE FROM identities WHERE id = ?').bind(identityId).run();
+      assert.equal(await tryCreateSession(db, identityId, NOW), null);
+      assert.equal(await sessionCount(identityId), 0);
+    });
+
+    it('発行しなくても、期限を過ぎたセッションの掃除は同じバッチで行う（バッチは1つ）', async () => {
+      const { identityId } = await newIdentity();
+      const old = await createSession(db, identityId, NOW - SESSION_TTL_MS);
+      await setRevokedAt(identityId, NOW + 1);
+      assert.equal(await tryCreateSession(db, identityId, NOW), null);
+      assert.equal(await row(old), null);
+    });
+  });
+
   describe('認証', () => {
     it('値から、ユーザー・ログイン手段・手段の種類を引く', async () => {
       const apple = await newIdentity('apple');
@@ -88,11 +139,13 @@ describe('セッション', () => {
       assert.deepEqual(await authenticateSession(db, await createSession(db, apple.identityId, NOW), NOW), {
         userId: apple.userId,
         identityId: apple.identityId,
+        sub: apple.sub,
         provider: 'apple',
       });
       assert.deepEqual(await authenticateSession(db, await createSession(db, google.identityId, NOW), NOW), {
         userId: google.userId,
         identityId: google.identityId,
+        sub: google.sub,
         provider: 'google',
       });
     });
@@ -193,6 +246,49 @@ describe('セッション', () => {
       await revokeSession(db, 'A'.repeat(43));
       await revokeSession(db, 'short');
       assert.equal(await sessionCount(identityId), 0);
+    });
+  });
+
+  describe('ほかの端末をすべてログアウト', () => {
+    it('認証済みのセッション以外の、同じユーザーのセッションをすべて消す（ログイン手段をまたぐ）', async () => {
+      const apple = await newIdentity('apple');
+      // 同じユーザーに、Googleのログイン手段をつなぐ（アカウントのつなぎ方。v1で画面を作るかは未定）。
+      const googleIdentity = crypto.randomUUID();
+      await db
+        .prepare(
+          `INSERT INTO identities (id, user_id, provider, sub, created_at, last_sign_in_at) VALUES (?1, ?2, 'google', ?3, ?4, ?4)`,
+        )
+        .bind(googleIdentity, apple.userId, `linked-${counter++}`, NOW)
+        .run();
+      const current = await createSession(db, apple.identityId, NOW);
+      const otherApple = await createSession(db, apple.identityId, NOW);
+      const otherGoogle = await createSession(db, googleIdentity, NOW);
+
+      await revokeOtherSessions(db, apple.userId, current);
+      assert.notEqual(await authenticateSession(db, current, NOW), null, '認証済みのセッションは残る');
+      assert.equal(await authenticateSession(db, otherApple, NOW), null);
+      assert.equal(await authenticateSession(db, otherGoogle, NOW), null);
+      assert.equal(await sessionCount(apple.identityId), 1);
+      assert.equal(await sessionCount(googleIdentity), 0);
+    });
+
+    it('ほかのユーザーのセッションは消さない', async () => {
+      const mine = await newIdentity();
+      const theirs = await newIdentity();
+      const current = await createSession(db, mine.identityId, NOW);
+      const mineOther = await createSession(db, mine.identityId, NOW);
+      const theirSession = await createSession(db, theirs.identityId, NOW);
+      await revokeOtherSessions(db, mine.userId, current);
+      assert.equal(await authenticateSession(db, mineOther, NOW), null);
+      assert.notEqual(await authenticateSession(db, theirSession, NOW), null);
+    });
+
+    it('消すものが無くても落ちない。何度呼んでも同じ', async () => {
+      const { identityId, userId } = await newIdentity();
+      const current = await createSession(db, identityId, NOW);
+      await revokeOtherSessions(db, userId, current);
+      await revokeOtherSessions(db, userId, current);
+      assert.equal(await sessionCount(identityId), 1);
     });
   });
 
