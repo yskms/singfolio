@@ -1079,6 +1079,19 @@ describe('deleteAccount（アカウントの削除）', () => {
     assert.equal(await account.getSignedInProvider(), 'apple');
   });
 
+  it('削除の要求を送ったあとの応答が読めない（invalid-response。Workerが 200 を返すのは消したあと）も delete-unconfirmed。セッションは捨てない', async () => {
+    const { account, sessions } = setup({
+      auth: {
+        deleteAccount: async () => {
+          throw new AuthError('invalid-response');
+        },
+      },
+    });
+    await account.signIn('apple');
+    await rejectsWith(account.deleteAccount(), 'delete-unconfirmed');
+    assert.equal((await sessions.read()).kind, 'found');
+  });
+
   it('T を得られなければ（通信の失敗）、各社の画面を開かない', async () => {
     const { account, hashed, sessions } = setup({
       auth: {

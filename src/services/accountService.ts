@@ -131,8 +131,8 @@ export interface AccountService {
    * `account-mismatch`、通らなければ `reauth-failed`（どちらも、何も消えず、サインインは保たれる）。成功したら、端末の
    * セッションを捨てる。端末内のレパートリーは消えない。サーバーがこのセッションを認めなければ（`unauthorized`）、
    * 端末のセッションを捨てる。失敗は `AuthError`。削除の要求（`/auth/delete`）を送ったあとの通信の失敗は
-   * `delete-unconfirmed`（サーバーで削除が済んでいるかもしれない）。それより前（`T` の取得）の通信の失敗は、何も
-   * 消えていないので、ふつうの `network`。
+   * `delete-unconfirmed`（サーバーで削除が済んでいるかもしれない。応答が読めない `invalid-response` も含む）。
+   * それより前（`T` の取得）の通信の失敗は、何も消えていないので、ふつうの `network`。
    */
   deleteAccount(): Promise<DeleteAccountResult>;
 }
@@ -410,11 +410,16 @@ export function createAccountService(deps: AccountServiceDeps | null): AccountSe
 
           // 要求を送ったあとの通信の失敗は、結果が分からない（サーバーで済んでいるかもしれない）。送る前の失敗
           // （上の `T` の取得）と区別して、画面が、それぞれの文言を出せるようにする。
+          // `invalid-response`（200 なのに本文が読めない・形が違う）も同じ: Workerが 200 を返すのは、D1を消したあとなので、
+          // サーバーでは済んでいる。`unavailable`（5xx・429）は読み替えない: WorkerのIDトークンの検証・Appleの呼び出しが
+          // 使えないときの 503 は、すべてD1を消す前で、何も消えていない（消したあとの失効の失敗は握りつぶして 200 を返す）。
           const result = await authorized(async () => {
             try {
               return await auth.deleteAccount(current.session, request);
             } catch (error) {
-              if (error instanceof AuthError && error.code === 'network') throw new AuthError('delete-unconfirmed');
+              if (error instanceof AuthError && (error.code === 'network' || error.code === 'invalid-response')) {
+                throw new AuthError('delete-unconfirmed');
+              }
               throw error;
             }
           });

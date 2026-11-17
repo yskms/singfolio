@@ -175,7 +175,7 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
 -   `account.signOutOthers()`・`deleteAccount()` は、サインイン中にだけ使える（`not-signed-in`）。認証が要るサーバーの呼び出しは `authorized` を通す（401 のときだけ
     端末のセッションを捨てる）。`deleteAccount` は、**ログイン中の手段で再認証する**（Apple（iOS）は `getIdTokenWithCode` で認可コードも得る）。成功したら端末のセッションを捨てる。
     端末内のレパートリーは消さない。再認証ができない利用者の逃げ道（再認証なしの削除）は作らない（決定済み。依頼先は 7.3.12 で決める。公開の GitHub Issues は向かない）。
-    要求（`/auth/delete`）を送ったあとの `network` は、Service が `delete-unconfirmed` に読み替える（要求を送る前の `T` の取得の `network` は、何も消えていないので読み替えない）。
+    要求（`/auth/delete`）を送ったあとの `network` と `invalid-response` は、Service が `delete-unconfirmed` に読み替える（要求を送る前の `T` の取得の `network` は、何も消えていないので読み替えない。`unavailable` も読み替えない: Workerの 503 はD1を消す前）。
     `/auth/delete` だけ、待つ上限が30秒（`authRepository` の `DELETE_TIMEOUT_MS`。ほかは10秒）。**10秒に「揃え」ない**: Workerは、公開鍵の取得・コードの交換・失効を順に待ち
     （それぞれ最大5秒）、先に打ち切ると、サーバーで削除が済んでいるのに、アプリは `network` と受け取り、端末のセッションも残る（やり直すと 401）。
     画面は、削除の 401 を「サインアウトされた。削除済みかもしれない。残っているなら、サインインし直して削除」と扱う（`account.error.deleteSignedOut`。再試行とは限らない）。
