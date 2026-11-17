@@ -543,7 +543,7 @@ describe('ログインとログアウト', () => {
   });
 
   describe('通知との競合（consent_revoked_at。migrations/0002）', () => {
-    it('取り消しの時刻が、ログインの開始より後なら、検証を通っても、セッションを作らず 401', async () => {
+    it('取り消しの時刻が、ログインの開始と同じか後なら、検証を通っても、セッションを作らず 401', async () => {
       await loginOk({ sub: 'apple-sub-race' });
       await db.prepare('UPDATE identities SET consent_revoked_at = ?').bind(NOW + 1).run();
       const t = await issueT();
@@ -553,9 +553,9 @@ describe('ログインとログアウト', () => {
       assert.deepEqual(await counts(), { users: 1, identities: 1, sessions: 1, used_nonces: 2 });
     });
 
-    it('取り消しのあとにあらためてログインすれば（開始が取り消しの時刻以降）、セッションを作る', async () => {
+    it('取り消しのあとにあらためてログインすれば（開始が取り消しの時刻より後）、セッションを作る', async () => {
       await loginOk({ sub: 'apple-sub-race' });
-      await db.prepare('UPDATE identities SET consent_revoked_at = ?').bind(NOW).run();
+      await db.prepare('UPDATE identities SET consent_revoked_at = ?').bind(NOW - 1).run();
       const t = await issueT();
       const response = await login({ provider: 'apple', idToken: await signToken(t, { sub: 'apple-sub-race' }), nonce: t });
       assert.equal(response.status, 200);

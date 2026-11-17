@@ -402,7 +402,7 @@ AppleとGoogleの仕様は、各社の公式資料で確かめた（Appleは、I
     `identity_id` の索引で引くので、件数が増えても費用が増えない）。全体の掃除はしない。二度とログインしない人の、期限を
     過ぎた行は残る（1行は小さく、認証には使えない）。1つのログイン手段に、端末ごとに複数のセッションを持てる。
     **発行しないことがある**（`null`。ログインは 401 になる）: ログイン手段の行が無い（直前に `account-deleted` で消えた）、または
-    `identities.consent_revoked_at`（Appleの `consent-revoked` の `event_time`）が、このログインの開始時刻（`now`）より後。
+    `identities.consent_revoked_at`（Appleの `consent-revoked` の `event_time`）が、このログインの開始時刻（`now`）と同じか、それより後。
     理由と使い方は「Appleのサーバー間通知」。
 -   ログアウトは、そのセッションの行の削除。アカウントの削除は、そのユーザーの全セッションの削除。
 -   **「ほかの端末をすべてログアウト」**（実装済み。7.3.10。`POST /auth/logout-others`。`worker/src/auth.ts` の `handleLogoutOthers`、
@@ -629,7 +629,8 @@ AppleとGoogleの仕様は、各社の公式資料で確かめた（Appleは、I
         そのトークンを、Services IDの `client_id` で失効させる。
     -   **`refresh_token`・`access_token` は、メモリの中で、交換から失効に渡して終わる**（D1にも、ログにも、応答にも出さない）。ログインの交換
         （`exchange`）は、これまでどおり `id_token` だけを読む（`exchangeWithToken` と `revoke` だけが、トークンを扱う）。失敗は、
-        `apple token revoke failed: ...`（ステータスと許可リストの `error` 名だけ）を1行 `console.error` に出す。
+        `apple token revoke failed: ...`（ステータスと許可リストの `error` 名だけ）を1行 `console.error` に出す。iOSの交換の失敗は、`apple token exchange failed: ...`（`appleToken.ts` と同じ。
+        鍵の設定の不備による例外は `unexpected`）で、失効の失敗と区別する。
 -   Apple Account側の資格情報が失効していて再認証できないとき（端末にAppleアカウントが無い、など）の逃げ道は、**まだ作っていない**。
     再認証なしでは削除できない（セッションを盗まれた端末から、再認証なしにアカウントが消えるのを防ぐ）。7.3.11 の画面設計で、再認証ができない
     利用者の扱い（別の手段・問い合わせ）を決める。
@@ -672,10 +673,10 @@ AppleとGoogleの仕様は、各社の公式資料で確かめた（Appleは、I
     （`deleteUserAccount`。R2のスナップショットなどは、7.4 以降）。**順序は見ずに処理する**（消えたApple Accountは戻らない）。同じ通知が2回届いても、2回目は行が無く、何も起きない。
 -   **ログインとの競合（7.3.10 で確かめた）。** 通知を処理した最中に、その前に検証を通っていたログインがセッションを作ると、取り消し後のセッションが1つ残りうる。
     **`last_sign_in_at` と `event_time` の比較だけでは、吸収できない**（ログインの開始が `event_time` より後だと、通知が「サインインし直した」と見て無視する）ので、
-    `consent_revoked_at` を足した。`createSession` は、INSERT の1文の中で、`consent_revoked_at` がそのログインの開始時刻（`now`）より後なら、セッションを作らない
+    `consent_revoked_at` を足した。`createSession` は、INSERT の1文の中で、`consent_revoked_at` がそのログインの開始時刻（`now`）と同じか後なら、セッションを作らない（同じミリ秒は、取り消しより前と見る。通知の削除の条件 `created_at <= event_time` と同じ側なので、どちらが先でも残らない）
     （ログインは 401。やり直せば通る）。通知の処理（削除と記録）も1バッチなので、どちらが先でも、取り消し後のセッションは残らない: ログインのINSERTが先なら、通知の
     DELETE が消し、通知が先なら、INSERT が条件で止まる（`worker/test/appleNotification.test.ts`）。
-    **残るリスク（受け入れる）**: ログインの開始が `event_time` と同じかそれより後で、IDトークンが取り消しの前に発行されたもの（取り消しの直前に得たトークンを、取り消しの
+    **残るリスク（受け入れる）**: ログインの開始が `event_time` より後で、IDトークンが取り消しの前に発行されたもの（取り消しの直前に得たトークンを、取り消しの
     あとに送る）。トークンは、サインインの直後にアプリが送るので、取り消しを、別の端末で、数秒のうちに行ったときだけ。IDトークンの `iat` と比べれば吸収できるが、
     検証の結果にクレームを載せない方針（「IDトークンの検証」）を崩し、通知の `event_time` の単位（秒かミリ秒か）への依存も増えるので、採らない。
     **同じ種類の穴**（どれも、取り消しの前後の1秒ほどに、サインインが重なったときだけ。受け入れる）: (a) `event_time` が秒で来ると、記録する値は、実際の取り消しより最大1秒前

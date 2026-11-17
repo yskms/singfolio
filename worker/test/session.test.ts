@@ -95,16 +95,19 @@ describe('セッション', () => {
     const setRevokedAt = (identityId: string, at: number | null) =>
       db.prepare('UPDATE identities SET consent_revoked_at = ? WHERE id = ?').bind(at, identityId).run();
 
-    it('取り消しの時刻が、ログインの開始時刻より後なら、発行しない（行も作らない）', async () => {
+    it('取り消しの時刻が、ログインの開始時刻と同じか後なら、発行しない（行も作らない）', async () => {
       const { identityId } = await newIdentity();
       await setRevokedAt(identityId, NOW + 1);
+      assert.equal(await tryCreateSession(db, identityId, NOW), null);
+      // 同じミリ秒は、取り消しより前と見る（通知の削除の条件 `created_at <= event_time` と同じ側。どちらが先でも、残らない）。
+      await setRevokedAt(identityId, NOW);
       assert.equal(await tryCreateSession(db, identityId, NOW), null);
       assert.equal(await sessionCount(identityId), 0);
     });
 
-    it('取り消しの時刻が、開始時刻と同じか前なら、発行する（取り消しのあとに、あらためてサインインした場合）', async () => {
+    it('取り消しの時刻が、開始時刻より前なら、発行する（取り消しのあとに、あらためてサインインした場合）', async () => {
       const { identityId } = await newIdentity();
-      await setRevokedAt(identityId, NOW);
+      await setRevokedAt(identityId, NOW - 1);
       assert.notEqual(await tryCreateSession(db, identityId, NOW), null);
       await setRevokedAt(identityId, NOW - DAY);
       assert.notEqual(await tryCreateSession(db, identityId, NOW), null);

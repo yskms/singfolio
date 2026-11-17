@@ -289,6 +289,23 @@ describe('POST /auth/apple/notifications', () => {
       assert.equal((await counts()).sessions, 0);
     });
 
+    it('取り消しと同じミリ秒に始まったログインは、どちらが先でも、セッションが残らない', async () => {
+      // ログインが先: 通知が消す（`created_at <= event_time`）。
+      assert.equal((await login(NOW)).status, 200);
+      assert.equal((await notify({ eventTime: NOW })).status, 200);
+      assert.equal((await counts()).sessions, 0);
+      // 通知が先（同じ通知の再送で、2回目）: ログインが、条件で止まる。
+      assert.equal((await login(NOW)).status, 401);
+      assert.equal((await counts()).sessions, 0);
+    });
+
+    it('取り消しと同じミリ秒に始まったログイン（通知が先）は、セッションを作らない', async () => {
+      await newSignedIn(NOW - 100_000);
+      assert.equal((await notify({ eventTime: NOW })).status, 200);
+      assert.equal((await login(NOW)).status, 401);
+      assert.equal((await counts()).sessions, 0);
+    });
+
     it('通知のあとに始めたログイン（あらためてサインインした場合）は、セッションを作る', async () => {
       await newSignedIn(NOW - 100_000);
       assert.equal((await notify({ eventTime: NOW })).status, 200);

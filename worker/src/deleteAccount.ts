@@ -115,8 +115,8 @@ export async function deleteAccount(
       const exchanged = await exchanger.exchangeWithToken(appleConfig(env, 'native'), nativeCode, now);
       if (exchanged.ok) revocation = exchanged.revocationToken;
     } catch {
-      // 鍵の設定の不備（`APPLE_PRIVATE_KEY`）など。例外の中身は出さない。
-      log('apple token revoke failed: unexpected');
+      // 鍵の設定の不備（`APPLE_PRIVATE_KEY`）など。例外の中身は出さない。`appleToken.ts` の分類（`apple token exchange failed: ...`）と揃える。
+      log('apple token exchange failed: unexpected');
     }
   }
 

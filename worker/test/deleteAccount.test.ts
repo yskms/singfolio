@@ -361,6 +361,33 @@ describe('POST /auth/delete', () => {
       assert.equal(response.status, 200);
       assert.deepEqual(await response.json(), { appleRevoked: false });
       await deleted();
+      // iOS: 交換（D1を消す前）の段階で、鍵を読めない。失効の段階の分類（`revoke`）とは別の行にする（`wrangler tail` で切り分ける）。
+      assert.deepEqual(logs, ['apple token exchange failed: unexpected']);
+    });
+
+    it('失効だけが例外で終わっても、消す。appleRevoked は false。失効の段階の分類を記録する', async () => {
+      const { session } = await signedIn();
+      tokenResponse = () => Response.json({ id_token: 'UNUSED', refresh_token: REFRESH });
+      const throwingRevoke = {
+        ...exchanger,
+        revoke: async () => {
+          throw new Error('SECRET-DETAIL');
+        },
+      };
+      const { body } = await appleNative();
+      const response = await handleDeleteAccount(
+        new Request('https://singfolio.app/auth/delete', {
+          method: 'POST',
+          headers: { authorization: `Bearer ${session}` },
+          body: JSON.stringify(body),
+        }),
+        env,
+        NOW,
+        { verifier, exchanger: throwingRevoke, log: (message) => logs.push(message) },
+      );
+      assert.equal(response.status, 200);
+      assert.deepEqual(await response.json(), { appleRevoked: false });
+      await deleted();
       assert.deepEqual(logs, ['apple token revoke failed: unexpected']);
     });
 

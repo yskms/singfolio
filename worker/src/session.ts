@@ -36,7 +36,9 @@ export function sessionTokenFromRequest(request: Request): string | null {
  * 二度とログインしない人の、期限を過ぎた行は残る（1行は小さく、認証には使えない）。
  *
  * **発行しないことがある（null）**: ログイン手段の行が無い（直前にAppleの `account-deleted` で消えた）、または
- * `consent_revoked_at`（Appleの `consent-revoked` の `event_time`）が、このログインの開始時刻（`now`）より後。
+ * `consent_revoked_at`（Appleの `consent-revoked` の `event_time`）が、このログインの開始時刻（`now`）と同じか、それより後。
+ * 同じミリ秒は、取り消しより前と見る（通知の削除の条件 `created_at <= event_time` と同じ側。通知とログインのどちらが先でも、
+ * 取り消しと同じ時刻に始まったログインのセッションは、残らない）。
  * ログインは、検証を通ったあと、ここへ来るまでの間に、通知の処理が入りうる。通知を先に処理した場合のセッションを、
  * ここで作らない（通知を後に処理した場合は、通知が消す）。条件は INSERT の1文の中で見るので、通知の処理
  * （削除と記録の1バッチ）と、どちらが先でも、取り消し後のセッションは残らない（migrations/0002）。
@@ -49,7 +51,7 @@ export async function createSession(db: D1Database, identityId: string, now: num
       .prepare(
         `INSERT INTO sessions (token_hash, identity_id, created_at, last_used_at)
          SELECT ?1, ?2, ?3, ?3
-         WHERE EXISTS (SELECT 1 FROM identities WHERE id = ?2 AND (consent_revoked_at IS NULL OR consent_revoked_at <= ?3))`,
+         WHERE EXISTS (SELECT 1 FROM identities WHERE id = ?2 AND (consent_revoked_at IS NULL OR consent_revoked_at < ?3))`,
       )
       .bind(await hashToken(token), identityId, now),
   ]);
