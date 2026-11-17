@@ -174,10 +174,11 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
 -   認証が要る呼び出しを足すときは、**401 のときだけ**端末のセッションを捨てる（503・5xx・通信の失敗では捨てない）。
 -   `account.signOutOthers()`・`deleteAccount()` は、サインイン中にだけ使える（`not-signed-in`）。認証が要るサーバーの呼び出しは `authorized` を通す（401 のときだけ
     端末のセッションを捨てる）。`deleteAccount` は、**ログイン中の手段で再認証する**（Apple（iOS）は `getIdTokenWithCode` で認可コードも得る）。成功したら端末のセッションを捨てる。
-    端末内のレパートリーは消さない。再認証ができない利用者の逃げ道（再認証なしの削除）は作らない（決定済み。プライバシーポリシーの連絡先へ依頼する）。
+    端末内のレパートリーは消さない。再認証ができない利用者の逃げ道（再認証なしの削除）は作らない（決定済み。依頼先は 7.3.12 で決める。公開の GitHub Issues は向かない）。
+    要求（`/auth/delete`）を送ったあとの `network` は、Service が `delete-unconfirmed` に読み替える（要求を送る前の `T` の取得の `network` は、何も消えていないので読み替えない）。
     `/auth/delete` だけ、待つ上限が30秒（`authRepository` の `DELETE_TIMEOUT_MS`。ほかは10秒）。**10秒に「揃え」ない**: Workerは、公開鍵の取得・コードの交換・失効を順に待ち
     （それぞれ最大5秒）、先に打ち切ると、サーバーで削除が済んでいるのに、アプリは `network` と受け取り、端末のセッションも残る（やり直すと 401）。
-    画面は、削除の再試行の 401 を「サインアウトされた。削除が済んでいるかもしれない」と扱う（`account.error.deleteSignedOut`）。
+    画面は、削除の 401 を「サインアウトされた。削除済みかもしれない。残っているなら、サインインし直して削除」と扱う（`account.error.deleteSignedOut`。再試行とは限らない）。
 -   Googleのサインインは、自作のExpoモジュール `modules/singfolio-google-signin`（公式SDKだけ。第三者のラッパーは使わない）。
     その `index.ts` は `requireOptionalNativeModule` で読む。`requireNativeModule` に「簡略化」しない（ネイティブ側が無い
     ビルドで、import の時点で投げ、アプリの起動ごと止まる。ログインを要求しない原則に反する）。呼んだときの失敗は
@@ -193,8 +194,9 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     `showInRecents`）は、既定と同じ値を明示して固定している（`src/services/index.ts`）。外さない: 旧来の経路は、Custom Tab を最近使ったアプリに出さず、
     アプリの外へ移ると破棄する（SMSの確認コードを別のアプリで開く経路が壊れる）。
 -   **Account 画面（`app/account.tsx`・`ui/AccountSection.tsx`。7.3.11）。** 入口は Settings の `Account` で、`account.available` が真のビルドだけ。
-    **`src/services/index.ts` の `ACCOUNT_ENABLED` は、7.3.12・7.3.13 が済むまで外さない**（リリースのビルドでは `auth` を注入せず、入口も出ない。
-    Workerが未デプロイで、ポリシー・申告もアカウントを前提にしていないため。署名したビルドで確かめるときだけ `EXPO_PUBLIC_SINGFOLIO_ACCOUNT=1`）。
+    **`src/services/index.ts` の `ACCOUNT_ENABLED` は、7.3.12・7.3.13 が済むまで外さない**（リリースのビルドでは `auth` を注入せず、入口の行も、ルート `singfolio://account` も閉じる。
+    Workerが未デプロイで、ポリシー・申告もアカウントを前提にしていないため。署名したビルドで確かめるときだけ、`eas.json` の `account-test` プロファイル
+    （`EXPO_PUBLIC_SINGFOLIO_ACCOUNT=1`）でビルドし、**そのビルドを製品版・審査へ昇格させない**）。
     Settings の行に、サインイン中の手段（値）を出さない（Settings が SecureStore を読まない）。この画面の失敗は ErrorBoundary に伝えず、画面の中で出す。
     操作のあとは、成功・失敗とも、サインインの状態を読み直す。実行中は戻れない（`usePreventRemove`。削除の結果を伝えられなくなる）。iOS の Apple は
     `AppleAuthenticationButton`（`style` に背景色・角丸を入れない。App Store のガイドラインに反する）。つなぐ画面・再認証なしの削除・Googleの

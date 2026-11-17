@@ -248,17 +248,18 @@ v1.0より後（公開機能・Requests）の実装順序は、
         Apple の公式資料で、通知の種類は `account-deleted`（`account-delete` も読む）、payload に `exp` が無いことを確かめた。
         **R2のスナップショット・`profiles`・Requestの削除は、消すものが無いので、7.4 以降に回した**（`deleteUserAccount` に足す。順序は §8）。
         **利用者の作業（デプロイのあと）**: Apple Developer の primary App ID の Sign in with Apple の設定に、通知のエンドポイント
-        `https://singfolio.app/auth/apple/notifications` を登録する。Apple Account側の資格情報が失効していて再認証できない利用者は、プライバシーポリシーの連絡先（GitHub Issues）へ
-        削除を依頼する（7.3.11 で決めた。再認証なしの削除の逃げ道は作らない。ポリシーに書くのは 7.3.12）
+        `https://singfolio.app/auth/apple/notifications` を登録する。Apple Account側の資格情報が失効していて再認証できない利用者の依頼先は、7.3.12 で決める
+        （再認証なしの削除の逃げ道は作らない。公開の GitHub Issues は向かない。詳細は §8「アカウントの削除とAppleのトークン失効」）
     -   [x] 7.3.11 アカウントの画面（サインイン・サインアウト・「ほかの端末をすべてサインアウト」・削除）。`app/account.tsx`・`ui/AccountSection.tsx`・
         `src/i18n/authErrors.ts`（失敗 → 操作ごとの文言）。**置き場所は Settings の `Account`**（Profile ではない。行は値を出さず、Settings が SecureStore を読まない）。
         サインイン中でない: Apple（iOSはシステムのボタン `AppleAuthenticationButton`）・Googleのボタンと、「アカウントなしで使える」の説明。サインイン中: 手段の名前、
         サインアウト・ほかの端末・削除（確認のダイアログつき。削除は再認証のあと、最大30秒の待ちを出す）。実行中は戻れない（`usePreventRemove`）。失敗は
         ErrorBoundary に伝えず画面の中で出し、操作のあとは必ずサインインの状態を読み直す。`getSignedInProvider` が投げたら「確認できませんでした」と「もう一度試す」。
         **リリースのビルドでは 7.3.13 まで出さない**（`src/services/index.ts` の `ACCOUNT_ENABLED`。`__DEV__` か `EXPO_PUBLIC_SINGFOLIO_ACCOUNT=1` のとき
-        だけ `auth` を注入し、`account.available` が真になる）。7.3.12・7.3.13 が済んだら外す。
+        だけ `auth` を注入し、`account.available` が真になる。入口の行も、ルート `singfolio://account` も閉じる）。7.3.13 のビルドは、`eas.json` の
+        `account-test` プロファイルで作り、**製品版・審査へ昇格させない**。7.3.12・7.3.13 が済んだら、ゲートとプロファイルを外す。
         **決めたこと**: サインイン済みから別のログイン手段をつなぐ画面は作らない（Worker にエンドポイントが無い。手段が違えば別のアカウント）。再認証なしの削除は作らない
-        （プライバシーポリシーの連絡先へ依頼）。Androidの Apple のサインインの再開は実装しない。Googleの `clearCredentialState` は呼ばない（§8「アカウントの画面」）。
+        （再認証できない利用者の依頼先は、7.3.12 で決める）。Androidの Apple のサインインの再開は実装しない。Googleの `clearCredentialState` は呼ばない（§8「アカウントの画面」）。
         iOS Simulator（iPhone 18 Pro。Release。日本語・ライト・ダーク）で確かめた: Settings の行、サインアウト中の画面、Apple のシートを閉じたときの `provider-failed`
         （1行の文言。ボタンは押せる状態に戻る）、Google の確認ダイアログのキャンセル（何も出ない）、実行中の表示、偽のセッションでのサインイン中の画面（Apple・Google）、
         削除の確認 → 再認証の失敗（サインイン中のまま）、ほかの端末のサインアウト（本番Workerが未対応で `invalid-request` → 汎用の文言。セッションは捨てない）、サインアウト
@@ -267,8 +268,8 @@ v1.0より後（公開機能・Requests）の実装順序は、
     -   [ ] 7.3.12 申告と文書。プライバシーポリシー、`docs/singfolio-store-listing.md`、App Store・Google Playの申告（SDKの
         プライバシーマニフェストを、そのときの版で読み直して決める）、Googleの同意画面（ブランド。サインインのボタンは、ロゴ無しのアプリのボタンで足りるかも）、
         再認証できない利用者の削除の依頼先（ポリシーの連絡先）をポリシーに書く、CLAUDE.mdの「スコープ」の節、`ACCOUNT_ENABLED` を外すかの判断（7.3.13 のあと）
-    -   [ ] 7.3.13 確認。実機と署名したビルド（TestFlight・Playの内部テスト。`EXPO_PUBLIC_SINGFOLIO_ACCOUNT=1` を付けてビルドする。付けないと Account の入口が出ない）で、ログイン・キャンセル・再ログイン・ログアウト・削除。
-        7.3.11 の画面の未確認（英語、Android、実行中に戻れないこと、VoiceOver・TalkBack、文字を大きくした端末、削除の成功と `appleRevoked: false` の文言）も、ここで見る。
+    -   [ ] 7.3.13 確認。実機と署名したビルド（TestFlight・Playの内部テスト。`eas build --local --profile account-test` で作る。`env` が `--local` のビルドに埋め込まれるかも、入口が出ることで確かめる。このビルドは製品版・審査へ昇格させない）で、ログイン・キャンセル・再ログイン・ログアウト・削除。
+        7.3.11 の画面の未確認（英語、Android、実行中に戻れないこと、VoiceOver・TalkBack、文字を大きくした端末、削除の成功と `appleRevoked: false`・`sessionCleared: false` の文言）も、ここで見る。
         7.3.10 の分: 削除でAppleのトークンが失効するか（iOSの認可コードを `redirect_uri` 無しで交換できるか、Appleの設定の「Appleでサインイン」の一覧からSingfolioが消えるか。
         AndroidのServices IDで得たトークンの失効が、iOS側も消すか）、Appleのサーバー間通知（エンドポイントの登録のあと、`wrangler tail` で、実際の通知の `events` の形・`event_time` の単位・`aud`・
         `account-deleted` の綴りを見る。「Appleでサインインの利用を停止」で `consent-revoked` が届き、セッションが消えるか）、「ほかの端末をすべてログアウト」（2台で）。
