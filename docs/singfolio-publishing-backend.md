@@ -441,8 +441,8 @@ AppleとGoogleの仕様は、各社の公式資料で確かめた（Appleは、I
     サインインは成功のまま）。別のDBのものは `getSignedInProvider` が `null` を返し、ログアウトの入口が出ないので、失効させる機会はここだけ。
     保存のあとにするのは、各社の画面を開く前に通信を待たせない（応答が無いと最大10秒）ため、かつ、直前のログインで通信できると分かっているため。
     この失効は待つので、通信が無応答のときは、ログインが成功していても `signIn` が返るまで最大10秒かかり、その間は直列化の列も止まる
-    （続くログアウトも待つ）。起こるのは、再インストール後の最初のサインインだけ。7.3.11 で読み込み中の表示を作るときに、気になれば、待たない形
-    （失効の完了を待たずに返す）に見直す。保存と失効の間でアプリが終わると、その別のDBのセッションは失効させる機会を失い、90日で切れるまで残る。
+    （続くログアウトも待つ）。起こるのは、再インストール後の最初のサインインだけ。7.3.11 の画面は、その間「サインインしています…」を出す。待たない形
+    （失効の完了を待たずに返す）には見直さなかった（まれで、最大10秒）。保存と失効の間でアプリが終わると、その別のDBのセッションは失効させる機会を失い、90日で切れるまで残る。
     取りやめ・失敗で保存まで進まなかったときは、値が端末に残り、次のサインインで失効させる。読めない値は、失効させるものを特定できず、
     サーバーに残る（最後の利用から90日で切れる。ログアウトで失効を確認できない場合と同じ扱い）。
 -   **保存。** SecureStore（iOSはKeychain、Androidは Keystore で暗号化）の1つのキー `singfolio.session` に、JSON
@@ -483,7 +483,7 @@ AppleとGoogleの仕様は、各社の公式資料で確かめた（Appleは、I
 -   **失敗の分類**（`AuthError.code`。`message` はログ用の英語で、トークン・応答の本文・例外の内容は載せない）。`getSignedInProvider`・
     `signIn`・`signOut` の失敗は、すべて `AuthError`（`AuthError` 以外の失敗は、`unexpected` に包んで、元の例外は載せない。画面が `code` で
     分類できる）。`getSignedInProvider` は、ローカルDBの識別子を読めないとき（セッションが保存されているときだけ読む）に投げ、`null` にはしない
-    （「ログアウト中」と「分からない」を、画面が取り違えないため）。**画面（7.3.11）は、これを捕まえて**、アカウントの欄を隠すなどにとどめる。
+    （「ログアウト中」と「分からない」を、画面が取り違えないため）。**画面（7.3.11。`AccountSection`）は、これを捕まえて**、Account 画面の中に「サインインの状態を確認できませんでした」と「もう一度試す」だけを出す。
     ErrorBoundaryまで伝えない（ログインを要求しないので、v1.0の機能を巻き込まない）。
 
     | `code` | 起きるとき | 利用者に |
@@ -495,16 +495,16 @@ AppleとGoogleの仕様は、各社の公式資料で確かめた（Appleは、I
     | `invalid-request` | 400・403・405・413 など | アプリの不具合 |
     | `invalid-response` | 200 なのに値が無い・形が違う、本文がJSONでない、各社のサインインが空のIDトークンを返した | アプリかサーバーの不具合 |
     | `storage-failed` | 端末のセッションの保存先に書けなかった（サーバー側は失効させた）、または消せなかった（ログアウト。やり直せる） | やり直せる |
-    | `provider-failed` | 各社のサインインが、取りやめ以外で終わらなかった（Appleは、端末にAppleアカウントでサインインしていないときなど。アプリ側の設定の不備でも同じになりうる） | やり直せる。原因を言い切らない文言にする（7.3.11） |
+    | `provider-failed` | 各社のサインインが、取りやめ以外で終わらなかった（Appleは、端末にAppleアカウントでサインインしていないときなど。アプリ側の設定の不備でも同じになりうる） | やり直せる。原因を言い切らない文言（7.3.11） |
     | `timeout` | 各社のサインインが5分で終わらなかった（下の「時間の上限と取り消し」） | やり直せる |
     | `provider-unavailable`・`already-signed-in` | 上のとおり | |
     | `not-signed-in` | 「ほかの端末をすべてログアウト」・アカウントの削除を、サインインしていないときに呼んだ（別のローカルDBのセッション・読めない値も、していない扱い） | 画面は、サインイン中にだけ入口を出す |
     | `reauth-failed` | アカウントの削除の再認証が通らない（403 `reauth_failed`。`T`・IDトークン・認可コードの不備、リプレイ）。サインインは保たれる | やり直せる |
-    | `account-mismatch` | 再認証は通ったが、ログイン中のアカウントとは別のアカウント（403 `account_mismatch`）。何も消えていない。サインインは保たれる | 「サインインに使っているアカウントで、もう一度」（7.3.11） |
+    | `account-mismatch` | 再認証は通ったが、ログイン中のアカウントとは別のアカウント（403 `account_mismatch`）。何も消えていない。サインインは保たれる | 「サインインしているアカウントと違う。同じアカウントを選ぶ」（7.3.11） |
     | `unexpected` | 各社のサインインが契約に反して投げた、ハッシュの計算・DBの失敗など | アプリの不具合 |
 
     5xx は本文を読まずに `unavailable` にする。再試行はしない（やり直しは利用者の操作）。`network`・`unavailable`・`timeout` が
-    一時的な失敗（`isTemporaryAuthError`。`provider-failed` は、設定の確認が要るので含めない）。利用者向けの文言への対応は、画面を足すとき（7.3.11）に作る。
+    一時的な失敗（`isTemporaryAuthError`。`provider-failed` は、設定の確認が要るので含めない）。利用者向けの文言への対応は `src/i18n/authErrors.ts`（7.3.11。操作ごと）。
 -   **認証が要る呼び出しを足すとき（7.4 以降）の規則。** 401 を受けたら、端末のセッションを捨てる（サーバーが認めない値は、
     二度と通らない）。503・5xx・通信の失敗では捨てない（一時的な失敗。セッションは生きている）。7.3.10 の `signOutOthers`・
     `deleteAccount` は、この規則どおり（`accountService` の `authorized`）。**アカウントの削除は、再認証の失敗を 401 にしない（403）**:
@@ -551,14 +551,14 @@ AppleとGoogleの仕様は、各社の公式資料で確かめた（Appleは、I
     アプリが対応していない言語の端末で、OSの部品の文言の言語選びが変わりうる**（Appleの資料の記述は「フレームワークのローカライズ文字列を取得できるか」だけ
     で、既定値の記載は無い。端末の言語で実際にどう変わるかは測っていない）ので、`app.json` の `ios.infoPlist.CFBundleAllowMixedLocalizations` を
     `false` にして、v1.0（未設定）に近い状態を保つ。plugin は `?? true` なので、`app.json` の値が残る（`expo prebuild` で、Info.plist が `false` に
-    なることを確かめた）。`nativeConfig.test.ts` が固定している。Appleのボタン（`AppleAuthenticationButton`）を使う 7.3.11 で、文言が足りなければ見直す。
+    なることを確かめた）。`nativeConfig.test.ts` が固定している。Appleのボタン（`AppleAuthenticationButton`）は 7.3.11 で使った（iOSのサインイン前の画面。文言はOSが決める）。端末の言語とアプリの言語がずれたときの扱いは、7.3.13 で見る。
     署名には、プロビジョニングプロファイルに Sign in with Apple が入っている必要がある（primary App ID には設定済み。EASが、次の本番ビルドで
     プロファイルを作り直す）。署名の失敗は、ストアに出すビルド（7.3.13）で初めて分かる。
 -   **失敗の分類。** 取りやめ（`ERR_REQUEST_CANCELED`）は `cancelled`。SDKのそのほかの失敗（`ERR_REQUEST_UNKNOWN`・`FAILED`・`NOT_HANDLED`・
     `NOT_INTERACTIVE`、`ERR_INVALID_RESPONSE`、`ERR_REQUEST_MATCHED_EXCLUDED_CREDENTIAL`）は `provider-failed`（端末にAppleアカウントが無いときの
     `unknown` を含む）。端末が対応していなければ `provider-unavailable`、それ以外は `unexpected`。**`provider-failed` は、端末の状態が原因とは限らない**:
     エンタイトルメントやプロファイルの不備も、同じ `ERR_REQUEST_UNKNOWN`（`ASAuthorizationError.unknown`）になりうる。`ERR_INVALID_RESPONSE`・
-    `ERR_REQUEST_NOT_HANDLED` も、利用者の設定の問題とは限らない。利用者向けの文言（7.3.11）は、「設定を確認して」と言い切らない。
+    `ERR_REQUEST_NOT_HANDLED` も、利用者の設定の問題とは限らない。利用者向けの文言（7.3.11）は、「設定を確認して」と言い切らない（`account.error.providerFailed`）。
     IDトークンが無いときは、SDKのJSが、`identityToken`・`authorizationCode`・`user` のどれかが欠けると自分で `ERR_REQUEST_FAILED` を投げる
     ので、`provider-failed` になる（Repositoryの `invalid-response` の分岐は、SDKが変わったときのための防御で、実際には届かない）。
     コードは、Expo Modules の例外のクラス名から決まる（ソースで確認。`InvalidResponseException` だけ `Request` が付かない）。
@@ -579,7 +579,7 @@ AppleとGoogleの仕様は、各社の公式資料で確かめた（Appleは、I
     `signInAsync` を呼ぶと、OSの「Apple Account にサインインしてください」のシートが出る（エンタイトルメントが通っている証拠）。そのシートの
     「閉じる」を押すと、SDKは **`ERR_REQUEST_CANCELED` ではなく `ERR_REQUEST_UNKNOWN`** を返し、`account.signIn('apple')` は `provider-failed` で
     失敗した（本番の `POST /auth/nonce` までは通っている）。**「閉じる」は、利用者の目には取りやめに見えるが、取りやめ扱い（`cancelled`）にならない。**
-    利用者向けの文言（7.3.11）は、`provider-failed` を、エラーとして強く出さない（再試行できる、程度）。
+    利用者向けの文言（7.3.11）は、`provider-failed` を、エラーとして強く出さない（再試行できる、程度。`account.error.providerFailed`）。
 -   未確認（7.3.13 で確かめる）: **実際のAppleのIDトークンの `nonce` が、渡した値そのままか**（端末にAppleアカウントでサインインしていないと
     試せない。iOS Simulator の iPhone 18 Pro は、サインインしていない）。そのままでなければ、Worker側の比べ方を直す必要がある（上の「nonce」）。
     それまでは、Appleのログインが `POST /auth/login` を通るかは分からない。サインインに成功したときの動き、Appleアカウントでサインインした
@@ -587,7 +587,7 @@ AppleとGoogleの仕様は、各社の公式資料で確かめた（Appleは、I
     入っているか。EASのビルドで初めて分かる）。
 
 **アカウントの削除とAppleのトークン失効**（実装済み。7.3.10。Worker: `worker/src/deleteAccount.ts`・`account.ts`・`appleToken.ts`。
-アプリ: `account.deleteAccount()`・`authRepository.deleteAccount`。画面は 7.3.11。本物のAppleでの確認は 7.3.13）
+アプリ: `account.deleteAccount()`・`authRepository.deleteAccount`。画面は 7.3.11（下の「アカウントの画面」）。本物のAppleでの確認は 7.3.13）
 
 -   削除は、アプリでの再認証を挟む。本人確認と、取り返しのつかない操作の確認を兼ねる。再認証は、**ログイン中の手段**（セッションを作った
     手段）で、ログインと同じ手順（Workerが発行した `T`、各社のIDトークン。AndroidのAppleは認可コードと `V`）を踏む。端末内のレパートリーは消えない。
@@ -617,10 +617,10 @@ AppleとGoogleの仕様は、各社の公式資料で確かめた（Appleは、I
     （`authRepository` の `DELETE_TIMEOUT_MS`。ほかの呼び出しは10秒のまま。Worker の最悪の合計に足りる）。**10秒に戻さない**: 短くすると、(a) が起きる。
     `ctx.waitUntil` に失効を回して先に応答する形は採らない（`appleRevoked` を返せなくなり、アプリが、Appleの設定から連携を解除できると案内できない）。
     それでも `network` になったとき（応答が届かなかった、アプリが中断された）は、削除が済んでいる可能性がある。やり直すと 401 になり、そこで端末のセッションが捨てられる。
-    画面（7.3.11）は、削除の再試行の 401 を、「ログアウトされた。削除が済んでいるかもしれない」と扱う。
+    画面（7.3.11）は、削除の再試行の 401 を、「サインアウトされた。削除が済んでいるかもしれない」と扱う（`account.error.deleteSignedOut`）。
 -   **Appleのトークンの失効は、削除を止めない（D1を消したあとに行う）。** Appleの案内は、失効を「すべき」とするもので、削除を難しくしないことが優先。
     失効の失敗（Appleの不調・コードの無効・鍵の設定の不備・`authorizationCode` が無い）は、`appleRevoked: false` で伝える。アプリは、利用者に、
-    Appleの設定（Apple Account の「Appleでサインイン」）から連携を解除できると案内できる（7.3.11）。D1が先なのは、失敗しうる書き込みを、止められる前に
+    Appleの設定（Apple Account の「Appleでサインイン」）から連携を解除できると案内する（7.3.11。`account.deletedAppleNotRevoked`）。D1が先なのは、失敗しうる書き込みを、止められる前に
     済ませ（失敗したら何も消えず、やり直せる）、あとに残るのを、失敗しても削除を損なわない処理だけにするため。
     -   iOS: 認可コードを、バンドルIDの `client_id` で交換し（`redirect_uri` は付けない。**ネイティブのコードの交換が `redirect_uri` 無しで通るかは未確認。7.3.13**。
         D1を消す前に行い、失敗しても削除は止めない）、得た `refresh_token`（無ければ `access_token`）を、D1を消したあとに、
@@ -631,16 +631,17 @@ AppleとGoogleの仕様は、各社の公式資料で確かめた（Appleは、I
         （`exchange`）は、これまでどおり `id_token` だけを読む（`exchangeWithToken` と `revoke` だけが、トークンを扱う）。失敗は、
         `apple token revoke failed: ...`（ステータスと許可リストの `error` 名だけ）を1行 `console.error` に出す。iOSの交換の失敗は、`apple token exchange failed: ...`（`appleToken.ts` と同じ。
         鍵の設定の不備による例外は `unexpected`）で、失効の失敗と区別する。
--   Apple Account側の資格情報が失効していて再認証できないとき（端末にAppleアカウントが無い、など）の逃げ道は、**まだ作っていない**。
-    再認証なしでは削除できない（セッションを盗まれた端末から、再認証なしにアカウントが消えるのを防ぐ）。7.3.11 の画面設計で、再認証ができない
-    利用者の扱い（別の手段・問い合わせ）を決める。
+-   Apple Account側の資格情報が失効していて再認証できないとき（端末にAppleアカウントが無い、など）の逃げ道は、**作らない（7.3.11 で決めた）**。
+    再認証なしでは削除できない（セッションを盗まれた端末から、再認証なしにアカウントが消えるのを防ぐ）。再認証できない利用者は、
+    プライバシーポリシーの連絡先（GitHub Issues）へ、削除を依頼する。ポリシーにその旨を書くのは 7.3.12。アプリの画面には、依頼先を出さない
+    （連絡先が変わっても、アプリの更新が要らないように。ポリシーへの行き先は About にある）。
 -   **R2のスナップショット・`profiles`・Requestは、7.4 以降で足す。** 今消すのは `users` の行（`identities`・`sessions` は、外部キーのCASCADE）だけ。
     `deleteUserAccount`（`worker/src/account.ts`）に足す（自己削除と `account-deleted` の両方が、この関数を使う）。順序は、
     「`username` を読む → R2のスナップショットを消す → D1の行を消す」。R2の削除に失敗したら、D1の行を残して失敗にする（行が無いと、消し残した
     スナップショットのキーが分からなくなる）。R2のバケットは、そのとき作る（今は消すものが無い）。
 -   `client_secret`（ES256のJWT）は、Workerがリクエストごとに、Sign in with Appleの秘密鍵（`.p8`。Workerのsecret）
     で署名する。`exp` は最大6か月先までなので、短く取り、定期的な再生成は要らない。
--   複数のログイン手段がつながったアカウント（「アカウントのつなぎ方」。画面を作るかは 7.3.11 で決める）では、削除は、ログイン中の手段で再認証するだけで、
+-   複数のログイン手段がつながったアカウント（「アカウントのつなぎ方」。つなぐ画面は、7.3.11 では作らなかった）では、削除は、ログイン中の手段で再認証するだけで、
     すべてのログイン手段と、全セッションを消す。つながった別のAppleのログイン手段のトークンは、失効しない（再認証していないため）。つなぐ画面を作るなら、
     そのときに、削除の再認証をどうするか決める。**Appleの `account-deleted` の処理（`worker/src/appleNotification.ts` の `deleteAppleIdentity`）は、ログイン手段の件数の確認と削除が
     1つのトランザクションに入っていない**（今は、既存のユーザーにログイン手段を足す処理が無いので、確認と削除の間に件数が増えない）。つなぐ処理を作るときは、確認のあとに
@@ -800,7 +801,7 @@ AndroidにはAppleのネイティブのサインインが無いので、Appleの
         （Androidで確認して直した）。ほかのURLは、そのまま渡す。
     -   **アプリが終了したときの再開は実装していない。** Custom Tab を開いている間にAndroidがアプリのプロセスを終了すると、戻りのURLで、アプリは新しく
         起動し、`V` と `T`（メモリにだけある）は失われる。サインインは完了せず、先頭の画面が出る（戻りのURLは無視される）。利用者がやり直す。
-        SecureStore に置いて再開するには、起動時に戻りのURLを拾って完了させる処理と、その結果を伝える画面が要るので、アカウントの画面（7.3.11）で決める。
+        SecureStore に置いて再開するには、起動時に戻りのURLを拾って完了させる処理と、その結果を伝える画面が要る。**7.3.11 では実装しないと決めた**: 起きるのは、Custom Tab を開いている間にOSがプロセスを終了したときだけで、失うのは「やり直す」1回の操作。`V` を端末に置く危険（`V` の秘匿が `C` の照合の根拠）のほうが大きい。
 -   **確かめたこと**: Nodeのテスト（Worker: コールバックの形と拒否、`client_secret` のJWT、コードの交換の成功・各失敗の分類と、`refresh_token` を
     載せないこと、`POST /auth/apple/login` の成功・各拒否（`V` の不一致・`native` の `T`・期限切れ・署名違い・`invalid_grant`・Appleの不調・リプレイ・形の不備）で、
     Appleを呼ぶ前に落ちるものはAppleを呼ばず、D1に何も書かないこと。アプリ: 認可のURL・戻りのURLの読み取り・`state` の照合・猶予・取りやめ・上限、
@@ -862,7 +863,7 @@ Googleの公式SDKだけを使う、自作の薄いExpoモジュールで実装�
     | `ERR_UNAVAILABLE` | ネイティブ側が組み込まれていないビルド | `provider-unavailable` |
     | `ERR_NOT_CONFIGURED`、知らないコード、コードの無い例外 | クライアントIDがビルドに入っていない（アプリの不具合）、想定外 | `unexpected` |
 
-    `provider-failed` は、Appleと同じく、原因を言い切らない文言にする（7.3.11）。Androidのアカウント無しも、端末の設定とは
+    `provider-failed` は、Appleと同じく、原因を言い切らない文言にする（7.3.11。`account.error.providerFailed`）。Androidのアカウント無しも、端末の設定とは
     限らない（Play services の状態、アプリの設定の不備でも同じ `ERR_FAILED` になりうる）。
 
 -   iOS: GoogleSignIn。`signIn(withPresenting:hint:additionalScopes:nonce:)` に `nonce` を渡す。Info.plistに、
@@ -940,7 +941,7 @@ Googleの公式SDKだけを使う、自作の薄いExpoモジュールで実装�
         届くのは EMM など特殊なときだけと見て、今は対応していない（対応するなら、`app/+native-intent.tsx` の
         `redirectSystemPath` で、このスキームを無視する形が候補。未検証）。
     -   Androidは、2回目以降のログインでも、アカウント選択と確認の画面が出る（自動でログインはされない）。ログアウトで
-        `clearCredentialState` を呼ぶかは、ログアウトの画面（7.3.11）で決める。
+        `clearCredentialState` は呼ばない（7.3.11 で決めた）: 自動でサインインされないので、ログアウトで消す状態が無く、ネイティブの口を足す理由がない。
 -   **ライセンス一覧への載せ方（決定。7.3.8）。** Androidの依存（Google Play services 9個と googleid。POMのライセンスは
     Android Software Development Kit License）は、オープンソースではない。`ALLOWED_LICENSES` には**足さず**、対象の
     groupId（`com.google.android.gms`・`com.google.android.libraries.identity.googleid`）だけを個別に許可する（その
@@ -973,6 +974,33 @@ Googleの公式SDKだけを使う、自作の薄いExpoモジュールで実装�
     なくドメインが出る（ブランドの確認を受けるまで）。「テスト中」の間は、テストユーザーだけが入れる、と画面に出る。
     基本のスコープ（`openid`・`email`・`profile`）だけなら、テストユーザーでなくても入れて警告も出ない、とGoogleの
     資料にあるが、「テスト中」に当てはまるかは読み取れておらず、未確認（7.3.13で、テストユーザーでないアカウントで確かめる）。
+
+**アカウントの画面**（実装済み。7.3.11。`app/account.tsx`・`ui/AccountSection.tsx`・`src/i18n/authErrors.ts`。仕様は screen-flow §9「Account」。
+本物のApple・Googleでの確認は 7.3.13）
+
+-   **置き場所は Settings の `Account`**（Profile ではない）。Settings の行には、サインイン中の手段を出さない: Settings がSecureStoreを読まず、
+    `getSignedInProvider` の失敗を考えなくて済むようにするため（状態は Account 画面だけが読む）。行は、`account.available`（`auth` を注入したビルド）が
+    真のときだけ出す。
+-   **リリースのビルドでは、7.3.13 まで出さない。** `src/services/index.ts` の `ACCOUNT_ENABLED`（`__DEV__ || process.env.EXPO_PUBLIC_SINGFOLIO_ACCOUNT === '1'`）が偽なら、
+    `auth` を注入せず（`account.available` が偽。`signIn` は `provider-unavailable`）、入口も出ない。理由: Workerが未デプロイで（本番は nonce と HTTPS の検査だけ）、
+    プライバシーポリシー・ストアの申告が、アカウントを前提にしていない（7.3.12）。署名したビルドで確かめるとき（7.3.13）は、
+    `EXPO_PUBLIC_SINGFOLIO_ACCOUNT=1` を付けてビルドする（JSバンドルに埋め込まれる）。7.3.12・7.3.13 が済んだら、この条件を外す。
+-   **この画面の失敗は、ErrorBoundary に伝えない。** ログインを要求しないので、`getSignedInProvider` の失敗も含め、画面の中で伝えて、やり直せるようにする。
+    終わった操作（成功・失敗とも）のあとは、必ずサインインの状態を読み直す（401 で端末のセッションが捨てられている、削除で消えた、など）。
+-   **実行中は戻れない**（`usePreventRemove`）。アカウントの削除の結果（成功・Appleの失効の可否・失敗の理由）は、この画面でしか伝えられないため。
+    待ちは、削除で最大30秒、サインインは各社のOSの画面が前面にある間（上限は5分。`PROVIDER_TIMEOUT_MS`）。AndroidのAppleは、Custom Tab を閉じて
+    アプリが前面に戻ったとき、戻りのURLが来なければ、猶予（1.5秒）のあとに取りやめとして終わる（`appleWebSignInRepository`。7.3.9）。
+-   **サインインのボタン。** iOSの Apple は、Apple のシステムのボタン（`AppleAuthenticationButton`。`buttonType` は `SIGN_IN`、ライトは黒・ダークは白、角丸は
+    専用のプロパティ。`style` に背景色・角丸を入れない）。それ以外（Android の Apple、Google）は、アプリのボタンで、ロゴは使わない（Googleは、公式のロゴ付きの
+    ボタンの規約に踏み込まない。Googleの同意画面のブランドの確認（7.3.12）で、ボタンが問われたら、そこで決める）。
+-   **削除の確認は二段**: アプリのダイアログ（元に戻せない・端末内の曲は消えない）→ 各社の再認証。待ちは「最大30秒」と出す。成功の文言は、`appleRevoked === false` のとき
+    だけ、Apple Account の設定から連携を解除できる旨を足す。
+-   **作らなかったもの（決めた）**: (a) サインイン済みから別のログイン手段をつなぐ画面（Worker に、つなぐエンドポイントが無い。手段が違えば別のアカウント）。
+    「アカウントのつなぎ方」の項は、データ側の方針（`identities` で複数つなげられる）のまま。画面とエンドポイントは、必要になったときに足す。
+    (b) 再認証なしの削除（上の項）。(c) Androidの Apple のサインインの再開（上の項）。(d) Googleの `clearCredentialState`（上の項）。
+-   **文言の方針**: 失敗は `AuthError.code` → 操作ごとの文言（`accountErrorMessageKey`）。取りやめは何も出さない。`provider-failed` は原因を言い切らない。削除の
+    `network` は「削除されたか分からない」、削除の再試行の 401 は「サインアウトされた。すでに削除されているかもしれない」、`reauth-failed`・`account-mismatch` は
+    「削除されていない」と伝える。説明文の「曲はこの端末に保存される」は、7.4（Publish）で、公開の説明と食い違わないか読み直す。
 
 **アカウントのつなぎ方**
 

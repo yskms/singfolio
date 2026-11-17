@@ -174,10 +174,10 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
 -   認証が要る呼び出しを足すときは、**401 のときだけ**端末のセッションを捨てる（503・5xx・通信の失敗では捨てない）。
 -   `account.signOutOthers()`・`deleteAccount()` は、サインイン中にだけ使える（`not-signed-in`）。認証が要るサーバーの呼び出しは `authorized` を通す（401 のときだけ
     端末のセッションを捨てる）。`deleteAccount` は、**ログイン中の手段で再認証する**（Apple（iOS）は `getIdTokenWithCode` で認可コードも得る）。成功したら端末のセッションを捨てる。
-    端末内のレパートリーは消さない。再認証ができない利用者の逃げ道（再認証なしの削除）は作っていない（7.3.11 で決める）。
+    端末内のレパートリーは消さない。再認証ができない利用者の逃げ道（再認証なしの削除）は作らない（決定済み。プライバシーポリシーの連絡先へ依頼する）。
     `/auth/delete` だけ、待つ上限が30秒（`authRepository` の `DELETE_TIMEOUT_MS`。ほかは10秒）。**10秒に「揃え」ない**: Workerは、公開鍵の取得・コードの交換・失効を順に待ち
     （それぞれ最大5秒）、先に打ち切ると、サーバーで削除が済んでいるのに、アプリは `network` と受け取り、端末のセッションも残る（やり直すと 401）。
-    画面は、削除の再試行の 401 を「ログアウトされた。削除が済んでいるかもしれない」と扱う（7.3.11）。
+    画面は、削除の再試行の 401 を「サインアウトされた。削除が済んでいるかもしれない」と扱う（`account.error.deleteSignedOut`）。
 -   Googleのサインインは、自作のExpoモジュール `modules/singfolio-google-signin`（公式SDKだけ。第三者のラッパーは使わない）。
     その `index.ts` は `requireOptionalNativeModule` で読む。`requireNativeModule` に「簡略化」しない（ネイティブ側が無い
     ビルドで、import の時点で投げ、アプリの起動ごと止まる。ログインを要求しない原則に反する）。呼んだときの失敗は
@@ -189,9 +189,16 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     外さない**（戻りのURL `singfolio://auth/apple?...` を expo-router に渡すと `+not-found` へ遷移する。起動時のURLには `null` ではなく `'/'` を返す: `null` だと
     ルートから始める処理が飛び、Add Song が開く）。`openAuthSessionAsync` は使わない（Androidでは、
     リダイレクトとブラウザを閉じた判定を競わせるだけで、`dismiss` が勝ちうる）。`state` が `SHA-256(T)` と違う戻りのURLは受け取らない。`V`・`T` は
-    メモリにだけ置く（アプリが終了したときの再開は、7.3.11 で決める）。`openBrowserAsync` のオプション（`createTask`・`useProxyActivity`・
+    メモリにだけ置く（アプリが終了したときの再開は実装しない。決定済み。docs §8）。`openBrowserAsync` のオプション（`createTask`・`useProxyActivity`・
     `showInRecents`）は、既定と同じ値を明示して固定している（`src/services/index.ts`）。外さない: 旧来の経路は、Custom Tab を最近使ったアプリに出さず、
     アプリの外へ移ると破棄する（SMSの確認コードを別のアプリで開く経路が壊れる）。
+-   **Account 画面（`app/account.tsx`・`ui/AccountSection.tsx`。7.3.11）。** 入口は Settings の `Account` で、`account.available` が真のビルドだけ。
+    **`src/services/index.ts` の `ACCOUNT_ENABLED` は、7.3.12・7.3.13 が済むまで外さない**（リリースのビルドでは `auth` を注入せず、入口も出ない。
+    Workerが未デプロイで、ポリシー・申告もアカウントを前提にしていないため。署名したビルドで確かめるときだけ `EXPO_PUBLIC_SINGFOLIO_ACCOUNT=1`）。
+    Settings の行に、サインイン中の手段（値）を出さない（Settings が SecureStore を読まない）。この画面の失敗は ErrorBoundary に伝えず、画面の中で出す。
+    操作のあとは、成功・失敗とも、サインインの状態を読み直す。実行中は戻れない（`usePreventRemove`。削除の結果を伝えられなくなる）。iOS の Apple は
+    `AppleAuthenticationButton`（`style` に背景色・角丸を入れない。App Store のガイドラインに反する）。つなぐ画面・再認証なしの削除・Googleの
+    `clearCredentialState`・Androidの Apple の再開は、作らないと決めた（理由は docs §8「アカウントの画面」）。
 -   `expo-secure-store` の config plugin を `app.json` に足さない。Androidのバックアップ規則が `<include>` で、v1.0で今
     バックアップされているSQLiteを外す。
 
@@ -502,7 +509,7 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
 -   `app.json` の `ios.infoPlist.CFBundleAllowMixedLocalizations: false` は消さない。`expo-apple-authentication` の
     config plugin が、Appleのボタンの文言のために `true` を足す（`?? true` なので、`app.json` の値が残る）。`true` は
     Info.plist 全体に効き、アプリが対応していない言語の端末で、OSの部品の文言の言語選びが変わりうる（v1.0は未設定）。
-    Appleのボタンを使う 7.3.11 で、必要なら見直す。`nativeConfig.test.ts` が検出する。
+    Appleのボタンは 7.3.11 で使った（iOSのサインイン前の画面）。端末の言語とずれたときの扱いは 7.3.13。`nativeConfig.test.ts` が検出する。
 -   ビルド番号（iOSの buildNumber・AndroidのversionCode）は、EAS が持つ（`eas.json` の
     `appVersionSource: "remote"`、`production` の `autoIncrement`）。`app.json` に書かない
     （書いても無視される）。`app.json` の `version`（ストアの表示版）は手で上げる。`eas init` は

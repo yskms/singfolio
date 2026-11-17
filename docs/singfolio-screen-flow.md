@@ -30,8 +30,9 @@
        Add / Edit                          Open source licenses
 ```
 
-設定（Appearance・Language・Suggestions）は、Settings 自身に並ぶ（§9）。Tags・Artists・About は、
-Settings から開く別の画面。Open source licenses は、About から開く画面。
+設定（Appearance・Language・Suggestions）は、Settings 自身に並ぶ（§9）。Tags・Artists・Account・About は、
+Settings から開く別の画面（Account は、アカウントが使えるビルドだけ。§9「Account」）。Open source licenses は、
+About から開く画面。
 
 v1.0ではログインを必須にしない。
 
@@ -505,7 +506,7 @@ iOSの、画面の端からのスワイプでは閉じない（人に渡して�
 
 ## 9. Settings
 
-Settings タブに、`Appearance` / `Language` / `Suggestions` / `Tags` / `Artists` / `About` の順に並ぶ
+Settings タブに、`Appearance` / `Language` / `Suggestions` / `Tags` / `Artists` / `Account` / `About` の順に並ぶ
 （以前は Profile の下半分に並んでいた。Profile は「自分の Singfolio」で、設定とは別のため、タブを分けた）。
 タブの先頭から並べる（区切り線は無い）。
 
@@ -514,8 +515,10 @@ Settings タブに、`Appearance` / `Language` / `Suggestions` / `Tags` / `Artis
     ダイアログで伝えて、表示は変えない。
 -   `Suggestions` は、行の中のスイッチ。切り替えは、保存の完了を待たずに反映し、保存に失敗したら
     元に戻して、ダイアログで伝える。
--   `Tags`・`Artists`・`About` は、押すと別の画面を開く（連打で重ねない）。ヘッダーの題は、項目の名前。
+-   `Tags`・`Artists`・`Account`・`About` は、押すと別の画面を開く（連打で重ねない）。ヘッダーの題は、項目の名前。
     `About` の中に、`Open source licenses` の行がある（下の「Open source licenses」）。
+    `Account` は、アカウントが使えないビルドでは、行ごと出さない（`Suggestions` と同じ）。右に値（サインイン中の
+    ログイン手段）は出さない: Settings がサインインの状態（SecureStore）を読まないようにするため。
 -   読み込み前（数ミリ秒）は、設定の並び全体を出さない（項目が後から増えて、位置が動かないように）。
 
 ### Appearance
@@ -617,6 +620,41 @@ Settings タブに、`Appearance` / `Language` / `Suggestions` / `Tags` / `Artis
     アーティストが既に無いときは、入力を直しても解消しないので、ダイアログを閉じて一覧を読み直す。
 -   変更は、そのアーティストの全曲に効く（名前・読みは、アーティストごとに1か所）。曲の最終更新は
     変わらない。Songs・Show Mode へ戻ったときに読み直されて、反映される。
+
+### Account
+
+Settings の `Account` から開く画面（`app/account.tsx`。連打で重ねない）。ログイン・ログアウト・「ほかの端末をすべて
+ログアウト」・アカウントの削除。**ログインを要求しない**（アカウントが無くても、v1.0の機能は何も変わらない）。
+アカウントが使えるビルドだけ（`account.available`）で、リリースのビルドでは 7.3.13 まで出さない
+（`src/services/index.ts` の `ACCOUNT_ENABLED`。`singfolio-publishing-backend.md` §8「アカウントの画面」）。
+
+置き場所は Settings（Profile ではない）: Profile は「自分の Singfolio」（件数と Show Mode の入口）で、アカウントの
+管理は設定に近い。公開機能（7.4 以降）で Profile に公開の設定を足すときは、そこから Account へ行く導線を足せる。
+
+-   **開いた直後**: サインインの状態を読むまで、中身を出さない（数ミリ秒）。読めなかったとき（`getSignedInProvider` が投げた）
+    は、「サインインの状態を確認できませんでした」と「もう一度試す」だけを出す（ErrorBoundary には伝えない。「ログアウト中」
+    とは出さない）。
+-   **サインインしていないとき**: 「アカウントなしで使える。曲はこの端末に保存される」の説明と、Apple・Google のボタン
+    （Apple が先。iOSの審査 4.8）。iOSの Apple は、システムのボタン（`AppleAuthenticationButton`。見た目と文言はOSが決め、
+    端末の言語で出る。ライトは黒、ダークは白）。それ以外（Android の Apple、Google）は、アプリの文言のボタンで、ロゴは使わない。
+    取りやめは何も出さない。失敗は、画面の上に1行で出す（`provider-failed` は、原因を言い切らず、強く出さない）。
+-   **サインインしているとき**: 「Apple（または Google）でサインイン中」と、`Sign out`・`Sign out of other devices`・
+    `Delete account`（区切り線の下。文字は `error` の色）。それぞれ確認のダイアログを出す。
+    -   `Sign out`: 端末の値を先に捨てる。サーバーに届かなかったときも、端末はサインアウトする（その旨を1行で出す）。
+    -   `Sign out of other devices`: 成功したら「ほかのすべての端末をサインアウトしました」。
+    -   `Delete account`: 確認のダイアログのあと、ログイン中の手段で**再認証**する（OSのサインインの画面）。待っている間は
+        「最大30秒」と出す。成功したら、サインアウト中の表示に変えて、「アカウントを削除しました」。Appleのトークンを失効
+        できなかったとき（`appleRevoked: false`）は、「Apple Account の設定から連携を解除できる」と添える。端末内の
+        レパートリーは消えない（ダイアログと行の下で伝える）。
+-   **実行中**: 操作は1つずつ。実行中は、ほかのボタンを押せず、**戻る操作も止める**（削除の結果は、この画面でしか伝えられない）。
+    終わったら、成功でも失敗でも、サインインの状態を読み直す（失敗のあとに、端末のセッションが捨てられていることがある）。
+-   **失敗の文言**は `src/i18n/authErrors.ts`（操作ごと。`AuthError.code` → 文言）。削除では、特に次を分ける。
+    `network`（サーバーで削除が済んでいるかもしれない）、`unauthorized`（再試行で 401: 「サインアウトされた。削除が済んでいる
+    かもしれない」）、`reauth-failed`・`account-mismatch`（削除されていない。後者は「サインインしているアカウントと違う」）。
+-   **作っていないもの**: サインイン済みから別のログイン手段をつなぐ画面（Worker に、つなぐエンドポイントが無い。
+    手段が違えば別のアカウントになる）。再認証なしの削除（再認証できない利用者は、プライバシーポリシーの連絡先
+    （GitHub Issues）へ、削除を依頼する。7.3.12 でポリシーに書く）。Androidの Apple のサインイン中にアプリが終了したときの
+    再開（戻りのURLは無視され、やり直す）。
 
 ### About
 
