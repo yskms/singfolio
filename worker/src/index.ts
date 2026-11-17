@@ -1,6 +1,7 @@
 // 入口。エンドポイントは 7.3.10 以降も足す。
 import { handleAppleNotification } from './appleNotification.ts';
 import { handleAppleCallback, handleAppleWebLogin } from './appleWeb.ts';
+import { handleDeleteAccount } from './deleteAccount.ts';
 import { handleLogin, handleLogout, handleLogoutOthers, handleNonce } from './auth.ts';
 import { httpsRequiredResponse, isInsecureRequest } from './https.ts';
 
@@ -14,6 +15,7 @@ export default {
     if (pathname === '/auth/login') return handleLogin(request, env, Date.now());
     if (pathname === '/auth/logout') return handleLogout(request, env);
     if (pathname === '/auth/logout-others') return handleLogoutOthers(request, env, Date.now());
+    if (pathname === '/auth/delete') return handleDeleteAccount(request, env, Date.now());
     if (pathname === '/auth/apple/callback') return handleAppleCallback(request);
     if (pathname === '/auth/apple/notifications') return handleAppleNotification(request, env, Date.now());
     if (pathname === '/auth/apple/login') return handleAppleWebLogin(request, env, Date.now());

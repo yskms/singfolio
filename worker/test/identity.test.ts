@@ -33,6 +33,7 @@ describe('resolveIdentity', () => {
       sub: 'apple-sub-1',
       created_at: NOW,
       last_sign_in_at: NOW,
+      consent_revoked_at: null,
     });
     const user = await db.prepare('SELECT * FROM users WHERE id = ?').bind(result.userId).first();
     assert.deepEqual(user, { id: result.userId, created_at: NOW });
