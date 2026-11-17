@@ -895,7 +895,7 @@ describe('deleteAccount（アカウントの削除）', () => {
     const { account, calls, sessions } = setup({ providers: { apple: provider } });
     await account.signIn('apple');
     calls.length = 0;
-    assert.deepEqual(await account.deleteAccount(), { appleRevoked: true });
+    assert.deepEqual(await account.deleteAccount(), { appleRevoked: true, sessionCleared: true });
     assert.deepEqual(calls, [
       'nonce',
       `delete:SESSION-1:${JSON.stringify({ provider: 'apple', nonce: 'T-1', idToken: 'ID-TOKEN', authorizationCode: 'AUTH-CODE' })}`,
@@ -933,7 +933,7 @@ describe('deleteAccount（アカウントの削除）', () => {
     });
     await account.signIn('google');
     calls.length = 0;
-    assert.deepEqual(await account.deleteAccount(), { appleRevoked: null });
+    assert.deepEqual(await account.deleteAccount(), { appleRevoked: null, sessionCleared: true });
     assert.deepEqual(requestOf(calls), { provider: 'google', nonce: 'T-1', idToken: 'GOOGLE-ID-TOKEN' });
   });
 
@@ -964,7 +964,7 @@ describe('deleteAccount（アカウントの削除）', () => {
   it('appleRevoked が false でも成功（アカウントは消えている）。値はそのまま返す', async () => {
     const { account } = setup({ auth: { deleteAccount: async () => ({ appleRevoked: false }) } });
     await account.signIn('apple');
-    assert.deepEqual(await account.deleteAccount(), { appleRevoked: false });
+    assert.deepEqual(await account.deleteAccount(), { appleRevoked: false, sessionCleared: true });
     assert.equal(await account.getSignedInProvider(), null);
   });
 
@@ -1052,19 +1052,31 @@ describe('deleteAccount（アカウントの削除）', () => {
     assert.equal((await sessions.read()).kind, 'none');
   });
 
-  it('通信の失敗・サーバーの不調（network・unavailable）では、セッションを捨てない。やり直せる', async () => {
-    for (const code of ['network', 'unavailable'] as const) {
-      const { account, sessions } = setup({
-        auth: {
-          deleteAccount: async () => {
-            throw new AuthError(code);
-          },
+  it('サーバーの不調（unavailable）では、セッションを捨てない。やり直せる', async () => {
+    const { account, sessions } = setup({
+      auth: {
+        deleteAccount: async () => {
+          throw new AuthError('unavailable');
         },
-      });
-      await account.signIn('apple');
-      await rejectsWith(account.deleteAccount(), code);
-      assert.equal((await sessions.read()).kind, 'found');
-    }
+      },
+    });
+    await account.signIn('apple');
+    await rejectsWith(account.deleteAccount(), 'unavailable');
+    assert.equal((await sessions.read()).kind, 'found');
+  });
+
+  it('削除の要求を送ったあとの通信の失敗（network）は delete-unconfirmed（済んでいるかもしれない）。セッションは捨てない', async () => {
+    const { account, sessions } = setup({
+      auth: {
+        deleteAccount: async () => {
+          throw new AuthError('network');
+        },
+      },
+    });
+    await account.signIn('apple');
+    await rejectsWith(account.deleteAccount(), 'delete-unconfirmed');
+    assert.equal((await sessions.read()).kind, 'found');
+    assert.equal(await account.getSignedInProvider(), 'apple');
   });
 
   it('T を得られなければ（通信の失敗）、各社の画面を開かない', async () => {
@@ -1076,8 +1088,23 @@ describe('deleteAccount（アカウントの削除）', () => {
       },
     });
     await sessions.set({ session: 'SESSION-X', provider: 'apple', localDataId: 'data-1' });
+    // 要求は、まだ送っていない（何も消えていない）ので、delete-unconfirmed ではなく、ふつうの network。
     await rejectsWith(account.deleteAccount(), 'network');
     assert.deepEqual(hashed, []);
+  });
+
+  it('AndroidのApple（認可コードの経路）も、T（web）の取得の通信の失敗は、ふつうの network', async () => {
+    const { account, sessions } = setup({
+      providers: {},
+      codeProviders: { apple: { getAuthorizationCode: async () => 'CODE' } },
+      auth: {
+        requestWebNonce: async () => {
+          throw new AuthError('network');
+        },
+      },
+    });
+    await sessions.set({ session: 'SESSION-X', provider: 'apple', localDataId: 'data-1' });
+    await rejectsWith(account.deleteAccount(), 'network');
   });
 
   it('削除は成功したが、端末のセッションを捨てられなくても、成功を返す（残った値は、次の呼び出しの 401 で捨てる）', async () => {
@@ -1086,7 +1113,8 @@ describe('deleteAccount（アカウントの削除）', () => {
     sessions.clear = async () => {
       throw new Error('keystore failed');
     };
-    assert.deepEqual(await account.deleteAccount(), { appleRevoked: true });
+    // 成功は成功のまま。画面が「この端末はまだサインイン中」と伝えられるよう、`sessionCleared` で知らせる。
+    assert.deepEqual(await account.deleteAccount(), { appleRevoked: true, sessionCleared: false });
   });
 
   it('組み込まれていない手段のセッション（手段のサインインが無い）は provider-unavailable。通信しない', async () => {

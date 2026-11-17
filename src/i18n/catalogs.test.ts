@@ -173,6 +173,7 @@ describe('accountErrorMessageKey', () => {
     'reauth-failed': true,
     'account-mismatch': true,
     'storage-failed': true,
+    'delete-unconfirmed': true,
     unexpected: true,
   };
   const actions: AccountAction[] = ['signIn', 'signOut', 'signOutOthers', 'deleteAccount'];
@@ -194,21 +195,31 @@ describe('accountErrorMessageKey', () => {
     assert.equal(accountErrorMessageKey(new AuthError('cancelled'), 'deleteAccount'), null);
   });
 
-  it('provider-failed は、取りやめと同じ扱いにも、アプリの不具合にもしない（原因を言い切らない文言）', () => {
+  it('provider-failed は、取りやめと同じ扱いにも、アプリの不具合にもしない（サインインでは、原因を言い切らない文言）', () => {
     assert.equal(accountErrorMessageKey(new AuthError('provider-failed'), 'signIn'), 'account.error.providerFailed');
-    assert.equal(
-      accountErrorMessageKey(new AuthError('provider-failed'), 'deleteAccount'),
-      'account.error.providerFailed',
-    );
   });
 
-  it('削除の network は、削除が済んでいるかもしれないと伝える専用の文言。ほかの操作の network とは別', () => {
-    assert.equal(accountErrorMessageKey(new AuthError('network'), 'deleteAccount'), 'account.error.deleteNetwork');
+  it('削除の再認証が終わらなかった・時間切れは、「本人確認ができず、削除していない」と伝える（サインインの文言にしない）', () => {
+    for (const code of ['provider-failed', 'timeout'] as const) {
+      assert.equal(accountErrorMessageKey(new AuthError(code), 'deleteAccount'), 'account.error.reauthFailed');
+    }
+    assert.equal(accountErrorMessageKey(new AuthError('timeout'), 'signIn'), 'account.error.timeout');
+    assert.match(en['account.error.reauthFailed'], /wasn’t deleted/);
+  });
+
+  it('削除の要求を送ったあとの通信の失敗（delete-unconfirmed）だけが、「削除されたか分からない」。送る前の network は、ふつうの文言', () => {
+    assert.equal(
+      accountErrorMessageKey(new AuthError('delete-unconfirmed'), 'deleteAccount'),
+      'account.error.deleteUnconfirmed',
+    );
+    assert.equal(accountErrorMessageKey(new AuthError('network'), 'deleteAccount'), 'account.error.network');
     assert.equal(accountErrorMessageKey(new AuthError('network'), 'signIn'), 'account.error.network');
     assert.equal(accountErrorMessageKey(new AuthError('network'), 'signOutOthers'), 'account.error.network');
+    // 削除以外では起きないコードは、アプリの不具合の扱い
+    assert.equal(accountErrorMessageKey(new AuthError('delete-unconfirmed'), 'signIn'), 'error.unexpected');
   });
 
-  it('削除の再試行の 401 は「サインアウトされた。削除が済んでいるかもしれない」。ほかの操作の 401 とは別', () => {
+  it('削除の 401 は、「サインアウトされた。削除済みかもしれない。残っているなら、サインインし直して削除」。ほかの操作の 401 とは別', () => {
     assert.equal(accountErrorMessageKey(new AuthError('unauthorized'), 'deleteAccount'), 'account.error.deleteSignedOut');
     assert.equal(accountErrorMessageKey(new AuthError('unauthorized'), 'signOutOthers'), 'account.error.signedOut');
     assert.equal(accountErrorMessageKey(new AuthError('unauthorized'), 'signIn'), 'account.error.signInFailed');
@@ -219,6 +230,11 @@ describe('accountErrorMessageKey', () => {
     assert.equal(accountErrorMessageKey(new AuthError('account-mismatch'), 'deleteAccount'), 'account.error.accountMismatch');
     assert.match(en['account.error.reauthFailed'], /wasn’t deleted/);
     assert.match(en['account.error.accountMismatch'], /wasn’t deleted/);
+  });
+
+  it('削除の 401 の文言は、「削除済みの可能性」と「残っている場合の手順」の両方を伝える（最初の削除の 401 でも、誤解させない）', () => {
+    assert.match(en['account.error.deleteSignedOut'], /may already be deleted/);
+    assert.match(en['account.error.deleteSignedOut'], /still exists/);
   });
 
   it('アプリの不具合（invalid-request など）と、AuthError 以外の失敗は、汎用の文言', () => {

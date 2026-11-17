@@ -14,9 +14,13 @@ export type AccountAction = 'signIn' | 'signOut' | 'signOutOthers' | 'deleteAcco
 // 文言の方針（docs §8「アプリ側の認証の土台」の「失敗の分類」）:
 // - `provider-failed` は、端末の状態が原因とは限らない（アプリ側の設定の不備でも同じになる）ので、
 //   原因を言い切らず、強く出さない（OSのシートを「閉じる」も、これになる）。
-// - アカウントの削除の `network` は、サーバーで削除が済んでいる可能性がある。やり直すと 401 になり、
-//   端末のセッションは捨てられる。その 401（`unauthorized`）は、「ログアウトされた。削除が済んでいる
-//   かもしれない」と伝える。
+// - アカウントの削除は、要求（`/auth/delete`）を送ったあとの通信の失敗だけが `delete-unconfirmed`（サーバーで削除が
+//   済んでいるかもしれない。やり直すと 401 になり、端末のセッションは捨てられる）。送る前（`T` の取得）の通信の失敗は、
+//   何も消えていないので、ふつうの `network`。
+// - 削除の 401（`unauthorized`）は、削除の再試行とは限らない（別の端末の「ほかの端末をすべてサインアウト」や、90日使わない
+//   失効のあとでも、再認証を済ませてから返る）。「削除済みかもしれない」と「残っているなら、サインインし直して削除」を、
+//   両方伝える。
+// - 削除の再認証の画面が終わらなかった（`provider-failed`）・時間切れ（`timeout`）は、「本人確認ができず、削除していない」。
 const messages: Record<AccountAction, Partial<Record<AuthErrorCode, AccountErrorMessageKey | null>>> = {
   signIn: {
     cancelled: null,
@@ -41,15 +45,16 @@ const messages: Record<AccountAction, Partial<Record<AuthErrorCode, AccountError
   },
   deleteAccount: {
     cancelled: null,
-    network: 'account.error.deleteNetwork',
+    network: 'account.error.network',
+    'delete-unconfirmed': 'account.error.deleteUnconfirmed',
     unavailable: 'account.error.unavailable',
     unauthorized: 'account.error.deleteSignedOut',
     'not-signed-in': 'account.error.signedOut',
     'reauth-failed': 'account.error.reauthFailed',
     'account-mismatch': 'account.error.accountMismatch',
-    'provider-failed': 'account.error.providerFailed',
+    'provider-failed': 'account.error.reauthFailed',
     'provider-unavailable': 'account.error.providerUnavailable',
-    timeout: 'account.error.timeout',
+    timeout: 'account.error.reauthFailed',
   },
 };
 

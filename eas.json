@@ -12,6 +12,12 @@
     },
     "production": {
       "autoIncrement": true
+    },
+    "account-test": {
+      "extends": "production",
+      "env": {
+        "EXPO_PUBLIC_SINGFOLIO_ACCOUNT": "1"
+      }
     }
   },
   "submit": {

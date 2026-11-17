@@ -84,6 +84,12 @@ export interface SignOutResult {
 
 export interface DeleteAccountResult {
   /**
+   * 端末のセッションを捨てられたか。`false` は、削除は成功したが、端末の値を消せなかった（残った値は、次に認証が要る
+   * 呼び出しをしたとき 401 になり、そこで捨てる）。画面は、「削除したが、この端末はまだサインイン中」と伝え、
+   * ログアウトを案内する（ログアウトは端末の値を捨てる）。
+   */
+  sessionCleared: boolean;
+  /**
    * Appleのトークンを失効できたか。Googleは `null`（失効するものが無い）。`false` でも、アカウントは消えている
    * （失効に失敗しても、削除は止めない）。利用者には、Appleの設定（Apple Account の「Appleでサインイン」）から、
    * Singfolio との連携を解除できると案内できる。
@@ -124,7 +130,9 @@ export interface AccountService {
    * 手段のサインインの画面が出る（取りやめは `cancelled`。何も消えない）。再認証のアカウントが、ログイン中のものと違えば
    * `account-mismatch`、通らなければ `reauth-failed`（どちらも、何も消えず、サインインは保たれる）。成功したら、端末の
    * セッションを捨てる。端末内のレパートリーは消えない。サーバーがこのセッションを認めなければ（`unauthorized`）、
-   * 端末のセッションを捨てる。失敗は `AuthError`。
+   * 端末のセッションを捨てる。失敗は `AuthError`。削除の要求（`/auth/delete`）を送ったあとの通信の失敗は
+   * `delete-unconfirmed`（サーバーで削除が済んでいるかもしれない）。それより前（`T` の取得）の通信の失敗は、何も
+   * 消えていないので、ふつうの `network`。
    */
   deleteAccount(): Promise<DeleteAccountResult>;
 }
@@ -400,15 +408,25 @@ export function createAccountService(deps: AccountServiceDeps | null): AccountSe
             request = { provider: 'apple', nonce, code, verifier };
           }
 
-          const result = await authorized(() => auth.deleteAccount(current.session, request));
+          // 要求を送ったあとの通信の失敗は、結果が分からない（サーバーで済んでいるかもしれない）。送る前の失敗
+          // （上の `T` の取得）と区別して、画面が、それぞれの文言を出せるようにする。
+          const result = await authorized(async () => {
+            try {
+              return await auth.deleteAccount(current.session, request);
+            } catch (error) {
+              if (error instanceof AuthError && error.code === 'network') throw new AuthError('delete-unconfirmed');
+              throw error;
+            }
+          });
           // アカウントは消えた。端末のセッションは、もう使えないので捨てる。捨てられなくても、削除は成功のまま
-          // （残った値は、次に認証が要る呼び出しをしたとき 401 になり、そこで捨てる）。
+          // （残った値は、次に認証が要る呼び出しをしたとき 401 になり、そこで捨てる）。画面には `sessionCleared` で伝える。
+          let sessionCleared = true;
           try {
             await sessions.clear();
           } catch {
-            // 上のとおり
+            sessionCleared = false;
           }
-          return { appleRevoked: result.appleRevoked };
+          return { appleRevoked: result.appleRevoked, sessionCleared };
         }),
       );
     },

@@ -154,12 +154,13 @@ export function AccountSection() {
           onPress: () =>
             void run('deleteAccount', async () => {
               const { account } = await getServices();
-              const { appleRevoked } = await account.deleteAccount();
-              // Appleのトークンを失効できなかったときも、アカウントは消えている。
-              return {
-                kind: 'info',
-                text: appleRevoked === false ? t('account.deletedAppleNotRevoked') : t('account.deleted'),
-              };
+              const { appleRevoked, sessionCleared } = await account.deleteAccount();
+              // 削除は成功している。端末のセッションを捨てられなかった（読み直すと、まだサインイン中に見える）ときと、
+              // Appleのトークンを失効できなかったときは、それぞれの案内を足す。
+              const lines = [t('account.deleted')];
+              if (!sessionCleared) lines.push(t('account.deletedSignInRemains'));
+              if (appleRevoked === false) lines.push(t('account.appleNotRevokedNote'));
+              return { kind: 'info', text: lines.join('\n') };
             }),
         },
       ],

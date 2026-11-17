@@ -198,8 +198,8 @@ export const ja: Record<MessageKey, Message> = {
   'account.deleteConfirmAction': '続ける',
   'account.deleting': 'アカウントを削除しています。最大30秒ほどかかります。',
   'account.deleted': 'アカウントを削除しました。',
-  'account.deletedAppleNotRevoked':
-    'アカウントを削除しました。Appleでサインインの連携も解除するには、Apple Account の設定を開いてください。',
+  'account.deletedSignInRemains': 'この端末はまだサインイン中です。「サインアウト」を押して完了してください。',
+  'account.appleNotRevokedNote': 'Appleでサインインの連携も解除するには、Apple Account の設定を開いてください。',
   'account.loadFailed': 'サインインの状態を確認できませんでした。',
   'account.retry': 'もう一度試す',
   'account.error.network': '接続できませんでした。通信を確認して、もう一度お試しください。',
@@ -214,9 +214,10 @@ export const ja: Record<MessageKey, Message> = {
   'account.error.reauthFailed': '本人確認ができなかったため、アカウントは削除されていません。もう一度お試しください。',
   'account.error.accountMismatch':
     'サインインしているアカウントと違うため、アカウントは削除されていません。同じアカウントを選んでください。',
-  'account.error.deleteNetwork':
+  'account.error.deleteUnconfirmed':
     'サーバーに接続できず、アカウントが削除されたかどうか分かりません。もう一度お試しください。サインアウトされた場合は、すでに削除されている可能性があります。',
-  'account.error.deleteSignedOut': 'サインアウトされました。アカウントはすでに削除されている可能性があります。',
+  'account.error.deleteSignedOut':
+    'サインアウトされました。アカウントはすでに削除されている可能性があります。残っている場合は、サインインし直して削除してください。',
 
   'error.titleRequired': '曲名を入力してください。',
   'error.artistRequired': 'アーティスト名を入力してください。',

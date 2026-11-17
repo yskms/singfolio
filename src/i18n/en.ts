@@ -238,9 +238,11 @@ export const en = {
   'account.deleteConfirmAction': 'Continue',
   'account.deleting': 'Deleting your account. This can take up to 30 seconds.',
   'account.deleted': 'Your account was deleted.',
-  // Appleのトークンを失効できなかったとき。アカウントは消えている。
-  'account.deletedAppleNotRevoked':
-    'Your account was deleted. To also stop using Sign in with Apple with Singfolio, open your Apple Account settings.',
+  // 削除は成功したが、端末のセッションを捨てられなかったとき（`sessionCleared` が偽）。「サインアウト」で端末の値を捨てられる。
+  'account.deletedSignInRemains': 'This device is still signed in. Tap Sign out to finish.',
+  // Appleのトークンを失効できなかったとき（`appleRevoked` が偽）。アカウントは消えている。
+  'account.appleNotRevokedNote':
+    'To also stop using Sign in with Apple with Singfolio, open your Apple Account settings.',
   'account.loadFailed': 'Couldn’t check your sign-in status.',
   'account.retry': 'Try again',
   // 失敗。取りやめは何も出さない。providerFailed は、原因を言い切らず、強く出さない（OSのシートを「閉じる」もこれになる）。
@@ -256,10 +258,12 @@ export const en = {
   'account.error.reauthFailed': 'Couldn’t confirm it’s you, so your account wasn’t deleted. Please try again.',
   'account.error.accountMismatch':
     'That’s not the account you signed in with, so your account wasn’t deleted. Please choose the same account.',
-  // 削除の通信が途中で切れたとき。サーバーで削除が済んでいるかもしれない（やり直すと、サインアウトされる）。
-  'account.error.deleteNetwork':
+  // 削除の要求を送ったあとの通信が途中で切れたとき。サーバーで削除が済んでいるかもしれない（やり直すと、サインアウトされる）。
+  'account.error.deleteUnconfirmed':
     'Couldn’t reach the server, so we can’t tell whether your account was deleted. Please try again. If you get signed out, it may already be deleted.',
-  'account.error.deleteSignedOut': 'You were signed out. Your account may already have been deleted.',
+  // 削除の 401。削除の再試行とは限らない（別の端末のサインアウトや、使わないままの失効でも起きる）ので、両方の場合を伝える。
+  'account.error.deleteSignedOut':
+    'You were signed out. Your account may already be deleted. If it still exists, sign in again to delete it.',
 
   // ServiceErrorCode → 文言の対応は errors.ts。
   'error.titleRequired': 'Enter a title.',
