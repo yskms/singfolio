@@ -7,7 +7,7 @@ v1.0の作業（0〜6章。保存・管理は端末内で完結し、外部通�
 v1.0より後（公開機能・Requests）の実装順序は、
 `singfolio-publishing-backend.md` §9 を参照。進捗は「7. 公開機能」に書く。
 
-**現在地**：6. リリース準備（6.5・6.8が残り。6.1・6.2・6.3・6.4・6.6・6.7は完了。6.4は、iOS の 1.0 を審査に提出して、審査を通って公開された。Android は、6.8 の変更を含む AAB（versionCode 4）を作って、内部テストへアップロードして、Pixel 11 で確認した。Play Console の申告・掲載を入力して、製品版の審査へ送信し、審査を通って公開された。iOS も審査を通って公開され、紹介ページに両ストアのバッジを載せた。6.8は、アプリの変更・スクリーンショットの撮り直し・ストアの文の修正・両ストアへの入力・Android の実機での確認まで済んだ）。7. 公開機能（v1.0より後）は、7.1（バックエンドの技術検証と選定）が済み、7.2（実装前に確かめること）も済んだ（Appleの公開鍵の取得・`singfolio.app` の取得・認証の方式の決定・Freeプランでの放置後の再アクセス。ログイン手段はiOS・Androidとも、AppleとGoogleに決めた）。7.3 は、小さな作業（7.3.1 から 7.3.13）に分けた。7.3.1（利用者の前提の準備）は済んだ。7.3.2（Workerの土台）も済んだ（本番のD1とWorkerを作り、`singfolio.app` で404を返す状態）。7.3.3（nonce の発行・検証・使用済みの記録と HTTPS の検査）も済んだ（本番へデプロイして、HTTPが403、HTTPSが200になることを実測した。レート制限は Worker に入れない。WAFが Worker より前で効くことも実測した）。7.3.4（IDトークンの検証と、ログイン手段の引き当て）も済んだ（jose で検証し、模擬の発行元でテストした。本物のトークンでの確認は 7.3.7・7.3.8）。7.3.5（セッションとログイン・ログアウトのエンドポイント）も済んだ（模擬の発行元とローカルのD1でテストし、workerd でも動きを確かめた）。7.3.4・7.3.5 とも、本番へのデプロイはまだ。7.3.6（アプリ側の認証の土台）も済んだ（HTTP・SecureStore・初回起動での破棄・ログアウト。画面は無く、何も送らない。AndroidエミュレータとiOS Simulatorで確かめた）。7.3.7（Appleのサインイン）も済んだ（AppleのIDトークンの `nonce` の確認は、7.3.13 へ移した）。7.3.8（Googleのサインイン）も済んだ（iOS Simulatorで、取りやめ・成功・2回目のログインを確かめた。Androidの成功経路は、7.3.13 へ移した）。7.3.9（AndroidのAppleログイン。Web経由）も済んだ（Workerのコールバックと認可コードの交換、アプリのCustom Tabと戻りのURL。Androidエミュレータで、Custom Tab から Worker の302、アプリが `code` を受け取るまでを確かめた。本物のAppleでの交換は 7.3.13）。次は 7.3.10
+**現在地**：6. リリース準備（6.5・6.8が残り。6.1・6.2・6.3・6.4・6.6・6.7は完了。6.4は、iOS の 1.0 を審査に提出して、審査を通って公開された。Android は、6.8 の変更を含む AAB（versionCode 4）を作って、内部テストへアップロードして、Pixel 11 で確認した。Play Console の申告・掲載を入力して、製品版の審査へ送信し、審査を通って公開された。iOS も審査を通って公開され、紹介ページに両ストアのバッジを載せた。6.8は、アプリの変更・スクリーンショットの撮り直し・ストアの文の修正・両ストアへの入力・Android の実機での確認まで済んだ）。7. 公開機能（v1.0より後）は、7.1（バックエンドの技術検証と選定）が済み、7.2（実装前に確かめること）も済んだ（Appleの公開鍵の取得・`singfolio.app` の取得・認証の方式の決定・Freeプランでの放置後の再アクセス。ログイン手段はiOS・Androidとも、AppleとGoogleに決めた）。7.3 は、小さな作業（7.3.1 から 7.3.13）に分けた。7.3.1（利用者の前提の準備）は済んだ。7.3.2（Workerの土台）も済んだ（本番のD1とWorkerを作り、`singfolio.app` で404を返す状態）。7.3.3（nonce の発行・検証・使用済みの記録と HTTPS の検査）も済んだ（本番へデプロイして、HTTPが403、HTTPSが200になることを実測した。レート制限は Worker に入れない。WAFが Worker より前で効くことも実測した）。7.3.4（IDトークンの検証と、ログイン手段の引き当て）も済んだ（jose で検証し、模擬の発行元でテストした。本物のトークンでの確認は 7.3.7・7.3.8）。7.3.5（セッションとログイン・ログアウトのエンドポイント）も済んだ（模擬の発行元とローカルのD1でテストし、workerd でも動きを確かめた）。7.3.4・7.3.5 とも、本番へのデプロイはまだ。7.3.6（アプリ側の認証の土台）も済んだ（HTTP・SecureStore・初回起動での破棄・ログアウト。画面は無く、何も送らない。AndroidエミュレータとiOS Simulatorで確かめた）。7.3.7（Appleのサインイン）も済んだ（AppleのIDトークンの `nonce` の確認は、7.3.13 へ移した）。7.3.8（Googleのサインイン）も済んだ（iOS Simulatorで、取りやめ・成功・2回目のログインを確かめた。Androidの成功経路は、7.3.13 へ移した）。7.3.9（AndroidのAppleログイン。Web経由）も済んだ（Workerのコールバックと認可コードの交換、アプリのCustom Tabと戻りのURL。Androidエミュレータで、Custom Tab から Worker の302、アプリが `code` を受け取るまでを確かめた。本物のAppleでの交換は 7.3.13）。7.3.10（ほかの端末のログアウト・アカウントの削除・Appleのサーバー間通知）も済んだ（Worker: `POST /auth/logout-others`・`POST /auth/delete`・`POST /auth/apple/notifications`、アプリ: `account.signOutOthers()`・`account.deleteAccount()`。Nodeのテストと、workerd での疎通を確かめた。画面は 7.3.11、本物のAppleでの確認は 7.3.13）。次は 7.3.11
 
 ## 0. 企画・設計
 
@@ -172,7 +172,7 @@ v1.0より後（公開機能・Requests）の実装順序は、
         （サーバー間通知のエンドポイントは 7.3.10）。Google: クライアント（Web・iOS・Androidの署名の鍵ごと。EASのlocal build・
         Play App Signingの鍵を含む）は作成済み。同意画面の「公開」は、ホームページとプライバシーポリシーのURLが要る
         ため、7.3.12 で決める（それまでは「テスト中」）。Cloudflare: アカウントの確認は済み。本番のWorkersとD1、`singfolio.app` のルート、秘密情報は
-        7.3.2 で作る（R2は 7.3.10 まで、Turnstileは 7.6）
+        7.3.2 で作る（R2は 7.4。スナップショットを置くときに作る。7.3.10 の削除には、消すものが無い。Turnstileは 7.6）
     -   [x] 7.3.2 Workerの土台。プロジェクトの構成（`worker/`。独立したパッケージ。§8「Workerの構成と運用」）、D1のスキーマと
         マイグレーション（`users`・`identities`・`sessions`・`used_nonces`。`migrations/0001_initial.sql`）、開発用と本番用の設定、
         秘密情報の扱い、リクエストのログに認証の値を出さない設定（Workers Logs を無効にする）。テストは `worker/` で `npm test`。
@@ -195,7 +195,7 @@ v1.0より後（公開機能・Requests）の実装順序は、
         `T` の検証 → IDトークンの検証 → 使用済みの記録 → ログイン手段の引き当て → セッションの発行の順で、D1に書くのは検証に通ったあと。
         つなぐときに決めた2点: 公開鍵を一度も取れていない間も冷却を守る（失敗した試みを記録し、60秒は取りに行かず、すぐ `unavailable`）、
         `audienceFor` が null の組み合わせ（Googleの `web`）は、公開鍵を取りに行く前に拒否する。`web` の `T` は、`V` の照合
-        を 7.3.9 で足して、`POST /auth/apple/login` だけが受け付ける。セッションの認証（`authenticateSession`）を使うエンドポイントは、まだ無い（7.3.10・7.4 以降）。
+        を 7.3.9 で足して、`POST /auth/apple/login` だけが受け付ける。セッションの認証（`authenticateSession`）を使うエンドポイントは、7.3.10 で足した（`/auth/logout-others`・`/auth/delete`）。
         本番へのデプロイはまだ
     -   [x] 7.3.6 アプリ側の認証の土台。HTTPをRepositoryに閉じ込める、SecureStoreにセッション、初回起動でセッションを捨てる、
         失敗の扱い。ログインを要求しない（ログアウトのままでも、v1.0の機能はすべて使える）。`authRepository`（`/auth/nonce`・
@@ -232,17 +232,31 @@ v1.0より後（公開機能・Requests）の実装順序は、
         （Custom Tab → Worker の302 → アプリが `code` を受け取る、本物のAppleの認可の画面が出る、取りやめ、起動時の戻りのURL。起動時は `null` を返すと
         Add Song が開くのを直した）。**本物のAppleでの確認（コードの交換・IDトークンの `nonce`・`sub`）は、デプロイと利用者のAppleアカウントが
         要るので、7.3.13**。アプリが終了したときの再開は実装していない（7.3.11 で決める）（§8「AndroidのAppleログイン（Web経由）の実装」）
-    -   [ ] 7.3.10 アカウントの削除（アプリ内。再認証、Appleのトークンの失効、D1の行とR2のスナップショットの削除）と、Appleの
-        サーバー間通知（`consent-revoked`・`account-deleted`）。通知のエンドポイントは、primary App IDに登録する。
-        `consent-revoked` の処理と、直前に検証を通ったログインの競合（取り消し後にセッションが残らないか）を確かめる（§8「Appleのサーバー間通知」）。
-        あわせて「ほかの端末をすべてログアウト」（同じユーザーの、認証済みのセッション以外の削除。端末をなくしたときの失効の手段。
-        絶対的なセッションの期限は置かない、と決めた代わり。§8「セッション」）を作る
+    -   [x] 7.3.10 アカウントの削除・Appleのサーバー間通知・「ほかの端末をすべてログアウト」。
+        Worker: `POST /auth/logout-others`（認証済みのセッション以外の、同じユーザーの全セッションを削除。204）。`POST /auth/delete`（セッション +
+        再認証。IDトークンの `sub` が、ログイン中のアカウントと一致しなければ 403 `account_mismatch`。再認証の失敗は 403 `reauth_failed`、セッションの無効は 401 と分ける。
+        D1の行を消してから、Appleのトークンを失効させる（失効の失敗は削除を止めず、`appleRevoked: false` で伝える。`refresh_token` はメモリの中だけ）。Appleの失効は
+        `appleToken.ts` に `exchangeWithToken`・`revoke` を足した（ログインの `exchange` は、これまでどおり `id_token` だけを読む））。`POST /auth/apple/notifications`
+        （JWSを `iss`・`aud`（バンドルIDとServices IDのどちらも）・署名で検証。`exp` は必須にしない。`consent-revoked` はセッションを消して `consent_revoked_at` を記録、
+        `account-deleted` は行（最後の手段ならアカウントごと）を消す。再送・遅れて届く古い通知・`event_time` の単位の揺れに備えた）。
+        **通知とログインの競合は、`last_sign_in_at` と `event_time` の比較だけでは吸収できなかった**ので、`identities.consent_revoked_at`（`migrations/0002`）を足し、
+        `createSession` が、取り消しより前に始まったログインのセッションを作らない形にした（§8「Appleのサーバー間通知」）。
+        アプリ: `authRepository`（`logoutOthers`・`deleteAccount`。403 を `reauth-failed`・`account-mismatch` に分ける）、`appleSignInRepository.getIdTokenWithCode`
+        （再認証で認可コードも返す）、`account`（`signOutOthers`・`deleteAccount`。ログイン中の手段で再認証。401 のときだけ端末のセッションを捨てる。成功したら捨てる）。
+        Apple の公式資料で、通知の種類は `account-deleted`（`account-delete` も読む）、payload に `exp` が無いことを確かめた。
+        **R2のスナップショット・`profiles`・Requestの削除は、消すものが無いので、7.4 以降に回した**（`deleteUserAccount` に足す。順序は §8）。
+        **利用者の作業（デプロイのあと）**: Apple Developer の primary App ID の Sign in with Apple の設定に、通知のエンドポイント
+        `https://singfolio.app/auth/apple/notifications` を登録する。Apple Account側の資格情報が失効していて再認証できない利用者の扱いは、7.3.11 の画面設計で決める
+        （再認証なしの削除の逃げ道は作っていない）
     -   [ ] 7.3.11 アカウントの画面（ログイン・ログアウト・「ほかの端末をすべてログアウト」・削除の入口）。置き場所（ProfileかSettings）は、
         画面設計で決める。サインイン済みから別のIDをつなぐ画面を、v1で用意するか決める。`provider-failed` の文言は、原因（端末の設定か、アプリ側の設定の不備か）を言い切らない（§8「Appleのサインイン（iOS）」）。`getSignedInProvider` は、判断できないとき
         `AuthError` を投げる（`null` ではない）ので、画面で捕まえて、アカウントの欄を隠すなどにとどめる（§8「アプリ側の認証の土台」の「失敗の分類」）
     -   [ ] 7.3.12 申告と文書。プライバシーポリシー、`docs/singfolio-store-listing.md`、App Store・Google Playの申告（SDKの
         プライバシーマニフェストを、そのときの版で読み直して決める）、Googleの同意画面（ブランド）、CLAUDE.mdの「スコープ」の節
     -   [ ] 7.3.13 確認。実機と署名したビルド（TestFlight・Playの内部テスト）で、ログイン・キャンセル・再ログイン・ログアウト・削除。
+        7.3.10 の分: 削除でAppleのトークンが失効するか（iOSの認可コードを `redirect_uri` 無しで交換できるか、Appleの設定の「Appleでサインイン」の一覧からSingfolioが消えるか。
+        AndroidのServices IDで得たトークンの失効が、iOS側も消すか）、Appleのサーバー間通知（エンドポイントの登録のあと、`wrangler tail` で、実際の通知の `events` の形・`event_time` の単位・`aud`・
+        `account-deleted` の綴りを見る。「Appleでサインインの利用を停止」で `consent-revoked` が届き、セッションが消えるか）、「ほかの端末をすべてログアウト」（2台で）。
         最初に、AppleのIDトークンの `nonce` が、渡した値（`SHA-256(T)` の base64url）そのままか（7.3.7 から移した。違うなら、Workerを直してから
         ほかを確かめる）。サインインの成功・取りやめ・失敗の、実際のエラーコード（`appleSignInRepository` の分類）。
         Appleの `sub` がiOSとAndroidで同じか、Services IDで得たトークンを失効させたときの連携、AndroidのWebのフロー全体、
@@ -257,7 +271,8 @@ v1.0より後（公開機能・Requests）の実装順序は、
         （debug・EASのlocal build・Play App Signing）のSHA-1）、プロジェクトの所有者でもテストユーザーでもないアカウントで入れるか
         （同意画面は「テスト中」）。Androidの成功経路は、**R8 入りの release で**確かめる（結果の解析 `GoogleIdTokenCredential.createFrom` と
         トークンの返却。googleid のクラスは R8 で改名される）。実機
--   [ ] 7.4 Public ProfileとPublish（Auto Publishを含む）
+-   [ ] 7.4 Public ProfileとPublish（Auto Publishを含む）。アカウントの削除（`worker/src/account.ts` の `deleteUserAccount`。自己削除とAppleの `account-deleted` が使う）に、
+    R2のスナップショット・`profiles`・Requestの削除を足す（順序: `username` を読む → R2を消す → D1の行を消す。R2に失敗したらD1の行を残して失敗にする。§8）
 -   [ ] 7.5 公開Web（`singfolio.app/username`）。プライバシーポリシーを直す（視聴者のアクセス）
 -   [ ] 7.6 Requests（所有者がアプリ内の一覧で受け取る）。プライバシーポリシー・ストアの申告を直す
     （視聴者のRequest。Turnstileとレート制限が扱う情報、ニックネーム）

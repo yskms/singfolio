@@ -127,6 +127,16 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     `invalid_client` は本物のコードでしか出ず、利用者には障害と同じ 503 になる。切り分けはこの1行だけ）。出すのは、ステータスと許可リストの
     `error` 名だけ。コード・`client_secret`・IDトークン・Appleの応答の本文・例外の中身は出さず、増やさない。詳細は docs §8「AndroidのAppleログイン（Web経由）の実装」。
 
+-   Appleのサーバー間通知（`worker/src/appleNotification.ts`）とセッション発行の競合: **`createSession` の INSERT にある `consent_revoked_at` の条件
+    （`migrations/0002`）は外さない。** 通知の処理の最中に進んでいたログインが、取り消し後のセッションを作るのを防ぐ唯一の手段で、`last_sign_in_at` と
+    `event_time` の比較だけでは吸収できない（確かめた）。通知の `aud` は、バンドルIDとServices IDの**どちらも**受け入れる（ログインの `aud` を1つに決める規則とは
+    別。通知がどちらで来るか、資料に無い）。`exp` は必須にしない（資料の例に無い）。`consent-revoked` は `last_sign_in_at <= event_time` の行だけ、`account-deleted`
+    は順序を見ずに処理する（`account-delete` の綴りも読む）。エンドポイントは、デプロイのあと、利用者が primary App ID に登録する。
+-   アカウントの削除（`POST /auth/delete`）: **再認証のIDトークンの `sub` が、ログイン中のアカウントと一致することの確認は外さない**（別のアカウントで再認証しても通ってしまう）。
+    再認証の失敗は 403 にして、401 にしない（アプリは 401 のときだけ端末のセッションを捨てる）。**Appleのトークンの失効は、D1の行を消したあとに行い、失敗しても削除を
+    止めない**（失効を先にすると、D1の失敗で、Apple側だけ失効した中途半端な状態になる）。`refresh_token`・`access_token` を読むのは、削除（`exchangeWithToken`）だけ。
+    ログインの交換（`exchange`）は読まない。R2・`profiles`・Requestの削除は、7.4 で `deleteUserAccount`（`worker/src/account.ts`）に足す。
+
 ### アカウント（アプリ側）
 
 詳細は `docs/singfolio-publishing-backend.md` §8「アプリ側の認証の土台」。
@@ -159,6 +169,9 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
 -   `signIn` が、読めたが別のDBのセッションを上書きするときは、新しいセッションの保存のあとに、サーバーで失効させる（失敗は無視）。
     ログアウトの入口が出ないので、機会はここだけ。「上書きの前」に動かさない（各社の画面を開く前に通信を待たせる）。
 -   認証が要る呼び出しを足すときは、**401 のときだけ**端末のセッションを捨てる（503・5xx・通信の失敗では捨てない）。
+-   `account.signOutOthers()`・`deleteAccount()` は、サインイン中にだけ使える（`not-signed-in`）。認証が要るサーバーの呼び出しは `authorized` を通す（401 のときだけ
+    端末のセッションを捨てる）。`deleteAccount` は、**ログイン中の手段で再認証する**（Apple（iOS）は `getIdTokenWithCode` で認可コードも得る）。成功したら端末のセッションを捨てる。
+    端末内のレパートリーは消さない。再認証ができない利用者の逃げ道（再認証なしの削除）は作っていない（7.3.11 で決める）。
 -   Googleのサインインは、自作のExpoモジュール `modules/singfolio-google-signin`（公式SDKだけ。第三者のラッパーは使わない）。
     その `index.ts` は `requireOptionalNativeModule` で読む。`requireNativeModule` に「簡略化」しない（ネイティブ側が無い
     ビルドで、import の時点で投げ、アプリの起動ごと止まる。ログインを要求しない原則に反する）。呼んだときの失敗は

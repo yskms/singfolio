@@ -396,15 +396,22 @@ AppleとGoogleの仕様は、各社の公式資料で確かめた（Appleは、I
 -   **認証**（`authenticateSession`）: 値から `sessions` と `identities` を1つのクエリで引き、ユーザーID・ログイン手段・
     手段の種類（`apple`・`google`）を返す。無い・期限切れ・形が違うは、区別せず null。期限切れの行は、見つかった時点で消す。
     通ったときだけ、`last_used_at` を進める（時計が戻る値は書かない）。ユーザーIDは、これで得たものだけを使う。使うのは、
-    アカウントの削除（7.3.10）・Publish（7.4）以降。
+    「ほかの端末をすべてログアウト」・アカウントの削除（7.3.10）・Publish（7.4）以降。セッションを作ったログイン手段の `sub` も返す
+    （アカウントの削除の再認証で、同じアカウントかを確かめる）。
 -   **発行**（`createSession`）は、同じログイン手段の、期限を過ぎたセッションを、同じバッチで消す（Cron Triggerは使わない。
     `identity_id` の索引で引くので、件数が増えても費用が増えない）。全体の掃除はしない。二度とログインしない人の、期限を
     過ぎた行は残る（1行は小さく、認証には使えない）。1つのログイン手段に、端末ごとに複数のセッションを持てる。
+    **発行しないことがある**（`null`。ログインは 401 になる）: ログイン手段の行が無い（直前に `account-deleted` で消えた）、または
+    `identities.consent_revoked_at`（Appleの `consent-revoked` の `event_time`）が、このログインの開始時刻（`now`）より後。
+    理由と使い方は「Appleのサーバー間通知」。
 -   ログアウトは、そのセッションの行の削除。アカウントの削除は、そのユーザーの全セッションの削除。
--   **「ほかの端末をすべてログアウト」**（7.3.10 で作る。未実装）: 認証済みのセッションを除く、同じユーザーの全セッションの行を
-    削除する。ユーザーに複数のログイン手段（AppleとGoogle）がつながっていれば、手段をまたいで消す（`sessions` は
-    `identity_id` を持つので、`identities` を `user_id` で引く）。ログアウトと違い、セッションの認証（`authenticateSession`）が要る。
-    端末をなくしたとき、残っている端末から、なくした端末の値を失効させる手段。
+-   **「ほかの端末をすべてログアウト」**（実装済み。7.3.10。`POST /auth/logout-others`。`worker/src/auth.ts` の `handleLogoutOthers`、
+    `session.ts` の `revokeOtherSessions`）: 認証済みのセッションを除く、同じユーザーの全セッションの行を削除して、204（本文なし）。
+    ユーザーに複数のログイン手段（AppleとGoogle）がつながっていれば、手段をまたいで消す（`sessions` は `identity_id` を持つので、
+    `identities` を `user_id` で引く）。ログアウトと違い、セッションの認証（`authenticateSession`）が要る: ヘッダーが無い・形が違う・
+    無効（無い・期限切れ）は 401 で、何も消さない。消すものが無くても204（何度呼んでも同じ）。405（`POST` 以外）。
+    アプリは、401 のとき端末のセッションを捨てる（`account.signOutOthers()`）。端末をなくしたとき、残っている端末から、なくした端末の値を
+    失効させる手段（絶対的な期限を置かない代わり）。期限を過ぎた行も、ここで消える。
 -   iOSのSecureStore（Keychain）は、アプリを削除しても残りうる（保証はされない。Androidは消える）。再インストール
     すると、ローカルDBは空なのに、セッションだけ生きている状態になる。そこで、ローカルDBを新しく作ったとき
     （初回起動）に、保存済みのセッションを捨てる。これだけでは、空のローカルからのPublishで公開内容が空に
@@ -440,7 +447,7 @@ AppleとGoogleの仕様は、各社の公式資料で確かめた（Appleは、I
     サーバーに残る（最後の利用から90日で切れる。ログアウトで失効を確認できない場合と同じ扱い）。
 -   **保存。** SecureStore（iOSはKeychain、Androidは Keystore で暗号化）の1つのキー `singfolio.session` に、JSON
     `{"v":1,"session":"<値>","provider":"apple"|"google","localDataId":"<UUID>"}`。SQLite・settings・ログには置かない。ユーザーID・メール・
-    名前は端末に持たない。`provider` を持つのは、アカウントの削除（7.3.10）が、どの手段で再認証するかを知るため。iOSは
+    名前は端末に持たない。`provider` を持つのは、アカウントの削除（7.3.10。`account.deleteAccount()`）が、どの手段で再認証するかを知るため。iOSは
     `WHEN_UNLOCKED_THIS_DEVICE_ONLY`（ロックが解けている間だけ読める。バックアップ・端末の引っ越しで別の端末へ移らない。移った先は
     ログアウトから始まる）。読み取りの結果は3通り（`SessionRead`）: `none`（項目が無い）、`unreadable`（読み取りの失敗・壊れた値・知らない版。
     値は消さない。投げない）、`found`。`none` と `unreadable` は、どちらもサインインしていない扱いだが、区別する（ログアウトの結果に出る）。
@@ -491,12 +498,17 @@ AppleとGoogleの仕様は、各社の公式資料で確かめた（Appleは、I
     | `provider-failed` | 各社のサインインが、取りやめ以外で終わらなかった（Appleは、端末にAppleアカウントでサインインしていないときなど。アプリ側の設定の不備でも同じになりうる） | やり直せる。原因を言い切らない文言にする（7.3.11） |
     | `timeout` | 各社のサインインが5分で終わらなかった（下の「時間の上限と取り消し」） | やり直せる |
     | `provider-unavailable`・`already-signed-in` | 上のとおり | |
+    | `not-signed-in` | 「ほかの端末をすべてログアウト」・アカウントの削除を、サインインしていないときに呼んだ（別のローカルDBのセッション・読めない値も、していない扱い） | 画面は、サインイン中にだけ入口を出す |
+    | `reauth-failed` | アカウントの削除の再認証が通らない（403 `reauth_failed`。`T`・IDトークン・認可コードの不備、リプレイ）。サインインは保たれる | やり直せる |
+    | `account-mismatch` | 再認証は通ったが、ログイン中のアカウントとは別のアカウント（403 `account_mismatch`）。何も消えていない。サインインは保たれる | 「サインインに使っているアカウントで、もう一度」（7.3.11） |
     | `unexpected` | 各社のサインインが契約に反して投げた、ハッシュの計算・DBの失敗など | アプリの不具合 |
 
     5xx は本文を読まずに `unavailable` にする。再試行はしない（やり直しは利用者の操作）。`network`・`unavailable`・`timeout` が
     一時的な失敗（`isTemporaryAuthError`。`provider-failed` は、設定の確認が要るので含めない）。利用者向けの文言への対応は、画面を足すとき（7.3.11）に作る。
--   **認証が要る呼び出しを足すとき（7.3.10・7.4 以降）の規則。** 401 を受けたら、端末のセッションを捨てる（サーバーが認めない値は、
-    二度と通らない）。503・5xx・通信の失敗では捨てない（一時的な失敗。セッションは生きている）。
+-   **認証が要る呼び出しを足すとき（7.4 以降）の規則。** 401 を受けたら、端末のセッションを捨てる（サーバーが認めない値は、
+    二度と通らない）。503・5xx・通信の失敗では捨てない（一時的な失敗。セッションは生きている）。7.3.10 の `signOutOthers`・
+    `deleteAccount` は、この規則どおり（`accountService` の `authorized`）。**アカウントの削除は、再認証の失敗を 401 にしない（403）**:
+    別のAppleアカウントで再認証しただけで、サインアウトさせないため。
 -   **`expo-secure-store` の config plugin を `app.json` に足さない。** plugin は、Androidのバックアップ規則（`fullBackupContent`・
     `dataExtractionRules`）に `<include domain="sharedpref" path=".">` を入れる。Androidの資料では、`<include>` が1つでもあると、
     その指定だけがバックアップされ、既定の対象は外れる。入れると、v1.0で今バックアップされているSQLite（レパートリー）が、
@@ -531,8 +543,9 @@ AppleとGoogleの仕様は、各社の公式資料で確かめた（Appleは、I
     **iOSのときだけ**注入する（`Platform.OS === 'ios'`。AndroidのAppleは Web 経由で、7.3.9）。SDKはRepositoryに注入する（`src/` はNodeのテストで
     直接動かすため、ここでimportしない）。このモジュールはAndroidに実装が無いが、JSをimportしても落ちない（`requireOptionalNativeModule`）。
 -   `nonce` には、渡された `SHA-256(T)` の base64url をそのまま入れる（変換しない）。**スコープは空**（`requestedScopes: []`）。名前もメールも要求しない
-    （使うのは `sub` だけ。Googleは、スコープを外せない（「Googleのサインイン」））。`authorizationCode` は、
-    受け取っても使わない（アカウントの削除（7.3.10）が、再認証であらためて得る）。
+    （使うのは `sub` だけ。Googleは、スコープを外せない（「Googleのサインイン」））。`authorizationCode` は、サインイン
+    （`getIdToken`）では受け取っても使わず、返さない。アカウントの削除の再認証（`getIdTokenWithCode`。同じSDKの呼び出しで、IDトークンと
+    一緒に得る）でだけ返し、Workerがトークンの失効に使う（次の「アカウントの削除とAppleのトークン失効」）。
 -   **config plugin**（`app.json` の `expo-apple-authentication`）は、iOSのエンタイトルメント `com.apple.developer.applesignin` を足し、
     `CFBundleAllowMixedLocalizations` を `true` にする（Appleのボタンの文言のため。今はボタンを使っていない）。**後者は Info.plist 全体に効き、
     アプリが対応していない言語の端末で、OSの部品の文言の言語選びが変わりうる**（Appleの資料の記述は「フレームワークのローカライズ文字列を取得できるか」だけ
@@ -573,31 +586,87 @@ AppleとGoogleの仕様は、各社の公式資料で確かめた（Appleは、I
     端末での取りやめ（`ERR_REQUEST_CANCELED` になるか）、実機（iPhone 8）、署名したビルド（プロビジョニングプロファイルに Sign in with Apple が
     入っているか。EASのビルドで初めて分かる）。
 
-**アカウントの削除とAppleのトークン失効**
+**アカウントの削除とAppleのトークン失効**（実装済み。7.3.10。Worker: `worker/src/deleteAccount.ts`・`account.ts`・`appleToken.ts`。
+アプリ: `account.deleteAccount()`・`authRepository.deleteAccount`。画面は 7.3.11。本物のAppleでの確認は 7.3.13）
 
--   削除は、アプリでの再認証を挟む。本人確認と、取り返しのつかない操作の確認を兼ねる。
--   Sign in with Appleのユーザーは、再認証で得たauthorization code（1回限り・5分有効）を、削除のAPIの中で
-    同期して `/auth/token` で交換し、得たトークンを `/auth/revoke` で失効させる。リフレッシュトークンはD1に保存しない。
--   **再認証のIDトークンの `sub` が、削除するアカウントの `identities` の行と一致することを、必ず確かめる。**
-    確かめないと、別のAppleアカウントで再認証しても削除が通る。
--   Appleの資格情報が失効していて再認証できないときは、失効を省いて削除を進められる（Appleの案内は、失効を
-    「すべき」とするもので、削除を難しくしないことが優先）。ユーザーが再認証を取りやめた場合は、削除しない。
+-   削除は、アプリでの再認証を挟む。本人確認と、取り返しのつかない操作の確認を兼ねる。再認証は、**ログイン中の手段**（セッションを作った
+    手段）で、ログインと同じ手順（Workerが発行した `T`、各社のIDトークン。AndroidのAppleは認可コードと `V`）を踏む。端末内のレパートリーは消えない。
+-   **`POST /auth/delete`**。`Authorization: Bearer <セッションの値>` と、再認証の本文（10KBまで）。ユーザーIDは受け取らない（セッションから決める）。
+    -   Apple（iOS）: `{"provider":"apple","nonce":"<T（native）>","idToken":"…","authorizationCode":"…"}`（`authorizationCode` は省略できる。
+        省略すると、Appleのトークンは失効できず、`appleRevoked: false`）
+    -   Apple（Android）: `{"provider":"apple","nonce":"<T（web）>","code":"…","verifier":"<V>"}`（IDトークンは、Workerが認可コードの交換で得る）
+    -   Google: `{"provider":"google","nonce":"<T（native）>","idToken":"…"}`
+    -   レスポンス: 200 `{"appleRevoked":true|false|null}`（`null` はGoogle。失効するものが無い。`false` でも、アカウントは消えている）。
+        エラー: 400（本文の不備。再認証の手段が、ログイン中の手段と違う場合を含む）、**401**（セッションが無効。アプリは端末のセッションを捨てる）、
+        **403**（再認証が通らない。`{"error":"reauth_failed"}`: `T`・IDトークン・認可コードの不備、リプレイ、`V` の不一致。
+        `{"error":"account_mismatch"}`: 再認証は通ったが、`sub` が、ログイン中のアカウントと違う）、405、413、503（公開鍵・Appleが使えない。何も消えていない）。
+        401 と 403 を分けるのは、アプリが 401 のときだけ端末のセッションを捨てるため。
+-   **再認証のIDトークンの `sub` が、ログイン中のアカウント（セッションを作った `identities` の行）の `sub` と一致することを、必ず確かめる。**
+    確かめないと、別のAppleアカウントで再認証しても削除が通る。外さない（`worker/test/deleteAccount.test.ts` が、外すと落ちる）。手段が違うもの
+    （Appleのセッションに、Googleの再認証）は 400。
+-   **処理の順序**: セッションの認証（D1の読み取り。本文の形の検査のあと）→ `T` の署名・種別・期限 → IDトークンの検証（AndroidのAppleは、`V` の照合 →
+    認可コードの交換 → 検証。`V` の照合が先で、通らなければAppleを呼ばない）→ `sub` の一致 → `T` を使用済みに → **D1の行を消す** → Appleのトークンの失効。
+    書き込みは、すべての確認が通ったあと。`T` を使い切りにするのは、`sub` の一致のあと（別のアカウントで再認証したときは、使い切りにしない）。
+-   **Appleのトークンの失効は、削除を止めない（D1を消したあとに行う）。** Appleの案内は、失効を「すべき」とするもので、削除を難しくしないことが優先。
+    失効の失敗（Appleの不調・コードの無効・鍵の設定の不備・`authorizationCode` が無い）は、`appleRevoked: false` で伝える。アプリは、利用者に、
+    Appleの設定（Apple Account の「Appleでサインイン」）から連携を解除できると案内できる（7.3.11）。D1が先なのは、失敗しうる書き込みを、止められる前に
+    済ませ（失敗したら何も消えず、やり直せる）、あとに残るのを、失敗しても削除を損なわない処理だけにするため。
+    -   iOS: 認可コードを、バンドルIDの `client_id` で交換し（`redirect_uri` は付けない。**ネイティブのコードの交換が `redirect_uri` 無しで通るかは未確認。7.3.13**）、
+        得た `refresh_token`（無ければ `access_token`）を `POST /auth/revoke`（`token_type_hint` 付き）で失効させる。
+    -   Android: 再認証の本人確認のための交換（Services IDの `client_id`・`redirect_uri`）で、同じ応答のトークンも得る（認可コードは1回限り）。
+        そのトークンを、Services IDの `client_id` で失効させる。
+    -   **`refresh_token`・`access_token` は、メモリの中で、交換から失効に渡して終わる**（D1にも、ログにも、応答にも出さない）。ログインの交換
+        （`exchange`）は、これまでどおり `id_token` だけを読む（`exchangeWithToken` と `revoke` だけが、トークンを扱う）。失敗は、
+        `apple token revoke failed: ...`（ステータスと許可リストの `error` 名だけ）を1行 `console.error` に出す。
+-   Apple Account側の資格情報が失効していて再認証できないとき（端末にAppleアカウントが無い、など）の逃げ道は、**まだ作っていない**。
+    再認証なしでは削除できない（セッションを盗まれた端末から、再認証なしにアカウントが消えるのを防ぐ）。7.3.11 の画面設計で、再認証ができない
+    利用者の扱い（別の手段・問い合わせ）を決める。
+-   **R2のスナップショット・`profiles`・Requestは、7.4 以降で足す。** 今消すのは `users` の行（`identities`・`sessions` は、外部キーのCASCADE）だけ。
+    `deleteUserAccount`（`worker/src/account.ts`）に足す（自己削除と `account-deleted` の両方が、この関数を使う）。順序は、
+    「`username` を読む → R2のスナップショットを消す → D1の行を消す」。R2の削除に失敗したら、D1の行を残して失敗にする（行が無いと、消し残した
+    スナップショットのキーが分からなくなる）。R2のバケットは、そのとき作る（今は消すものが無い）。
 -   `client_secret`（ES256のJWT）は、Workerがリクエストごとに、Sign in with Appleの秘密鍵（`.p8`。Workerのsecret）
     で署名する。`exp` は最大6か月先までなので、短く取り、定期的な再生成は要らない。
+-   複数のログイン手段がつながったアカウント（「アカウントのつなぎ方」。画面を作るかは 7.3.11 で決める）では、削除は、ログイン中の手段で再認証するだけで、
+    すべてのログイン手段と、全セッションを消す。つながった別のAppleのログイン手段のトークンは、失効しない（再認証していないため）。つなぐ画面を作るなら、
+    そのときに、削除の再認証をどうするか決める。
 
-**Appleのサーバー間通知**
+**Appleのサーバー間通知**（実装済み。7.3.10。`worker/src/appleNotification.ts`・`idToken.ts` の `verifyAppleNotification`。本物のAppleでの確認は 7.3.13）
 
--   `consent-revoked`（アプリとの連携の解除）と `account-deleted`（Appleアカウントの削除）を受けるエンドポイントを
-    持つ（Appleが使うよう案内している。7.3）。署名（JWS）・`iss`・`aud` を確かめてから処理する。
--   単位は、そのApple IDの `identities` の行。`consent-revoked` は、その行から作ったセッションを失効させる。
-    `account-deleted` は、その行とそのセッションを消し、ほかのIDが残っていなければ、アカウントごと（R2の
-    スナップショットも）削除する。
--   同じ通知が2回届いても、結果は変わらない。その行の最後のサインインより前の `event_time` の通知は無視する。
--   **ログインとの競合（実装時に確かめる）。** `consent-revoked` を処理した直後に、その前に検証を通っていたログインが
-    セッションを作ると（`signIn` は、検証・`resolveIdentity`・`createSession` の間に、他のリクエストが入りうる）、取り消し後の
-    セッションが1つ残りうる。`last_sign_in_at`（ログインの開始時刻）と `event_time` の比較で吸収できるかを、通知の処理を
-    作るとき（7.3.10）に確かめる。吸収できないなら、そのときに手段を決める。`account-deleted` は、`identities` の行が無くなるので、
-    外部キーで `createSession` が失敗し、セッションは残らない（`consent-revoked` は、行が残るため、この保護が効かない）。
+-   **`POST /auth/apple/notifications`**。本文は `{"payload":"<JWS>"}`（16KBまで）。デプロイのあと、利用者が、Apple Developer の primary App ID の
+    Sign in with Apple の設定に、`https://singfolio.app/auth/apple/notifications` を登録する（グループで1つ。TLS 1.2 以上が要る。Cloudflareは満たす）。
+    登録するまで、通知は届かない。
+-   **検証**（IDトークンと同じ公開鍵のキャッシュ。`alg` は RS256 のみ、`kid` 必須、`iss` は `https://appleid.apple.com`）。`aud` は、**バンドルIDとServices IDの
+    どちらでもよい**（ログインの `aud` は1つに決めるが、通知がどちらの `client_id` で来るかは、資料に書かれていない。どちらも自分のIDで、署名が、Appleが
+    自分宛てに送ったことを示す。7.3.13 で実際の値を見る）。**`exp`・`iat` は必須にしない**（資料の例は `iss`・`aud`・`iat`・`jti`・`events` で、`exp` が無い。
+    `exp` が付いていれば jose が見る）。通らなければ D1に何も書かない: 401（どの検査かは教えない）、公開鍵が取れなければ 503、本文の形の不備は 400、413、405。
+    検証に通らなかったときは、理由の分類だけを `apple notification rejected: reason=...` と1行 `console.error` に出す（`aud` の食い違いなどの設定の不備は、
+    これでしか切り分けられない。通知の中身・トークンは出さない）。
+-   **`events`** は、資料の例ではJSONのオブジェクト。文字列（JSON）で送られる、という報告もあるので、どちらも読む。`type`・`sub`・`event_time` の3つを必須にする。
+    `event_time` は、資料の例は秒、実際はミリ秒という報告があるので、1e11 未満なら秒として1000倍し、受け取った時刻を超える値は、受け取った時刻に丸める
+    （巨大な値を記録して、そのあとのログインが止まらないように）。数字の文字列も読む。**種類の綴り**: 資料（確認: 2026-11-17）は `account-deleted`。
+    古い資料・フォーラムには `account-delete` の記述があるので、両方を読む。`email-enabled`・`email-disabled`・知らない種類は、200で何もしない。
+-   単位は、その Apple の `sub` の `identities` の行（`provider = 'apple'`）。
+-   **`consent-revoked`**（アプリとの連携の解除）: その行のセッションを消し、`identities.consent_revoked_at`（migrations/0002）に `event_time` を記録する。1つのバッチで、
+    どちらにも同じ条件を付ける: ① `last_sign_in_at <= event_time`（通知のあとにサインインし直した行は、触らない。遅れて届いた・再送された古い通知で、
+    サインインし直した利用者をログアウトさせない）、② `consent_revoked_at` が無い、または `event_time` より前（同じ通知の再送は、何もしない）。行は消さない。
+-   **`account-deleted`**（Apple Account の削除）: その行を消す（セッションも、外部キーで消える）。ほかのログイン手段が無ければ、アカウントごと消す
+    （`deleteUserAccount`。R2のスナップショットなどは、7.4 以降）。**順序は見ずに処理する**（消えたApple Accountは戻らない）。同じ通知が2回届いても、2回目は行が無く、何も起きない。
+-   **ログインとの競合（7.3.10 で確かめた）。** 通知を処理した最中に、その前に検証を通っていたログインがセッションを作ると、取り消し後のセッションが1つ残りうる。
+    **`last_sign_in_at` と `event_time` の比較だけでは、吸収できない**（ログインの開始が `event_time` より後だと、通知が「サインインし直した」と見て無視する）ので、
+    `consent_revoked_at` を足した。`createSession` は、INSERT の1文の中で、`consent_revoked_at` がそのログインの開始時刻（`now`）より後なら、セッションを作らない
+    （ログインは 401。やり直せば通る）。通知の処理（削除と記録）も1バッチなので、どちらが先でも、取り消し後のセッションは残らない: ログインのINSERTが先なら、通知の
+    DELETE が消し、通知が先なら、INSERT が条件で止まる（`worker/test/appleNotification.test.ts`）。
+    **残るリスク（受け入れる）**: ログインの開始が `event_time` と同じかそれより後で、IDトークンが取り消しの前に発行されたもの（取り消しの直前に得たトークンを、取り消しの
+    あとに送る）。トークンは、サインインの直後にアプリが送るので、取り消しを、別の端末で、数秒のうちに行ったときだけ。IDトークンの `iat` と比べれば吸収できるが、
+    検証の結果にクレームを載せない方針（「IDトークンの検証」）を崩し、通知の `event_time` の単位（秒かミリ秒か）への依存も増えるので、採らない。
+    `account-deleted` との競合: ログインの `resolveIdentity` のあとに行が消えたなら、`createSession` が、行が無いので条件で止まり、401（例外にしない）。
+    `resolveIdentity` のまえに消えたなら、その `sub` の新しい（空の）アカウントができる。消えたApple Accountの `sub` で、削除の前に発行されたIDトークンを
+    送ったときだけで、空のアカウントは何も持たない（受け入れる）。
+-   確かめたこと: Nodeのテスト（模擬の発行元・ローカルD1。`worker/test/appleNotification.test.ts`）で、各検査の拒否（`aud`・`iss`・署名・`kid`・`alg: none`・`HS256`・`exp`・`events` の形）、
+    `consent-revoked` の処理・再送・遅れて届く通知・時刻の単位・競合、`account-deleted` の処理（唯一のログイン手段・ほかが残る場合）。workerd（`wrangler dev`）で、
+    エンドポイントが届くこと（400・401・405・理由の1行）。**未確認（7.3.13）**: 実際のAppleの通知の形（`events` が文字列かオブジェクトか、`event_time` の単位、`aud`、
+    `account-deleted` の綴り）、登録（primary App IDで、Services IDのグループを含む）、通知が届くまでの遅れ、Appleが同じ通知を再送するか。
 
 **AndroidのAppleログイン（Web経由）**（実装済み。7.3.9。実際のAppleでの確認は未了で、7.3.13。最後の「実装」の節）
 
@@ -623,7 +692,7 @@ AndroidにはAppleのネイティブのサインインが無いので、Appleの
     `SHA-256(V)` が `T` の中の `C` と一致することを確かめてから、`/auth/token` で交換し（`client_id` はServices ID、
     `redirect_uri` が必須）、得たIDトークンを検証する（`aud` はServices ID、`nonce` が `SHA-256(T)` と一致）。
     以降はiOSと同じ。交換で得るリフレッシュトークンは保存しない。Workerは `state` を見ない（`T` から決まるので）。
--   削除のときの再認証も、同じフロー（同じ `V`・`T` の結びつけ）で `code` を得て、交換し、失効させる。
+-   削除のときの再認証も、同じフロー（同じ `V`・`T` の結びつけ）で `code` を得て、交換し、失効させる（`POST /auth/delete`。「アカウントの削除とAppleのトークン失効」）。
 -   **横取りの対策。** Androidでは、同じカスタムURLスキームを登録した別のアプリも、リダイレクトを受け取れる
     （RFC 8252 §8.1）。横取りされた `code` と `state` だけでは、`T` も `V` も無い（`state` は `T` のハッシュ）ので、
     Workerは受け付けない。AppleのAPIにはPKCEのパラメータが無いので、`T` に結びつけた `V` で、PKCEと同じ役割を
@@ -670,8 +739,8 @@ AndroidにはAppleのネイティブのサインインが無いので、Appleの
     `consumeNonce` → `resolveIdentity` → セッションの発行。D1に書くのは、IDトークンの検証が通ったあとだけ。
 -   **Appleとの通信**（`appleToken.ts`）。form で `client_id`（Services ID）・`client_secret`・`code`・`grant_type=authorization_code`・`redirect_uri`
     （Return URL と同じ）を送る。リダイレクトには従わない、5秒で打ち切る、再試行しない（認可コードは1回限りで5分有効）。応答は、`id_token` だけを
-    使う。**`refresh_token`・`access_token` は、読まず、保存せず、ログにも出さない**（ログインには要らない。アカウントの削除（7.3.10）は、
-    再認証であらためて得る）。Appleの応答の本文・コード・IDトークンを、エラーにも結果にも載せない。**400 `invalid_grant`**（無効・期限切れ・
+    使う。**ログインでは、`refresh_token`・`access_token` は、読まず、保存せず、ログにも出さない**（ログインには要らない。アカウントの削除（7.3.10）だけが、
+    失効のために、メモリの中で読む。「アカウントの削除とAppleのトークン失効」）。Appleの応答の本文・コード・IDトークンを、エラーにも結果にも載せない。**400 `invalid_grant`**（無効・期限切れ・
     使用済みのコード）**は 401**。それ以外（通信の失敗・5xx・`invalid_client`（こちらの設定の不備）・`invalid_request` など）は 503
     （どれも利用者にできることが無い。コードの問題と区別しても同じ）。
     **設定の不備は、本物のコードで試すまで分からない。** でたらめなコードでAppleのトークンのエンドポイントを呼ぶと、Team ID・Key ID・鍵・Services ID・
@@ -928,6 +997,10 @@ nonce・セッションの失効・Appleのトークン失効の方式は、「�
     連携が残って見えないか）。残るなら、削除の要件は満たせるが、ユーザーに案内を出すか決める。
 -   AndroidのWebのフロー全体。Custom Tabからコールバック、アプリのURLスキームへのリダイレクトが続くか。
     `nonce`・`state`（43字）が、Appleにそのまま受け付けられ、返るか。
+-   アカウントの削除（7.3.10）: iOSの認可コードを、バンドルIDの `client_id` で、`redirect_uri` 無しで交換できるか。得た `refresh_token` の失効で、Appleの設定の
+    「Appleでサインイン」の一覧から、Singfolio が消えるか。Androidで、Services IDで得たトークンの失効が、iOS（バンドルID）側の連携も消すか（上と同じ）。
+-   Appleのサーバー間通知（7.3.10）: primary App ID にエンドポイントを登録して、実際の通知の形（`events` が文字列かオブジェクトか、`event_time` の単位、`aud`、
+    `account-deleted` の綴り）を `wrangler tail` で見る。Apple Account の設定の「Appleでサインインの利用を停止」で、`consent-revoked` が届き、セッションが消えるか。
 
 実装時に決めること：
 
@@ -1070,8 +1143,8 @@ Repositoryを、同じコミットで直せるため）。
     時刻はINTEGER（ミリ秒）。TEXTの主キーのテーブルは `WITHOUT ROWID` にする（ROWID付きだと、
     主キーの索引の分だけ書き込みが増え、Freeの書き込みの上限（10万行/日）に響く）。外部キーは有効で、
     `users` の行を消すと、`identities`・`sessions` も消える。Appleの `consent-revoked` は、
-    `sessions` の行だけを消す（`identities` の行は残す。`last_sign_in_at` が要るため）。
-    `account-deleted` は `identities` の行を消す（セッションも消える）。
+    `sessions` の行だけを消し、`identities.consent_revoked_at`（0002）に時刻を記録する（`identities` の行は残す。
+    `last_sign_in_at` が要るため）。`account-deleted` は `identities` の行を消す（セッションも消える）。
     **親テーブル（`users`・`identities`）は、作り直さない。** 外部キーが有効なとき、`DROP TABLE` は
     暗黙の `DELETE` として `ON DELETE CASCADE` を発動し、子の行を消す。ローカルのD1では、
     `PRAGMA defer_foreign_keys` でも `PRAGMA foreign_keys = OFF` でも止まらなかった（バッチの中、単独の文、
