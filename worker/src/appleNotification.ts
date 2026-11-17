@@ -1,0 +1,106 @@
+// Apple のサーバー間通知（POST /auth/apple/notifications）。方式と理由は
+// docs/singfolio-publishing-backend.md §8「Appleのサーバー間通知」。
+//
+// Apple が、アプリとの連携の解除（`consent-revoked`）と、Apple Account の削除（`account-deleted`）を、
+// 登録したエンドポイントへ送る（primary App ID に登録する。デプロイのあとに、利用者が行う）。本文は
+// `{"payload":"<JWS>"}`。署名・`iss`・`aud` を確かめてから、種類ごとに処理する。
+//
+// 守ること:
+// - 検証に通る前は、D1に触れない。通ったあとも、知らない種類（`email-enabled` など）は何もしない。
+// - 同じ通知が何度届いても、結果は同じにする（Apple は同じ通知を繰り返し送る、という報告がある）。
+// - `consent-revoked` は、その行の最後のサインインより前の通知だけを処理する。あとでサインインし直した（連携が
+//   戻った）利用者を、届くのが遅れた古い通知で、ログアウトさせない。
+// - `account-deleted` は、順序を見ずに処理する（消えた Apple Account は戻らない）。
+// - 通知の中身（`sub`・`event_time`）・JWSを、ログに出さない。失敗の分類だけを、`console.error` に1行出す。
+import { deleteUserAccount } from './account.ts';
+import { invalidRequest, json, methodNotAllowed, readJsonObject, serviceUnavailable, unauthorized } from './http.ts';
+import { getIdTokenVerifier, type AppleNotificationEvent, type IdTokenVerifier } from './idToken.ts';
+
+// 本文の上限。JWS は1〜2KB。
+const MAX_BODY_BYTES = 16 * 1024;
+
+/** 処理した結果。呼び出し側（テスト）が、何が起きたか見分けるためのもの。応答には出さない。 */
+export type AppleEventOutcome = 'ignored' | 'sessions-revoked' | 'identity-deleted' | 'user-deleted' | 'nothing';
+
+/**
+ * POST /auth/apple/notifications。検証に通ったら、通知を処理して 200（本文 `{}`）を返す（知らない種類・対象が
+ * 無い通知も 200）。形の不備は 400、検証に通らない（どの検査かは教えない）は 401、公開鍵を取得できないは 503
+ * （Apple が再送するかは分からないが、トークンの問題ではない）。
+ */
+export async function handleAppleNotification(
+  request: Request,
+  env: Env,
+  now: number,
+  deps: { verifier?: IdTokenVerifier; log?: (message: string) => void } = {},
+): Promise<Response> {
+  if (request.method !== 'POST') return methodNotAllowed('POST');
+  const parsed = await readJsonObject(request, MAX_BODY_BYTES);
+  if (!parsed.ok) return parsed.response;
+  const { payload } = parsed.body;
+  if (typeof payload !== 'string' || payload === '') return invalidRequest();
+
+  const verified = await (deps.verifier ?? getIdTokenVerifier()).verifyAppleNotification({
+    token: payload,
+    audiences: [env.APPLE_BUNDLE_ID, env.APPLE_SERVICES_ID],
+    now,
+  });
+  if (!verified.ok) {
+    // 設定の不備（`aud` の食い違いなど）は、検証に通らない理由が見えないと切り分けられない。通知は Apple からしか
+    // 来ないので、理由の分類（固定の語彙）だけを出す。トークンの中身は出さない（Workers Logs は無効。`wrangler tail` で見る）。
+    (deps.log ?? ((message) => console.error(message)))(`apple notification rejected: reason=${verified.reason}`);
+    return verified.reason === 'unavailable' ? serviceUnavailable() : unauthorized();
+  }
+
+  await applyAppleEvent(env.DB, verified.event);
+  return json({});
+}
+
+/**
+ * 検証済みの通知を処理する。
+ * - `consent-revoked`: その Apple の `sub` の `identities` の行のセッションを消し、`consent_revoked_at` を記録する。
+ * - `account-deleted`（`account-delete` も読む。資料の版で綴りが違うという報告がある）: その行を消す。ほかのログイン手段が
+ *   無ければ、アカウントごと消す。
+ * - それ以外: 何もしない。
+ */
+export async function applyAppleEvent(db: D1Database, event: AppleNotificationEvent): Promise<AppleEventOutcome> {
+  if (event.type === 'consent-revoked') return revokeConsent(db, event);
+  if (event.type === 'account-deleted' || event.type === 'account-delete') return deleteAppleIdentity(db, event.sub);
+  return 'ignored';
+}
+
+/**
+ * `consent-revoked`。1つのバッチ（トランザクション）で、セッションの削除と記録を行う。どちらにも同じ条件を付ける:
+ * - `last_sign_in_at <= eventTime`: 通知のあとにサインインし直した行は、触らない（遅れて届いた、または再送された古い通知）。
+ * - `consent_revoked_at` が無い、または `eventTime` より前: 同じ通知（同じ `event_time`）の再送は、何もしない。
+ * `consent_revoked_at` は、`createSession` が、この通知より前に始まったログインのセッションを作らないために見る
+ * （通知の処理の最中に進んでいたログイン。migrations/0002）。
+ */
+async function revokeConsent(db: D1Database, event: AppleNotificationEvent): Promise<AppleEventOutcome> {
+  const condition = `provider = 'apple' AND sub = ?1 AND last_sign_in_at <= ?2 AND (consent_revoked_at IS NULL OR consent_revoked_at < ?2)`;
+  const [, update] = await db.batch([
+    db
+      .prepare(`DELETE FROM sessions WHERE identity_id IN (SELECT id FROM identities WHERE ${condition})`)
+      .bind(event.sub, event.eventTime),
+    db.prepare(`UPDATE identities SET consent_revoked_at = ?2 WHERE ${condition}`).bind(event.sub, event.eventTime),
+  ]);
+  return update!.meta.changes === 1 ? 'sessions-revoked' : 'nothing';
+}
+
+/** `account-deleted`。その Apple の `sub` の行を消す（セッションも、外部キーで消える）。最後のログイン手段なら、アカウントごと。 */
+async function deleteAppleIdentity(db: D1Database, sub: string): Promise<AppleEventOutcome> {
+  const row = await db
+    .prepare(
+      `SELECT i.id AS id, i.user_id AS user_id,
+              (SELECT COUNT(*) FROM identities o WHERE o.user_id = i.user_id) AS total
+       FROM identities i WHERE i.provider = 'apple' AND i.sub = ?1`,
+    )
+    .bind(sub)
+    .first<{ id: string; user_id: string; total: number }>();
+  if (row === null) return 'nothing';
+  if (row.total <= 1) {
+    await deleteUserAccount(db, row.user_id);
+    return 'user-deleted';
+  }
+  await db.prepare('DELETE FROM identities WHERE id = ?1').bind(row.id).run();
+  return 'identity-deleted';
+}

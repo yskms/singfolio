@@ -83,8 +83,31 @@ export interface VerifyIdTokenInput {
   now: number;
 }
 
+/**
+ * Apple のサーバー間通知（`consent-revoked`・`account-deleted` など）の、検証済みの中身。使う項目だけで、`email` などは持たない。
+ * `eventTime` はミリ秒（Apple の `event_time` を、秒でもミリ秒でも読めるように揃え、未来の値は `now` に丸めたもの）。
+ */
+export interface AppleNotificationEvent {
+  type: string;
+  sub: string;
+  eventTime: number;
+}
+
+export type AppleNotificationResult = { ok: true; event: AppleNotificationEvent } | { ok: false; reason: IdTokenFailure };
+
+export interface VerifyAppleNotificationInput {
+  /** 通知の本文 `{"payload":"<JWT>"}` の `payload`。 */
+  token: string;
+  /** 受け付ける `aud`（バンドルIDとServices ID。通知がどちらの `client_id` で来るかは、資料に書かれていない）。 */
+  audiences: readonly string[];
+  /** 現在時刻（ミリ秒）。 */
+  now: number;
+}
+
 export interface IdTokenVerifier {
   verify(input: VerifyIdTokenInput): Promise<IdTokenResult>;
+  /** Apple のサーバー間通知（JWS）の検証。公開鍵の取得・キャッシュは、IDトークンの検証と共通。 */
+  verifyAppleNotification(input: VerifyAppleNotificationInput): Promise<AppleNotificationResult>;
 }
 
 /**
@@ -211,7 +234,61 @@ export function createIdTokenVerifier(
       if (typeof payload.nonce !== 'string' || payload.nonce !== nonce) return { ok: false, reason: 'nonce' };
       return { ok: true, sub };
     },
+
+    async verifyAppleNotification({ token, audiences, now }) {
+      if (typeof token !== 'string' || token.length === 0 || token.length > MAX_TOKEN_LENGTH) {
+        return { ok: false, reason: 'malformed' };
+      }
+      let payload;
+      try {
+        ({ payload } = await jwtVerify(token, (header) => resolveKey('apple', header, now), {
+          algorithms: ['RS256'],
+          issuer: [...providers.apple.issuers],
+          audience: [...audiences],
+          // `exp` と `iat` は必須にしない: 資料の例（`iss`・`aud`・`iat`・`jti`・`events`）に `exp` は無い。`exp` が
+          // 付いていれば、jose が見る。署名・`iss`・`aud` で、Apple が自分宛てに送ったことは確かめられる。
+          clockTolerance: CLOCK_TOLERANCE_SECONDS,
+          currentDate: new Date(now),
+        }));
+      } catch (error) {
+        return { ok: false, reason: classify(error) };
+      }
+      return parseNotificationEvents(payload.events, now);
+    },
   };
+}
+
+/**
+ * 通知の `events` を読む。資料の例は JSON のオブジェクトだが、文字列（JSON）で送られる、という報告もあるので、
+ * どちらも読む。`type`・`sub`・`event_time` の3つが無ければ拒否する（資料の例は、どの種類にも3つある）。
+ */
+function parseNotificationEvents(events: unknown, now: number): AppleNotificationResult {
+  const claimsFailure: AppleNotificationResult = { ok: false, reason: 'claims' };
+  let value = events;
+  if (typeof value === 'string') {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return claimsFailure;
+    }
+  }
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return claimsFailure;
+  const { type, sub, event_time: rawEventTime } = value as Record<string, unknown>;
+  // 資料の例は数値。文字列で来ても読む（読めずに拒否すると、通知が黙って効かなくなる）。
+  const eventTime = typeof rawEventTime === 'string' && /^\d{1,16}$/.test(rawEventTime) ? Number(rawEventTime) : rawEventTime;
+  if (typeof type !== 'string' || type === '' || type.length > 64) return claimsFailure;
+  if (typeof sub !== 'string' || sub === '' || sub.length > MAX_SUB_LENGTH) return claimsFailure;
+  if (typeof eventTime !== 'number' || !Number.isFinite(eventTime) || eventTime <= 0) return claimsFailure;
+  return { ok: true, event: { type, sub, eventTime: normalizeEventTime(eventTime, now) } };
+}
+
+// Apple の `event_time` は、資料の例が秒、実際の通知はミリ秒、という報告があり、確かめられていない。秒（1e11 未満。
+// ミリ秒なら1973年）なら1000倍して、ミリ秒に揃える。通知の時刻が未来になることは無いので、`now` を超える値は `now` に丸める
+// （巨大な値を記録して、そのあとのログインが止まらないように。`consent_revoked_at` は、ログインの開始時刻と比べる）。
+const SECONDS_BELOW = 1e11;
+function normalizeEventTime(value: number, now: number): number {
+  const milliseconds = value < SECONDS_BELOW ? value * 1000 : value;
+  return Math.min(Math.floor(milliseconds), now);
 }
 
 // joseの例外を、理由だけに落とす。例外（`payload` にクレームが入っている）は、ここで捨てる。
