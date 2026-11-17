@@ -235,10 +235,12 @@ v1.0より後（公開機能・Requests）の実装順序は、
     -   [x] 7.3.10 アカウントの削除・Appleのサーバー間通知・「ほかの端末をすべてログアウト」。
         Worker: `POST /auth/logout-others`（認証済みのセッション以外の、同じユーザーの全セッションを削除。204）。`POST /auth/delete`（セッション +
         再認証。IDトークンの `sub` が、ログイン中のアカウントと一致しなければ 403 `account_mismatch`。再認証の失敗は 403 `reauth_failed`、セッションの無効は 401 と分ける。
-        D1の行を消してから、Appleのトークンを失効させる（失効の失敗は削除を止めず、`appleRevoked: false` で伝える。`refresh_token` はメモリの中だけ）。Appleの失効は
+        D1の行を消してから、Appleのトークンを失効させる（失効の失敗は削除を止めず、`appleRevoked: false` で伝える。`refresh_token` はメモリの中だけ。iOSの認可コードの交換は、
+        消す前に行い、消したあとに待つのを失効の1回にした。アプリは、`/auth/delete` だけ待つ上限を30秒にした）。Appleの失効は
         `appleToken.ts` に `exchangeWithToken`・`revoke` を足した（ログインの `exchange` は、これまでどおり `id_token` だけを読む））。`POST /auth/apple/notifications`
         （JWSを `iss`・`aud`（バンドルIDとServices IDのどちらも）・署名で検証。`exp` は必須にしない。`consent-revoked` はセッションを消して `consent_revoked_at` を記録、
-        `account-deleted` は行（最後の手段ならアカウントごと）を消す。再送・遅れて届く古い通知・`event_time` の単位の揺れに備えた）。
+        `account-deleted` は行（最後の手段ならアカウントごと）を消す。再送・遅れて届く古い通知・`event_time` の単位の揺れに備えた。`consent-revoked` のセッションの削除は、
+        セッションの単位（`created_at <= event_time`）。
         **通知とログインの競合は、`last_sign_in_at` と `event_time` の比較だけでは吸収できなかった**ので、`identities.consent_revoked_at`（`migrations/0002`）を足し、
         `createSession` が、取り消しより前に始まったログインのセッションを作らない形にした（§8「Appleのサーバー間通知」）。
         アプリ: `authRepository`（`logoutOthers`・`deleteAccount`。403 を `reauth-failed`・`account-mismatch` に分ける）、`appleSignInRepository.getIdTokenWithCode`
@@ -250,7 +252,9 @@ v1.0より後（公開機能・Requests）の実装順序は、
         （再認証なしの削除の逃げ道は作っていない）
     -   [ ] 7.3.11 アカウントの画面（ログイン・ログアウト・「ほかの端末をすべてログアウト」・削除の入口）。置き場所（ProfileかSettings）は、
         画面設計で決める。サインイン済みから別のIDをつなぐ画面を、v1で用意するか決める。`provider-failed` の文言は、原因（端末の設定か、アプリ側の設定の不備か）を言い切らない（§8「Appleのサインイン（iOS）」）。`getSignedInProvider` は、判断できないとき
-        `AuthError` を投げる（`null` ではない）ので、画面で捕まえて、アカウントの欄を隠すなどにとどめる（§8「アプリ側の認証の土台」の「失敗の分類」）
+        `AuthError` を投げる（`null` ではない）ので、画面で捕まえて、アカウントの欄を隠すなどにとどめる（§8「アプリ側の認証の土台」の「失敗の分類」）。
+        アカウントの削除は、待ちの表示を出す（最大30秒）。`network` で終わったときは、サーバーで削除が済んでいる可能性があり、やり直すと 401（`unauthorized`。
+        端末のセッションは捨てられる）になる。削除の再試行の 401 は、「ログアウトされた。削除が済んでいるかもしれない」と伝える（§8「アカウントの削除とAppleのトークン失効」）
     -   [ ] 7.3.12 申告と文書。プライバシーポリシー、`docs/singfolio-store-listing.md`、App Store・Google Playの申告（SDKの
         プライバシーマニフェストを、そのときの版で読み直して決める）、Googleの同意画面（ブランド）、CLAUDE.mdの「スコープ」の節
     -   [ ] 7.3.13 確認。実機と署名したビルド（TestFlight・Playの内部テスト）で、ログイン・キャンセル・再ログイン・ログアウト・削除。
