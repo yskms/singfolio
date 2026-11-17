@@ -302,3 +302,87 @@ Apple へ送る検索語があるため、次の1項目を申告する。他は�
     `catalogFetch` を外した場合）は、プライバシーポリシー・掲載文・プライバシーの申告から、Apple へ送る
     記述を外す（WBS 6.5）。
 -   公開機能（公開プロフィール・リクエスト）は、v1.0に含まれない。
+-   アカウント（Settings の Account）は、v1.0には出ていない（`src/services/index.ts` の `ACCOUNT_ENABLED` で閉じている）。
+    アカウントを出す版の申告・文面は、§6 に下書きしてある。§2・§3 は、アカウントを出す版が出るまで、このままにする。
+
+## 6. アカウントを出す版の申告・文面（7.3.12 の下書き。反映は 7.3.13 のリリースのとき）
+
+アカウント（AppleまたはGoogleでのサインイン。任意。曲は送らない）を出す版で、ストアの申告と文面を直す点。
+§2・§3 の申告は、アカウントを出す版を審査に出す**前**に、ここの内容に直す（`ACCOUNT_ENABLED` を外す前）。
+プライバシーポリシーは `docs/singfolio-privacy-policy-next.md` に下書きがある（反映の手順はそのファイル先頭）。
+サーバーが保存するもの・保存期間・削除は、`docs/singfolio-publishing-backend.md` §8 が正。
+
+### 共通
+
+-   **削除の窓口**: プライバシーポリシーの「アカウントの削除」の節（英語 `#delete-account`、日本語 `#delete-account-ja`）。
+    連絡先は `yskms.studio@gmail.com`（メール）。アプリ内の削除（Settings > Account > Delete account）が主で、メールは手順の案内まで。
+    運営者は、メールからアカウントを引けない（メールアドレスも名前も保存しない）ので、サインインできない人は、1年の自動削除を待つ。
+    ポリシーにそのまま書いた。
+-   **保存期間**: 削除するまで、または最後に使ってから1年。削除後も、D1の自動の復旧履歴に最大30日残りうる
+    （[D1 Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/)。Freeは7日、Paidは30日）。
+-   サーバーが受け取るが保存しないもの: Googleのトークンの `email`・`name`・`picture` など（`sub` だけを読む）。
+    Appleは、名前もメールも求めない（スコープが空）。
+
+### App Store（iOS）
+
+-   **App プライバシー**（アカウントを出す版）: 次の2項目を申告する。他は「収集しない」。
+
+| データの種類 | 収集 | ユーザーに紐付け | トラッキング | 目的 |
+|---|---|---|---|---|
+| 検索履歴（Search History） | する | しない | しない | アプリの機能 |
+| ユーザーID（User ID） | する | する | しない | アプリの機能 |
+
+    -   ユーザーIDは、サーバーが保存する、AppleまたはGoogleが付ける識別子（`sub`）。アカウントに紐付く。
+    -   名前・メールアドレスは、サーバーが保存しないので、収集に数えない（トークンの中を通るだけ）。Appleの定義で「収集」にならないことを、
+        申告の画面の説明文で、提出のときに確かめる。
+    -   **決めること（SDK のマニフェスト）**: 下の「SDK のプライバシーマニフェスト」参照。Googleのサインインを iOS に入れる限り、この表で足りるかを決める必要がある。
+-   **Sign in with Apple**: ガイドライン 4.8 は、サードパーティのログインを出すアプリに、プライバシーに配慮したログイン（Sign in with Apple が該当する）を
+    同等に出すことを求める。Apple のボタンは `AppleAuthenticationButton`（OSの部品）を使っている。
+-   **アカウントの削除（5.1.1(v)）**: アカウントを作れるアプリは、アプリ内で削除を始められることが必要。Settings > Account > Delete account（再認証つき）。
+-   **App Review のメモ**に足す文（§2 の英文の「No account or sign-in is required.」を、次に直す）:
+
+```text
+An account is optional. Nothing in the app requires one, and signing in does not upload any songs. Settings tab > Account offers Sign in with Apple and Sign in with Google. A reviewer can sign in with their own Apple Account and delete the account from the same screen (Delete account asks for the same sign-in again). The server stores only an opaque account identifier and when it was last used; it stores no name or email address. Accounts unused for one year are deleted automatically. Deleting an account does not delete songs, which stay on the device.
+```
+
+    審査用のデモアカウントは不要（アカウントが無いと使えない機能が無い）。「サインインが必要です」はオフのまま。
+-   **年齢指定（Age Rating）**: 変わらない（ユーザー生成コンテンツを他の人へ共有する機能は無い）。
+
+### Google Play（Android）
+
+-   **データ セーフティ**（アカウントを出す版）:
+
+| データの種類 | 収集 | 共有 | 目的 | 任意か |
+|---|---|---|---|---|
+| アプリのアクティビティ > アプリ内の検索履歴 | する | する（Apple） | アプリの機能 | 任意（設定の「候補」で、オフにできる） |
+| 個人情報 > ユーザーID | する | しない | アプリの機能・アカウント管理 | 任意（サインインしなければ、収集しない） |
+
+    -   「共有」は、サービス提供者（運用先のCloudflare）の処理を除く扱い。AppleまたはGoogleのサインインを使うことは、サービスの利用で、共有に当たるかは、Playの定義を、申告のときに確かめる。
+    -   データは、転送中に暗号化される（HTTPS）。
+    -   **削除をリクエストする手段**: 設ける。アプリ内（Settings > Account > Delete account）と、Webの窓口（上のポリシーの節のURL）。Console の
+        「アプリのアカウントの削除」の項目に、アカウントを作れること、アプリ内の削除の手順、WebのURLを入れる。Playは、保存期間の明示も求める
+        （削除後に保持するデータとその期間: 最大30日の復旧履歴）。
+    -   **要確認**: 運営者がメールの依頼からアカウントを引けない運用が、Play の審査で通るか。資料は、窓口にメールを認めるが、本人確認やサインインできない人の扱いを書いていない。
+-   **Google サインインの同意画面（Google Auth Platform。7.3.13 までに）**: 公開状態を「本番環境」にする。アプリ名・サポートメール・ホームページ・
+    プライバシーポリシーのURLが要る（ホームページは検証済みのドメインに置く、とGoogleの資料にある。`yskms.github.io` が条件を満たすかは、資料に書かれていない。
+    満たさないなら、`singfolio.app`（7.5 の公開Web）にポリシーを置く）。基本のスコープ（`openid`・`email`・`profile`）だけなので、機密のスコープの検証は不要
+    （Googleの資料。テストユーザー以外で入れるかは、7.3.13 で確かめる）。ロゴを付けない間は、同意画面にアプリ名ではなくドメインが出る。
+-   **ターゲット ユーザー・コンテンツのレーティング**: 変わらない。
+
+### SDK のプライバシーマニフェスト（iOS。読み直した版: 2026-11-18）
+
+`ios/Pods/` の `PrivacyInfo.xcprivacy` を読んだ（GoogleSignIn 10.1.0・AppAuth 3.0.0・GTMSessionFetcher・GoogleUtilities 8.1.5 など）。
+`expo-apple-authentication` は、Pod に独自のマニフェストを持たない（Apple のシステム機能）。
+
+-   トラッキング: どれも `NSPrivacyTracking` は `false`、トラッキングのドメインは無い。
+-   必須理由APIの宣言: UserDefaults（GoogleSignIn・GTMSessionFetcher・GoogleUtilities）、ファイルのタイムスタンプ（GoogleUtilities）。自分のコードは、これらを使っていない。
+-   **GoogleSignIn 10.1.0 のマニフェストは、収集するデータ種別を、多く宣言している**（すべて、ユーザーに紐付く・トラッキングしない）: 名前、メールアドレス、電話番号、
+    おおまかな位置情報、ユーザーID（目的: アプリの機能・分析）、デバイスID（分析）、その他の利用状況（分析）、その他のデータ（アプリの機能・分析）。
+    これは Google の SDK が宣言する、Google 側の扱い。アプリのサーバーが保存するものではない。
+-   **決める（7.3.13 のリリースの前。ユーザーの判断）**: App プライバシーの表を、(A) 上の2項目だけにする（Googleのサインインで Google が扱うデータは、Google が
+    ユーザーと直接やり取りする自分のサービスの範囲、と読む）、(B) SDK のマニフェストの種別も申告する（サードパーティのコードが収集するデータも、申告の対象という
+    Apple の説明に沿う。ラベルは大きくなる）、(C) iOS の Google サインインを外し、iOS は Apple のみにする（Apple のサインインを出していれば、4.8 の求めは満たす。
+    Android は Apple と Google のまま）。判断の前に、Apple の「App プライバシーの詳細」の、サードパーティのパートナーのデータについての説明を、提出の画面で読み直す。
+    (A) は、読みが分かれうるので、根拠を確かめずに採らない。
+-   Android は、Play services の `Credential Manager`・`googleid` を使う。データ セーフティで、これらが収集するデータをどう扱うかは、Google の説明
+    （Play services のデータの開示）を、提出のときに読み直して決める。

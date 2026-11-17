@@ -7,7 +7,7 @@ v1.0の作業（0〜6章。保存・管理は端末内で完結し、外部通�
 v1.0より後（公開機能・Requests）の実装順序は、
 `singfolio-publishing-backend.md` §9 を参照。進捗は「7. 公開機能」に書く。
 
-**現在地**：6. リリース準備（6.5・6.8が残り。6.1・6.2・6.3・6.4・6.6・6.7は完了。6.4は、iOS の 1.0 を審査に提出して、審査を通って公開された。Android は、6.8 の変更を含む AAB（versionCode 4）を作って、内部テストへアップロードして、Pixel 11 で確認した。Play Console の申告・掲載を入力して、製品版の審査へ送信し、審査を通って公開された。iOS も審査を通って公開され、紹介ページに両ストアのバッジを載せた。6.8は、アプリの変更・スクリーンショットの撮り直し・ストアの文の修正・両ストアへの入力・Android の実機での確認まで済んだ）。7. 公開機能（v1.0より後）は、7.1（バックエンドの技術検証と選定）が済み、7.2（実装前に確かめること）も済んだ（Appleの公開鍵の取得・`singfolio.app` の取得・認証の方式の決定・Freeプランでの放置後の再アクセス。ログイン手段はiOS・Androidとも、AppleとGoogleに決めた）。7.3 は、小さな作業（7.3.1 から 7.3.13）に分けた。7.3.1（利用者の前提の準備）は済んだ。7.3.2（Workerの土台）も済んだ（本番のD1とWorkerを作り、`singfolio.app` で404を返す状態）。7.3.3（nonce の発行・検証・使用済みの記録と HTTPS の検査）も済んだ（本番へデプロイして、HTTPが403、HTTPSが200になることを実測した。レート制限は Worker に入れない。WAFが Worker より前で効くことも実測した）。7.3.4（IDトークンの検証と、ログイン手段の引き当て）も済んだ（jose で検証し、模擬の発行元でテストした。本物のトークンでの確認は 7.3.7・7.3.8）。7.3.5（セッションとログイン・ログアウトのエンドポイント）も済んだ（模擬の発行元とローカルのD1でテストし、workerd でも動きを確かめた）。7.3.4・7.3.5 とも、本番へのデプロイはまだ。7.3.6（アプリ側の認証の土台）も済んだ（HTTP・SecureStore・初回起動での破棄・ログアウト。画面は無く、何も送らない。AndroidエミュレータとiOS Simulatorで確かめた）。7.3.7（Appleのサインイン）も済んだ（AppleのIDトークンの `nonce` の確認は、7.3.13 へ移した）。7.3.8（Googleのサインイン）も済んだ（iOS Simulatorで、取りやめ・成功・2回目のログインを確かめた。Androidの成功経路は、7.3.13 へ移した）。7.3.9（AndroidのAppleログイン。Web経由）も済んだ（Workerのコールバックと認可コードの交換、アプリのCustom Tabと戻りのURL。Androidエミュレータで、Custom Tab から Worker の302、アプリが `code` を受け取るまでを確かめた。本物のAppleでの交換は 7.3.13）。7.3.10（ほかの端末のログアウト・アカウントの削除・Appleのサーバー間通知）も済んだ（Worker: `POST /auth/logout-others`・`POST /auth/delete`・`POST /auth/apple/notifications`、アプリ: `account.signOutOthers()`・`account.deleteAccount()`。Nodeのテストと、workerd での疎通を確かめた。画面は 7.3.11、本物のAppleでの確認は 7.3.13）。7.3.11（アカウントの画面）も済んだ（Settings の `Account`。サインイン・サインアウト・ほかの端末のサインアウト・削除。iOS Simulator で、サインアウト中・サインイン中・各確認・取りやめ・失敗の表示を確かめた。リリースのビルドでは 7.3.13 まで出さない）。次は 7.3.12
+**現在地**：6. リリース準備（6.5・6.8が残り。6.1・6.2・6.3・6.4・6.6・6.7は完了。6.4は、iOS の 1.0 を審査に提出して、審査を通って公開された。Android は、6.8 の変更を含む AAB（versionCode 4）を作って、内部テストへアップロードして、Pixel 11 で確認した。Play Console の申告・掲載を入力して、製品版の審査へ送信し、審査を通って公開された。iOS も審査を通って公開され、紹介ページに両ストアのバッジを載せた。6.8は、アプリの変更・スクリーンショットの撮り直し・ストアの文の修正・両ストアへの入力・Android の実機での確認まで済んだ）。7. 公開機能（v1.0より後）は、7.1（バックエンドの技術検証と選定）が済み、7.2（実装前に確かめること）も済んだ（Appleの公開鍵の取得・`singfolio.app` の取得・認証の方式の決定・Freeプランでの放置後の再アクセス。ログイン手段はiOS・Androidとも、AppleとGoogleに決めた）。7.3 は、小さな作業（7.3.1 から 7.3.13）に分けた。7.3.1（利用者の前提の準備）は済んだ。7.3.2（Workerの土台）も済んだ（本番のD1とWorkerを作り、`singfolio.app` で404を返す状態）。7.3.3（nonce の発行・検証・使用済みの記録と HTTPS の検査）も済んだ（本番へデプロイして、HTTPが403、HTTPSが200になることを実測した。レート制限は Worker に入れない。WAFが Worker より前で効くことも実測した）。7.3.4（IDトークンの検証と、ログイン手段の引き当て）も済んだ（jose で検証し、模擬の発行元でテストした。本物のトークンでの確認は 7.3.7・7.3.8）。7.3.5（セッションとログイン・ログアウトのエンドポイント）も済んだ（模擬の発行元とローカルのD1でテストし、workerd でも動きを確かめた）。7.3.4・7.3.5 とも、本番へのデプロイはまだ。7.3.6（アプリ側の認証の土台）も済んだ（HTTP・SecureStore・初回起動での破棄・ログアウト。画面は無く、何も送らない。AndroidエミュレータとiOS Simulatorで確かめた）。7.3.7（Appleのサインイン）も済んだ（AppleのIDトークンの `nonce` の確認は、7.3.13 へ移した）。7.3.8（Googleのサインイン）も済んだ（iOS Simulatorで、取りやめ・成功・2回目のログインを確かめた。Androidの成功経路は、7.3.13 へ移した）。7.3.9（AndroidのAppleログイン。Web経由）も済んだ（Workerのコールバックと認可コードの交換、アプリのCustom Tabと戻りのURL。Androidエミュレータで、Custom Tab から Worker の302、アプリが `code` を受け取るまでを確かめた。本物のAppleでの交換は 7.3.13）。7.3.10（ほかの端末のログアウト・アカウントの削除・Appleのサーバー間通知）も済んだ（Worker: `POST /auth/logout-others`・`POST /auth/delete`・`POST /auth/apple/notifications`、アプリ: `account.signOutOthers()`・`account.deleteAccount()`。Nodeのテストと、workerd での疎通を確かめた。画面は 7.3.11、本物のAppleでの確認は 7.3.13）。7.3.11（アカウントの画面）も済んだ（Settings の `Account`。サインイン・サインアウト・ほかの端末のサインアウト・削除。iOS Simulator で、サインアウト中・サインイン中・各確認・取りやめ・失敗の表示を確かめた。リリースのビルドでは 7.3.13 まで出さない）。7.3.12（申告と文書。未使用のアカウントの自動削除、ポリシーとストアの申告の下書き）も済んだ。次は 7.3.13
 
 ## 0. 企画・設計
 
@@ -171,7 +171,7 @@ v1.0より後（公開機能・Requests）の実装順序は、
     -   [x] 7.3.1 前提の準備（利用者の作業）。Apple: Sign in with Appleの設定（primary App ID・Services ID・鍵）は済み
         （サーバー間通知のエンドポイントは 7.3.10）。Google: クライアント（Web・iOS・Androidの署名の鍵ごと。EASのlocal build・
         Play App Signingの鍵を含む）は作成済み。同意画面の「公開」は、ホームページとプライバシーポリシーのURLが要る
-        ため、7.3.12 で決める（それまでは「テスト中」）。Cloudflare: アカウントの確認は済み。本番のWorkersとD1、`singfolio.app` のルート、秘密情報は
+        ため、7.3.13 のリリースの前に決める（7.3.12 の項。それまでは「テスト中」）。Cloudflare: アカウントの確認は済み。本番のWorkersとD1、`singfolio.app` のルート、秘密情報は
         7.3.2 で作る（R2は 7.4。スナップショットを置くときに作る。7.3.10 の削除には、消すものが無い。Turnstileは 7.6）
     -   [x] 7.3.2 Workerの土台。プロジェクトの構成（`worker/`。独立したパッケージ。§8「Workerの構成と運用」）、D1のスキーマと
         マイグレーション（`users`・`identities`・`sessions`・`used_nonces`。`migrations/0001_initial.sql`）、開発用と本番用の設定、
@@ -248,7 +248,7 @@ v1.0より後（公開機能・Requests）の実装順序は、
         Apple の公式資料で、通知の種類は `account-deleted`（`account-delete` も読む）、payload に `exp` が無いことを確かめた。
         **R2のスナップショット・`profiles`・Requestの削除は、消すものが無いので、7.4 以降に回した**（`deleteUserAccount` に足す。順序は §8）。
         **利用者の作業（デプロイのあと）**: Apple Developer の primary App ID の Sign in with Apple の設定に、通知のエンドポイント
-        `https://singfolio.app/auth/apple/notifications` を登録する。Apple Account側の資格情報が失効していて再認証できない利用者の依頼先は、7.3.12 で決める
+        `https://singfolio.app/auth/apple/notifications` を登録する。Apple Account側の資格情報が失効していて再認証できない利用者の依頼先は、7.3.12 でメールに決めた（運営者はメールからアカウントを引けず、1年の自動削除を待つ）
         （再認証なしの削除の逃げ道は作らない。公開の GitHub Issues は向かない。詳細は §8「アカウントの削除とAppleのトークン失効」）
     -   [x] 7.3.11 アカウントの画面（サインイン・サインアウト・「ほかの端末をすべてサインアウト」・削除）。`app/account.tsx`・`ui/AccountSection.tsx`・
         `src/i18n/authErrors.ts`（失敗 → 操作ごとの文言）。**置き場所は Settings の `Account`**（Profile ではない。行は値を出さず、Settings が SecureStore を読まない）。
@@ -259,15 +259,25 @@ v1.0より後（公開機能・Requests）の実装順序は、
         だけ `auth` を注入し、`account.available` が真になる。入口の行も、ルート `singfolio://account` も閉じる）。7.3.13 のビルドは、`eas.json` の
         `account-test` プロファイルで作り、**製品版・審査へ昇格させない**。7.3.12・7.3.13 が済んだら、ゲートとプロファイルを外す。
         **決めたこと**: サインイン済みから別のログイン手段をつなぐ画面は作らない（Worker にエンドポイントが無い。手段が違えば別のアカウント）。再認証なしの削除は作らない
-        （再認証できない利用者の依頼先は、7.3.12 で決める）。Androidの Apple のサインインの再開は実装しない。Googleの `clearCredentialState` は呼ばない（§8「アカウントの画面」）。
+        （再認証できない利用者の依頼先は、7.3.12 でメールに決めた）。Androidの Apple のサインインの再開は実装しない。Googleの `clearCredentialState` は呼ばない（§8「アカウントの画面」）。
         iOS Simulator（iPhone 18 Pro。Release。日本語・ライト・ダーク）で確かめた: Settings の行、サインアウト中の画面、Apple のシートを閉じたときの `provider-failed`
         （1行の文言。ボタンは押せる状態に戻る）、Google の確認ダイアログのキャンセル（何も出ない）、実行中の表示、偽のセッションでのサインイン中の画面（Apple・Google）、
         削除の確認 → 再認証の失敗（サインイン中のまま）、ほかの端末のサインアウト（本番Workerが未対応で `invalid-request` → 汎用の文言。セッションは捨てない）、サインアウト
         （サーバー側を終了できなかった旨の1行）。**未確認**: 英語の表示、Android、本物のサインインの成功・削除の成功・`appleRevoked: false` の表示、実行中に戻る操作が止まること、
         VoiceOver・TalkBack、文字を大きくした端末（7.3.13）
-    -   [ ] 7.3.12 申告と文書。プライバシーポリシー、`docs/singfolio-store-listing.md`、App Store・Google Playの申告（SDKの
-        プライバシーマニフェストを、そのときの版で読み直して決める）、Googleの同意画面（ブランド。サインインのボタンは、ロゴ無しのアプリのボタンで足りるかも）、
-        再認証できない利用者の削除の依頼先（ポリシーの連絡先）をポリシーに書く、CLAUDE.mdの「スコープ」の節、`ACCOUNT_ENABLED` を外すかの判断（7.3.13 のあと）
+    -   [x] 7.3.12 申告と文書、未使用のアカウントの自動削除。
+        **自動削除（Worker）**: 最後に使ってから1年で消す（Cron Trigger は毎日1回。`worker/src/inactiveAccounts.ts`・`migrations/0003`）。
+        `users.last_active_at` を、ログイン・セッションの更新（24時間に1回）・ログアウトで進める。消す文に条件を入れ直し（候補に選んだあとにログインしたアカウントは消えない）、
+        NULL は消さない側。D1のクエリは2回だけ（Freeは1回の実行で50回まで）。**D1の `meta.changes` は、外部キーのカスケードで消えた行も数える**（実測。「1のとき成功」ではなく
+        「0より大きいとき」）。Node のテストと、`wrangler dev --test-scheduled`（workerd）で確かめた。本番へは次のデプロイで登録される（§8「未使用のアカウントの自動削除」）。
+        **削除の窓口（決定）**: メール（`yskms.studio@gmail.com`）。運営者はメールからアカウントを引けないので、サインインできない人は1年の自動削除を待つ。ポリシーにそのまま書いた。
+        **文書**: `docs/singfolio-privacy-policy-next.md`（英日。アカウントを出す版のポリシー。公開しない。7.3.13 のリリース手順で `privacy-policy.md` に反映する）、
+        `docs/singfolio-store-listing.md` §6（App プライバシー・データ セーフティ・App Review のメモ・Googleの同意画面・SDK のマニフェストの読み直し）、CLAUDE.md。
+        **ユーザーの判断・作業が要る点（7.3.13 のリリースの前）**: (1) iOS の App プライバシー: GoogleSignIn 10.1.0 のマニフェストが、名前・メール・電話番号・位置情報などの収集を宣言している。
+        (A) 2項目だけ、(B) マニフェストの種別も申告、(C) iOS は Apple のみ、のどれにするか（§6）。(2) Google の同意画面（本番環境。ホームページ・ポリシーのURLが
+        検証済みのドメインに置けるか。`yskms.github.io` で足りるか不明。足りないなら `singfolio.app` にポリシーを置く）。(3) Play Console の申告
+        （データ セーフティ、アカウントの削除のURL・保存期間）と App Store Connect の申告・App Review のメモ。メールの窓口がPlayの審査で通るかは未確認。
+        (4) ポリシーの施行日と、公開後のアンカー（`#delete-account`）の確認。(5) `ACCOUNT_ENABLED` とプロファイル `account-test` を外すのは、7.3.13 のあと。
     -   [ ] 7.3.13 確認。実機と署名したビルド（TestFlight・Playの内部テスト。`eas build --local --profile account-test` で作る。`env` が `--local` のビルドに埋め込まれるかも、入口が出ることで確かめる。このビルドは製品版・審査へ昇格させない）で、ログイン・キャンセル・再ログイン・ログアウト・削除。
         7.3.11 の画面の未確認（英語、Android、実行中に戻れないこと、VoiceOver・TalkBack、文字を大きくした端末、削除の成功と `appleRevoked: false`・`sessionCleared: false` の文言）も、ここで見る。
         7.3.10 の分: 削除でAppleのトークンが失効するか（iOSの認可コードを `redirect_uri` 無しで交換できるか、Appleの設定の「Appleでサインイン」の一覧からSingfolioが消えるか。
@@ -288,7 +298,9 @@ v1.0より後（公開機能・Requests）の実装順序は、
         （同意画面は「テスト中」）。Androidの成功経路は、**R8 入りの release で**確かめる（結果の解析 `GoogleIdTokenCredential.createFrom` と
         トークンの返却。googleid のクラスは R8 で改名される）。実機
 -   [ ] 7.4 Public ProfileとPublish（Auto Publishを含む）。アカウントの削除（`worker/src/account.ts` の `deleteUserAccount`。自己削除とAppleの `account-deleted` が使う）に、
-    R2のスナップショット・`profiles`・Requestの削除を足す（順序: `username` を読む → R2を消す → D1の行を消す。R2に失敗したらD1の行を残して失敗にする。§8）
+    R2のスナップショット・`profiles`・Requestの削除を足す（順序: `username` を読む → R2を消す → D1の行を消す。R2に失敗したらD1の行を残して失敗にする。§8）。
+    **未使用のアカウントの自動削除（1年）を見直す**: 公開ページが載ると、端末の中だけで使い続ける人は、サーバーとの通信が無く、1年後に公開ページごと消える。
+    公開ページのあるアカウントを対象外にするか、利用の記録を足すか、決める（決めずに公開機能を出さない。対象外にすれば、条件つきの削除とR2の順序の問題も無くなる。§8）
 -   [ ] 7.5 公開Web（`singfolio.app/username`）。プライバシーポリシーを直す（視聴者のアクセス）
 -   [ ] 7.6 Requests（所有者がアプリ内の一覧で受け取る）。プライバシーポリシー・ストアの申告を直す
     （視聴者のRequest。Turnstileとレート制限が扱う情報、ニックネーム）

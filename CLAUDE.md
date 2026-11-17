@@ -7,7 +7,8 @@
 
 -   `docs/singfolio-requirements.md` --- 要件・対象外・UI/ブランド方針
 -   `docs/singfolio-screen-flow.md` --- v1.0の画面設計
--   `docs/singfolio-publishing-backend.md` --- 公開機能・バックエンド方針（Cloudflareに決定。実装前に確かめることを含む）
+-   `docs/singfolio-publishing-backend.md` --- 公開機能・バックエンド方針（Cloudflareに決定。実装前に確かめることを含む）。
+    アカウントを出す版のポリシーの下書きは `docs/singfolio-privacy-policy-next.md`、ストアの申告の下書きは `docs/singfolio-store-listing.md` §6
 -   `docs/singfolio-data-model.md` --- ローカルDB（SQLite）のスキーマ・マイグレーション方針
 -   `docs/singfolio-wbs.md` --- v1.0と、v1.0より後の公開機能の作業分解と進捗
 -   `docs/Singfolio ブランドスタイルガイドとアプリ展示板.png` --- ブランドカラー・フォント（確定。
@@ -68,7 +69,12 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     （Aboutのプライバシーポリシーのリンクを、ブラウザで開くのは、アプリの通信ではない）。
     プライバシーポリシー（`docs/privacy-policy.md`）とストアの申告は、この範囲を前提に書いてある。
     外部へ送るものを増やしたら、方針・`docs/singfolio-store-listing.md`・ストアの申告も直す。
-    バックエンド・認証・同期処理は先行実装しない。
+    同期処理は先行実装しない。
+-   アカウント（7.3。サインイン・サインアウト・削除）は実装済みだが、リリースのビルドでは `ACCOUNT_ENABLED` で閉じている
+    （下の「アカウント（アプリ側）」）。**公開中の `docs/privacy-policy.md` は、アカウントを出す版が出るまで書き換えない**
+    （main に push した時点で GitHub Pages に出る。出すと、アプリが持たない機能の説明が公開される）。アカウントを出す版のポリシーは
+    `docs/singfolio-privacy-policy-next.md`（`singfolio-*.md` なので公開されない）に下書きがあり、7.3.13 のリリース手順で
+    `privacy-policy.md` に反映する。ストアの申告の下書きは `docs/singfolio-store-listing.md` §6。
 -   v1.0で実装しない設定項目（Dataなど）は画面に表示しない。
 
 ### 公開機能のバックエンド
@@ -127,6 +133,15 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     `invalid_client` は本物のコードでしか出ず、利用者には障害と同じ 503 になる。切り分けはこの1行だけ）。出すのは、ステータスと許可リストの
     `error` 名だけ。コード・`client_secret`・IDトークン・Appleの応答の本文・例外の中身は出さず、増やさない。詳細は docs §8「AndroidのAppleログイン（Web経由）の実装」。
 
+-   未使用のアカウントの自動削除（`worker/src/inactiveAccounts.ts`。Cron Trigger は毎日1回の1つ）: 最後に使ってから1年（`INACTIVE_ACCOUNT_TTL_MS`）で消す。
+    基準は `users.last_active_at`（`sessions.last_used_at` や `identities.last_sign_in_at` に「簡略化」しない。ログアウトで消えるセッションの行だけでは、
+    「11か月使って、ログアウトの1か月後に消える」穴が残る）。**消す文に条件を入れ直す**（`DELETE … WHERE id=? AND last_active_at < cutoff`。無条件の
+    `deleteUserAccount` を使い回さない。候補に選んだあとにログインしたアカウントを消す）。**NULL は消さない側**（`COALESCE(…, created_at)` にしない）。
+    **削除できたかは、文ごとの変更行数が 0 より大きいか**（D1 の `meta.changes` は、外部キーのカスケードで消えた行も数えるので、「1 のとき」にも、合計にもしない）。
+    **D1のクエリは2回だけ**（候補の SELECT と、条件つき DELETE の1バッチ。アカウントごとのクエリに分けない。Freeは1回の実行で50回まで、バッチは1回と数える）。
+    Cron Trigger を足さない（Freeは5つまで）。ポリシーに書いた「1年」「90日」「30日」を変えるときは、定数・docs・ポリシーを一緒に直す。
+    **7.4 で、公開ページのあるアカウントを自動削除の対象外にするか、利用の記録を足すか、決めてから公開機能を出す**（端末の中だけで使い続ける人は、
+    1年後に公開ページごと消える）。詳細は `docs/singfolio-publishing-backend.md` §8「未使用のアカウントの自動削除」。
 -   Appleのサーバー間通知（`worker/src/appleNotification.ts`）とセッション発行の競合: **`createSession` の INSERT にある `consent_revoked_at` の条件
     （`migrations/0002`）は外さない。** 通知の処理の最中に進んでいたログインが、取り消し後のセッションを作るのを防ぐ唯一の手段で、`last_sign_in_at` と
     `event_time` の比較だけでは吸収できない（確かめた）。通知の `aud` は、バンドルIDとServices IDの**どちらも**受け入れる（ログインの `aud` を1つに決める規則とは
@@ -174,7 +189,7 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
 -   認証が要る呼び出しを足すときは、**401 のときだけ**端末のセッションを捨てる（503・5xx・通信の失敗では捨てない）。
 -   `account.signOutOthers()`・`deleteAccount()` は、サインイン中にだけ使える（`not-signed-in`）。認証が要るサーバーの呼び出しは `authorized` を通す（401 のときだけ
     端末のセッションを捨てる）。`deleteAccount` は、**ログイン中の手段で再認証する**（Apple（iOS）は `getIdTokenWithCode` で認可コードも得る）。成功したら端末のセッションを捨てる。
-    端末内のレパートリーは消さない。再認証ができない利用者の逃げ道（再認証なしの削除）は作らない（決定済み。依頼先は 7.3.12 で決める。公開の GitHub Issues は向かない）。
+    端末内のレパートリーは消さない。再認証ができない利用者の逃げ道（再認証なしの削除）は作らない（決定済み。窓口はメール。運営者はメールからアカウントを引けない（メールアドレスも名前も保存しない）ので、サインインできない人は、1年の自動削除を待つ。公開の GitHub Issues は向かない。ポリシー `singfolio-privacy-policy-next.md`）。
     要求（`/auth/delete`）を送ったあとの `network` と `invalid-response` は、Service が `delete-unconfirmed` に読み替える（要求を送る前の `T` の取得の `network` は、何も消えていないので読み替えない。`unavailable` も読み替えない: Workerの 503 はD1を消す前）。
     `/auth/delete` だけ、待つ上限が30秒（`authRepository` の `DELETE_TIMEOUT_MS`。ほかは10秒）。**10秒に「揃え」ない**: Workerは、公開鍵の取得・コードの交換・失効を順に待ち
     （それぞれ最大5秒）、先に打ち切ると、サーバーで削除が済んでいるのに、アプリは `network` と受け取り、端末のセッションも残る（やり直すと 401）。
