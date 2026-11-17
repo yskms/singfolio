@@ -53,8 +53,10 @@ export function handleAppleCallback(request: Request): Response {
   if (state !== null) target.searchParams.set('state', state);
   const location = target.toString();
 
-  // 302 に、戻れなかったとき（リダイレクトに従わない環境）のためのリンクを添える。コードを含むので、
-  // キャッシュさせず、Referer にも出さない。
+  // 本文のリンクは、ブラウザには描画されない（302 に従うので。Chrome が確認の表示を出す場合も、本文は出ない。
+  // エミュレータの Custom Tab で確認）。リダイレクトに従わないクライアントのための形式的なもので、逃げ道ではない。
+  // 200 のページにリンクを置く形にしないのは、確認の表示が出る場合も、利用者が1回押せば戻れるため（出ない場合は
+  // 押す手間も無い。docs §8「Chrome の Custom Tab での戻り方」）。コードを含むので、キャッシュさせず、Referer にも出さない。
   const body = `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Singfolio</title><p><a href="${htmlEscape(location)}">Return to Singfolio</a></p>`;
   return new Response(request.method === 'HEAD' ? null : body, {
     status: 302,

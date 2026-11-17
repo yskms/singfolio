@@ -183,7 +183,8 @@ describe('認可コードの交換', () => {
     recorded.push({ url, init, form: new URLSearchParams(String(init.body)) });
     return respond();
   };
-  const exchanger = createAppleCodeExchanger({ fetch: appleFetch });
+  const logs: string[] = [];
+  const exchanger = createAppleCodeExchanger({ fetch: appleFetch, log: (message) => logs.push(message) });
   const config = {
     clientId: SERVICES_ID,
     redirectUri: APPLE_CALLBACK_URL,
@@ -194,6 +195,7 @@ describe('認可コードの交換', () => {
 
   beforeEach(() => {
     recorded = [];
+    logs.length = 0;
     respond = () => Response.json({ id_token: 'ID-TOKEN', refresh_token: 'REFRESH-SECRET', access_token: 'ACCESS-SECRET' });
   });
 
@@ -253,9 +255,53 @@ describe('認可コードの交換', () => {
       fetch: async () => {
         throw new Error('connect failed SECRET-DETAIL');
       },
+      log: (message) => logs.push(message),
     });
     const result = await failing.exchange(config, 'c', NOW);
     assert.deepEqual(result, { ok: false, reason: 'unavailable' });
+    assert.deepEqual(logs, ['apple token exchange failed: network']);
+  });
+
+  it('失敗の分類を1行出す。出すのは、ステータスと、許可リストにある error の名前だけ', async () => {
+    // Appleは、でたらめなコードには常に invalid_grant を返す（Team ID・Key ID・鍵・Services ID が違っても。測定）ので、
+    // 設定の不備（invalid_client）は、本物のコードで試すまで分からない。503 から切り分けられるのは、この1行だけ。
+    const cases: Array<[() => Response, string]> = [
+      [() => Response.json({ error: 'invalid_client', error_description: 'SECRET-DESCRIPTION' }, { status: 400 }), 'status=400 error=invalid_client'],
+      [() => Response.json({ error: 'invalid_client' }, { status: 401 }), 'status=401 error=invalid_client'],
+      [() => Response.json({ error: 'invalid_request' }, { status: 400 }), 'status=400 error=invalid_request'],
+      [() => Response.json({ error: 'invalid_grant' }, { status: 401 }), 'status=401 error=invalid_grant'],
+      [() => Response.json({ error: 'surprise SECRET-ERROR\nline2' }, { status: 400 }), 'status=400 error=other'],
+      [() => Response.json({}, { status: 503 }), 'status=503 error=other'],
+      [() => new Response('<html>SECRET-BODY</html>', { status: 502 }), 'status=502 unreadable'],
+      [() => Response.json(null, { status: 200 }), 'status=200 unreadable'],
+      [() => new Response('x'.repeat(70_000), { status: 200 }), 'status=200 unreadable'],
+      [() => Response.json({ not_id_token: 1 }), 'status=200 no id_token'],
+      [() => Response.json({ id_token: '' }), 'status=200 no id_token'],
+    ];
+    for (const [response, expected] of cases) {
+      logs.length = 0;
+      respond = response;
+      assert.deepEqual(await exchanger.exchange(config, 'THE-CODE', NOW), { ok: false, reason: 'unavailable' });
+      assert.deepEqual(logs, [`apple token exchange failed: ${expected}`]);
+    }
+  });
+
+  it('コードが無効（400 invalid_grant）と成功は、記録しない。記録に、コード・client_secret・id_token を含めない', async () => {
+    respond = () => Response.json({ error: 'invalid_grant' }, { status: 400 });
+    await exchanger.exchange(config, 'THE-CODE', NOW);
+    respond = () => Response.json({ id_token: 'ID-TOKEN' });
+    await exchanger.exchange(config, 'THE-CODE', NOW);
+    assert.equal(logs.length, 0);
+
+    respond = () => Response.json({ error: 'invalid_client', id_token: 'ID-TOKEN' }, { status: 400 });
+    await exchanger.exchange(config, 'THE-CODE', NOW);
+    const clientSecret = recorded.at(-1)!.form.get('client_secret') ?? '';
+    assert.ok(clientSecret.length > 0);
+    for (const line of logs) {
+      for (const secret of ['THE-CODE', clientSecret, 'ID-TOKEN', APPLE_PRIVATE_KEY]) {
+        assert.equal(line.includes(secret), false);
+      }
+    }
   });
 
   it('鍵の設定が不備なら、Appleを呼ぶ前に投げる（利用者の失敗に見せかけない）', async () => {
@@ -317,6 +363,7 @@ describe('POST /auth/apple/login', () => {
       appleCalls.push({ code: form.get('code') ?? '' });
       return appleResponse!(form);
     },
+    log: () => {}, // 失敗の記録は、上の「認可コードの交換」で確かめる
   });
 
   beforeEach(async () => {

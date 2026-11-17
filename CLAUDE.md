@@ -122,7 +122,10 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     呼ばない。Appleの `refresh_token`・`access_token` は、読まず、保存せず、ログにも出さない。`client_secret` は `APPLE_PRIVATE_KEY`
     （必須の secret。`vars` に置かない）でリクエストごとに署名する。コールバックの戻り先 `singfolio://auth/apple` は固定で、パラメータから決めない
     （オープンリダイレクトにしない）。Appleを呼ぶ `/auth/apple/login` のレート制限は、WAFの1ルール（デプロイのときに利用者が作る）。Workers の
-    Rate Limiting API は、Freeで使えるかが資料のどこにも無いので、設定に足さない。詳細は docs §8「AndroidのAppleログイン（Web経由）の実装」。
+    Rate Limiting API は、Freeで使えるかが資料のどこにも無いので、設定に足さない。`appleToken.ts` が `invalid_grant` 以外の失敗の分類を
+    `console.error` に1行出すのは、外さない（でたらめなコードでは、設定が違ってもAppleは常に `invalid_grant` を返すので、設定の不備
+    `invalid_client` は本物のコードでしか出ず、利用者には障害と同じ 503 になる。切り分けはこの1行だけ）。出すのは、ステータスと許可リストの
+    `error` 名だけ。コード・`client_secret`・IDトークン・Appleの応答の本文・例外の中身は出さず、増やさない。詳細は docs §8「AndroidのAppleログイン（Web経由）の実装」。
 
 ### アカウント（アプリ側）
 
@@ -167,7 +170,9 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     外さない**（戻りのURL `singfolio://auth/apple?...` を expo-router に渡すと `+not-found` へ遷移する。起動時のURLには `null` ではなく `'/'` を返す: `null` だと
     ルートから始める処理が飛び、Add Song が開く）。`openAuthSessionAsync` は使わない（Androidでは、
     リダイレクトとブラウザを閉じた判定を競わせるだけで、`dismiss` が勝ちうる）。`state` が `SHA-256(T)` と違う戻りのURLは受け取らない。`V`・`T` は
-    メモリにだけ置く（アプリが終了したときの再開は、7.3.11 で決める）。
+    メモリにだけ置く（アプリが終了したときの再開は、7.3.11 で決める）。`openBrowserAsync` のオプション（`createTask`・`useProxyActivity`・
+    `showInRecents`）は、既定と同じ値を明示して固定している（`src/services/index.ts`）。外さない: 旧来の経路は、Custom Tab を最近使ったアプリに出さず、
+    アプリの外へ移ると破棄する（SMSの確認コードを別のアプリで開く経路が壊れる）。
 -   `expo-secure-store` の config plugin を `app.json` に足さない。Androidのバックアップ規則が `<include>` で、v1.0で今
     バックアップされているSQLiteを外す。
 

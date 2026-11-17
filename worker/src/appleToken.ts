@@ -6,12 +6,30 @@
 //   （ログインには要らない。アカウントの削除（7.3.10）は、再認証であらためて得る）。
 // - Apple の応答の本文・コード・IDトークンを、結果にもエラーにも載せない。返すのは、`id_token` か、失敗の分類だけ。
 // - 再試行しない（認可コードは1回限りで、やり直しはアプリがする）。リダイレクトには従わない。5秒で打ち切る。
+// - 失敗（`invalid_grant` 以外）は、分類だけを1行、`console.error` に出す。こちらの設定の不備（Appleの `invalid_client`。
+//   Team ID・Key ID・鍵・Services ID の食い違い）も、Appleの障害も、利用者には同じ 503 になり、でたらめなコードでは
+//   Appleは常に `invalid_grant` を返すので（測定）、本物のコードで試すまで設定の不備は分からない。切り分けは、この1行だけ
+//   （Workers Logs は無効のままなので、`wrangler dev` の出力か `wrangler tail` で見る）。出すのは、ステータスと、許可リストにある
+//   `error` の名前だけ。コード・トークン・Apple の応答の本文・例外の中身は出さない。
 import { createAppleClientSecret } from './appleClientSecret.ts';
 
 const TOKEN_ENDPOINT = 'https://appleid.apple.com/auth/token';
 const TIMEOUT_MS = 5000;
 // IDトークンは1〜2KB。応答の大きさの上限（`id_token` と、使わない `refresh_token` などが入る）。
 const MAX_RESPONSE_BYTES = 64 * 1024;
+
+/** 失敗の分類を出す先。既定は `console.error`（テストでは差し替える）。 */
+export type AppleLog = (message: string) => void;
+
+// Apple の OAuth のエラー名（RFC 6749）。この外の値は、中身を出さず `other` と書く。
+const KNOWN_APPLE_ERRORS = new Set([
+  'invalid_request',
+  'invalid_client',
+  'invalid_grant',
+  'unauthorized_client',
+  'unsupported_grant_type',
+  'invalid_scope',
+]);
 
 /**
  * - `invalid_grant`: コードが無効（期限切れ・使用済み・でたらめ）。呼んだ側の問題で、やり直せば通りうる。
@@ -30,8 +48,9 @@ export interface AppleCodeExchangeConfig {
   privateKey: string;
 }
 
-export function createAppleCodeExchanger(options: { fetch?: AppleFetch } = {}) {
+export function createAppleCodeExchanger(options: { fetch?: AppleFetch; log?: AppleLog } = {}) {
   const fetchFunction: AppleFetch = options.fetch ?? ((url, init) => fetch(url, init));
+  const report = (detail: string) => (options.log ?? ((message) => console.error(message)))(`apple token exchange failed: ${detail}`);
 
   return {
     async exchange(config: AppleCodeExchangeConfig, code: string, now: number): Promise<AppleCodeExchange> {
@@ -58,29 +77,36 @@ export function createAppleCodeExchanger(options: { fetch?: AppleFetch } = {}) {
           signal: AbortSignal.timeout(TIMEOUT_MS),
         });
       } catch {
+        report('network'); // 通信の失敗・タイムアウト。例外の中身は出さない
         return { ok: false, reason: 'unavailable' };
       }
 
       let data: unknown;
       try {
         const declared = Number(response.headers.get('content-length'));
-        if (declared > MAX_RESPONSE_BYTES) return { ok: false, reason: 'unavailable' };
+        if (declared > MAX_RESPONSE_BYTES) throw new Error('too large');
         const text = await response.text();
-        if (text.length > MAX_RESPONSE_BYTES) return { ok: false, reason: 'unavailable' };
+        if (text.length > MAX_RESPONSE_BYTES) throw new Error('too large');
         data = JSON.parse(text);
       } catch {
+        report(`status=${response.status} unreadable`);
         return { ok: false, reason: 'unavailable' };
       }
-      if (typeof data !== 'object' || data === null) return { ok: false, reason: 'unavailable' };
+      if (typeof data !== 'object' || data === null) {
+        report(`status=${response.status} unreadable`);
+        return { ok: false, reason: 'unavailable' };
+      }
       const record = data as Record<string, unknown>;
 
       if (response.status === 200) {
-        return typeof record.id_token === 'string' && record.id_token !== ''
-          ? { ok: true, idToken: record.id_token }
-          : { ok: false, reason: 'unavailable' };
+        if (typeof record.id_token === 'string' && record.id_token !== '') return { ok: true, idToken: record.id_token };
+        report('status=200 no id_token');
+        return { ok: false, reason: 'unavailable' };
       }
-      // Apple は、エラーを 400 と `{"error":"invalid_grant"}` で返す。
+      // Apple は、エラーを 400 と `{"error":"invalid_grant"}` で返す。コードが無効なのは利用者側の事情で、記録しない。
       if (response.status === 400 && record.error === 'invalid_grant') return { ok: false, reason: 'invalid_grant' };
+      const name = typeof record.error === 'string' && KNOWN_APPLE_ERRORS.has(record.error) ? record.error : 'other';
+      report(`status=${response.status} error=${name}`);
       return { ok: false, reason: 'unavailable' };
     },
   };

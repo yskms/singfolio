@@ -134,7 +134,10 @@ export function createAppleWebSignInRepository(
             const params = parseReturnUrl(url);
             if (params === null) return;
             // 自分のフローの `state` だけを受け取る。違う・無いものは、他のアプリが押し込んだものかもしれない。
-            // 取りやめ（`error`）は、`state` が付かないことがあるので、無くてもよい（違うものは受け取らない）。
+            // 取りやめ（`error`）は、`state` が付かない場合に備えて、無くてもよい（違うものは受け取らない。Appleが
+            // 取りやめに `state` を付けるかは、7.3.13 で確かめる）。`state` の無い `error` のURLは、外から送って、進行中の
+            // サインインを取りやめさせられる。それでも `state` を必須にしないのは、アプリを前面に出すだけで（ランチャー
+            // など）、同じ取りやめが、猶予のあとに起きるため（エミュレータで確認）。守れる範囲が増えない。
             if (params.state !== undefined && params.state !== hashedNonce) return;
             if (params.error !== undefined) {
               fail(params.error === 'user_cancelled_authorize' ? 'cancelled' : 'provider-failed');

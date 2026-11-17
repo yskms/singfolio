@@ -51,9 +51,20 @@ const secureStorage: SecureStorage = {
 // ブラウザは、expo-web-browser の `openBrowserAsync`（Androidでは、開いた時点で解決する）。戻りのURLは、
 // `singfolio://auth/apple?...` でアプリが開き、Linking に届く（expo-router には `app/+native-intent.tsx` で、
 // 画面への遷移をさせない）。
+//
+// オプションは、既定と同じ値を**明示して固定する**。外さない。expo-web-browser は、`useProxyActivity` が真のとき、
+// Custom Tab を別のタスク（`.webContainer`）の透過Activityから開き、最近使ったアプリに出して、アプリの外へ移っても
+// 破棄しない。偽（旧来の経路）だと、`showInRecents` が偽のときに `EXCLUDE_FROM_RECENTS` と `NO_HISTORY` を付け、
+// 最近使ったアプリに出ず、離れると破棄される。Appleの確認コードをSMSで受け取るなど、アプリの外へ移って戻る
+// 経路を壊すので、既定が変わっても旧来の経路にならないようにする（エミュレータで、Home → Settings → 最近使った
+// アプリからの復帰を確認済み）。
 const authBrowser: AuthBrowser = {
   open: async (url) => {
-    await WebBrowser.openBrowserAsync(url);
+    await WebBrowser.openBrowserAsync(url, {
+      createTask: true,
+      useProxyActivity: true,
+      showInRecents: true,
+    });
   },
   onUrl: (listener) => {
     const subscription = Linking.addEventListener('url', ({ url }) => listener(url));

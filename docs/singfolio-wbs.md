@@ -249,7 +249,11 @@ v1.0より後（公開機能・Requests）の実装順序は、
         異常系（通信断・アカウントの切り替え・連打）。**AndroidのApple（Web経由。7.3.9）は、デプロイのあとで**: 先に、利用者が
         `wrangler secret put APPLE_PRIVATE_KEY`（`.p8` の中身）と、WAFのルール（Path が `/auth/apple/login`、IPで数える、5件/10秒 目安、Block）を
         作る。そのうえで、Appleの認可コードの交換が通るか（Appleが `client_secret` と `redirect_uri` を受け付けるか）、IDトークンの `nonce` が `SHA-256(T)`
-        そのままか、`sub` がiOSと同じか、Return URL からの 302 が実機の Custom Tab でアプリを開くか、取りやめ（`user_cancelled_authorize`）を確かめる。Googleは、Androidの成功経路（本番用のクライアントIDと、署名の鍵ごと
+        そのままか、`sub` がiOSと同じか、Return URL からの 302 が実機の Custom Tab でアプリを開くか（Chrome が「Continue to Singfolio?」を出して、利用者に押させる
+        場合がある。エミュレータの測定は §8「Chrome の Custom Tab での戻り方」。Appleの実際のページからの戻りが、確認なし・確認ありのどちらになるか）、
+        取りやめ（`user_cancelled_authorize`）と、Appleが取りやめに `state` を付けるか、SMSの確認コードを別のアプリで開いて入力して戻る経路（Custom Tab に戻れるか）を確かめる。
+        設定の不備（`invalid_client`）は、本物のコードの交換で初めて出る（でたらめなコードでは常に `invalid_grant`）。503 が続いたら、`wrangler dev` の出力か
+        `wrangler tail` の1行（`apple token exchange failed: ...`）で切り分ける（デプロイしたWorkerでの `wrangler tail` は未確認）。Googleは、Androidの成功経路（本番用のクライアントIDと、署名の鍵ごと
         （debug・EASのlocal build・Play App Signing）のSHA-1）、プロジェクトの所有者でもテストユーザーでもないアカウントで入れるか
         （同意画面は「テスト中」）。Androidの成功経路は、**R8 入りの release で**確かめる（結果の解析 `GoogleIdTokenCredential.createFrom` と
         トークンの返却。googleid のクラスは R8 で改名される）。実機

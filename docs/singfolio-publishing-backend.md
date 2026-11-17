@@ -662,7 +662,7 @@ AndroidにはAppleのネイティブのサインインが無いので、Appleの
     コードに固定で、リクエストのパラメータからは決めない。渡すのは、形を確かめた `code`（印字できるASCII 1〜1024字）・`state`（`SHA-256(T)` の
     43字）・`error`（小文字と `_` の64字まで）だけで、URLエンコードして付ける。`code` か `error` のどちらか1つが無い、形が違う、は 400
     （Appleのリダイレクトではない）。HEAD は本文なしの 302、`GET`・`HEAD` 以外は 405。`Cache-Control: no-store`・`Referrer-Policy: no-referrer`。
-    本文には、戻れなかったとき用のリンクを添える。
+    本文には、リダイレクトに従わないクライアント用のリンクを添える（ブラウザには描画されない。逃げ道ではない。下の「Chrome の Custom Tab での戻り方」）。
 -   **`POST /auth/apple/login`**。JSON `{"code":"<認可コード>","nonce":"<T（web）>","verifier":"<V>"}`（本文は4KBまで）。200 `{"session":"<値>"}`。
     失敗は `/auth/login` と同じ形: 400（形の不備。`verifier` は43字の base64url）、401（検証に通らない。理由は教えない）、503（Appleが使えない）、
     405、413。順序: `T` の署名・種別（`web`）・期限 → **`SHA-256(V)` が `T` の中の `C` と一致するか（Appleを呼ぶ前。通らなければ呼ばない）** →
@@ -674,6 +674,15 @@ AndroidにはAppleのネイティブのサインインが無いので、Appleの
     再認証であらためて得る）。Appleの応答の本文・コード・IDトークンを、エラーにも結果にも載せない。**400 `invalid_grant`**（無効・期限切れ・
     使用済みのコード）**は 401**。それ以外（通信の失敗・5xx・`invalid_client`（こちらの設定の不備）・`invalid_request` など）は 503
     （どれも利用者にできることが無い。コードの問題と区別しても同じ）。
+    **設定の不備は、本物のコードで試すまで分からない。** でたらめなコードでAppleのトークンのエンドポイントを呼ぶと、Team ID・Key ID・鍵・Services ID・
+    `redirect_uri` が合っていなくても、Appleは常に 400 `invalid_grant`（"The code has expired or has been revoked."）を返す（使い捨ての鍵・存在しない
+    Services ID・違う Team ID・違う Key ID・未登録の `redirect_uri` で測定した）。つまり、でたらめなコードで設定を事前に確かめる手は使えない
+    （「`invalid_grant` なら設定は正しい」とは言えない）。設定の不備（`invalid_client`）は、7.3.13 の最初の本物のコードの交換で初めて出て、利用者には
+    Appleの障害と同じ 503 になる。切り分けのため、`invalid_grant` 以外の失敗は、分類だけを1行、`console.error` に出す
+    （`apple token exchange failed: status=400 error=invalid_client`・`...: network`・`...: status=502 unreadable`・`...: status=200 no id_token`）。
+    出すのは、ステータスと、許可リストにある `error` の名前（RFC 6749 の語彙。外の値は `other`）だけで、コード・`client_secret`・IDトークン・Appleの応答の
+    本文（`error_description` を含む）・例外の中身は出さない。Workers Logs は無効のままなので、`wrangler dev` の出力か `wrangler tail` で見る
+    （`wrangler tail` は、Workers Logs が無効でも出ると理解しているが、デプロイしたWorkerでは未確認。7.3.13 で確かめる）。
 -   **`client_secret`**（`appleClientSecret.ts`）。ES256のJWT（`kid` = Key ID、`iss` = Team ID、`sub` = Services ID、`aud` =
     `https://appleid.apple.com`、`exp` は5分先）を、秘密鍵（`.p8`）でリクエストごとに署名する。Team ID・Key ID は `wrangler.jsonc` の `vars`
     （秘密情報ではない）、**秘密鍵は `APPLE_PRIVATE_KEY`（必須の秘密情報。`wrangler secret put APPLE_PRIVATE_KEY`）**。鍵が無い・PKCS#8のEC鍵として
@@ -715,6 +724,25 @@ AndroidにはAppleのネイティブのサインインが無いので、Appleの
     （コード・`state` を含む）が出うる（adb でだけ読める。コードは1回限りで5分有効、`V` が無いと使えないので、この設計で受け入れる）。
     **本物のAppleでの確認（コードの交換、IDトークンの `nonce`、`sub` がiOSと同じか、`client_secret` をAppleが受け付けるか、Return URL からの 302 が実機の
     Custom Tab でアプリを開くか）は、デプロイと、利用者のAppleアカウントでのサインインが要るので、7.3.13。**
+-   **Chrome の Custom Tab での戻り方**（エミュレータ API 36、Chrome 154 で測った。テスト用のページ（`127.0.0.1`）から、別のオリジン（`localhost`）のコールバックへ
+    スクリプトで遷移し、302 でアプリのURLスキームへ戻す形。Appleのページそのものは再現できないので、最後の遷移が「利用者の操作から、どれだけ離れているか」
+    だけを変えた）。(a) 操作なし（開いたまま、8秒後にスクリプトが遷移）は、**確認なしで**アプリが開く。(b) ボタンを押し、`fetch` のあと1秒以内に遷移も、
+    確認なしで開く。(c) ボタンを押して**7秒後**に遷移（ユーザー操作の有効期間（約5秒）を過ぎる）は、Chrome が「Continue to Singfolio?」（「This site wants to open
+    the Singfolio app」）を出し、**押すとアプリが開く**（自動では開かない。表示は数秒で消え、押さずに Custom Tab を閉じると、猶予のあと `cancelled`）。302 の
+    本文（リンク）は、どの場合も描画されない。200 のページにリンクを置く形にしない理由は、(a)(b) でも毎回1回押させることになり、JSでの遷移がより厳しく
+    扱われるかも測っていないため。Appleの実際のページからの戻りが(a)(b)(c)のどれになるかは、7.3.13 で確かめる。(c) になるなら、利用者への見え方（確認を押す
+    必要）を踏まえて、戻し方を見直す。
+-   **Custom Tab のタスクと、アプリの外へ移る経路**（確認コードをSMSで受け取るなど）。`openBrowserAsync` には、`createTask: true`・`useProxyActivity: true`・
+    `showInRecents: true` を**明示して渡す**（`src/services/index.ts`。expo-web-browser 57.0.3 の既定と同じ値だが、固定する。外さない）。`useProxyActivity` が真だと、
+    Custom Tab を、別のタスク（`taskAffinity` が `.webContainer`）の透過Activityから開く。このタスクは最近使ったアプリに出て、Home・ほかのアプリへ移っても破棄されない。
+    偽（旧来の経路）は、`showInRecents` が偽のとき `EXCLUDE_FROM_RECENTS` と `NO_HISTORY` を付け、最近使ったアプリに出ず、離れると破棄される（レビューは、この経路の
+    ソースを読んで、「戻る手段が無い」と推した。既定では、この経路は使われない）。エミュレータで、Home → 設定アプリ → 最近使ったアプリ から Custom Tab のカードを選ぶと、
+    Appleのページに戻り、アプリには何も起きない（サインインは続く）ことを確かめた（固定したオプションでも同じ）。**アプリのほう**（ランチャーのアイコン・アプリのカード）を
+    開くと、前面への復帰から1.5秒で `cancelled` になる。Custom Tab が残っているかは、アプリから分からないので、見分けられない（利用者がやり直す。Custom Tab は
+    最近使ったアプリに残る）。実機で、SMSの確認コードを別のアプリで開いて入力する経路は、7.3.13。
+-   **`state` の無い `error` のURL。** `singfolio://auth/apple?error=x` は、ほかのアプリやWebのリンクからも送れ、届くと進行中のサインインが `cancelled`（または
+    `provider-failed`）で終わる。やり直しが要るだけで、乗っ取りにはならない。`error` にも `state` の一致を求める形にしないのは、アプリを前面に出すだけで（ランチャーの
+    アイコンなど）、同じ取りやめが猶予のあとに起きるため（エミュレータで確認）。守れる範囲が増えない。Appleが取りやめに `state` を付けるかは、7.3.13 で確かめる。
 
 **Googleのサインイン（iOS・Android）**（実装済み。7.3.8。`modules/singfolio-google-signin`・`plugins/withGoogleSignIn.js`・`src/repositories/googleSignInRepository.ts`）
 
