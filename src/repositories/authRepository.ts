@@ -30,6 +30,13 @@ export type AuthFetchLike = (
 export const API_ORIGIN = 'https://singfolio.app';
 /** 応答を待つ上限。超えたら `network`。 */
 const DEFAULT_TIMEOUT_MS = 10_000;
+/**
+ * アカウントの削除（`POST /auth/delete`）だけ、待つ上限を長くする。Worker は 1 回のリクエストの中で、公開鍵の取得・Appleの認可コードの交換・
+ * Appleのトークンの失効を順に待つ（それぞれ最大5秒。合計15秒ほど）。アプリが先に打ち切ると、サーバーでは削除が済んでいるのに、
+ * アプリは失敗（`network`）と受け取り、端末のセッションも残る（やり直すと 401）。通常は1秒以内に終わるので、長くするのは、Appleが遅いときだけ。
+ * 削除は、利用者が確認して押す、まれな操作（画面は待ちの表示を出す。7.3.11）。
+ */
+export const DELETE_TIMEOUT_MS = 30_000;
 
 // 値の中身は解釈しない（不透明な値）。ヘッダーに載せても安全な（見える ASCII だけの）、常識的な長さの
 // 文字列かだけを確かめる。
@@ -82,10 +89,11 @@ export interface DeleteAccountResponse {
 
 export function createAuthRepository(
   fetchImpl: AuthFetchLike,
-  options: { origin?: string; timeoutMs?: number } = {},
+  options: { origin?: string; timeoutMs?: number; deleteTimeoutMs?: number } = {},
 ) {
   const origin = (options.origin ?? API_ORIGIN).replace(/\/+$/, '');
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const deleteTimeoutMs = options.deleteTimeoutMs ?? DELETE_TIMEOUT_MS;
 
   /** POST して、成功（2xx）の応答を返す。失敗は `AuthError`。 */
   async function post<T>(
@@ -93,6 +101,8 @@ export function createAuthRepository(
     init: {
       json?: unknown;
       session?: string;
+      /** 応答を待つ上限（ミリ秒）。省略すると既定。 */
+      timeoutMs?: number;
       /** 401・429・5xx 以外の失敗（4xx）を、`AuthError` にする。`undefined` を返すと、`invalid-request`。 */
       rejected?: (status: number, response: { json(): Promise<unknown> }) => Promise<AuthError | undefined>;
     },
@@ -107,7 +117,7 @@ export function createAuthRepository(
     if (init.session !== undefined) headers.Authorization = `Bearer ${init.session}`;
 
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const timer = setTimeout(() => controller.abort(), init.timeoutMs ?? timeoutMs);
     try {
       let response: Awaited<ReturnType<AuthFetchLike>>;
       try {
@@ -215,6 +225,8 @@ export function createAuthRepository(
      * 401（セッションが無効）は `unauthorized`、403 は本文の `error` で `reauth-failed`（再認証が通らない）か
      * `account-mismatch`（別のアカウントで再認証した）。503 などは `unavailable`。
      * 再認証の値（IDトークン・認可コード・`T`・`V`）と、セッションの値を、エラーの `message` にもログにも出さない。
+     * 待つ上限は `DELETE_TIMEOUT_MS`（ほかより長い）。それでも `network` になったときは、削除が済んでいる可能性がある
+     * （応答が届かなかっただけ）。やり直すと、セッションが無いので 401（`unauthorized`）になる。
      */
     deleteAccount(session: string, request: DeleteAccountRequest): Promise<DeleteAccountResponse> {
       return post(
@@ -222,6 +234,7 @@ export function createAuthRepository(
         {
           session,
           json: request,
+          timeoutMs: deleteTimeoutMs,
           rejected: async (status, response) => {
             if (status !== 403) return undefined;
             const data = await response.json();

@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { AuthError } from './authError.ts';
-import { createAuthRepository, type AuthFetchLike } from './authRepository.ts';
+import { createAuthRepository, DELETE_TIMEOUT_MS, type AuthFetchLike } from './authRepository.ts';
 
 type Init = Parameters<AuthFetchLike>[1];
 
@@ -317,6 +317,39 @@ describe('deleteAccount（アカウントの削除）', () => {
       const { fetchImpl } = fakeFetch(() => reply(200, body));
       await rejectsWith(createAuthRepository(fetchImpl).deleteAccount(SESSION, native), 'invalid-response');
     }
+  });
+
+  describe('待つ上限（削除はほかより長い）', () => {
+    // 応答が `ms` ミリ秒かかる fetch。中断されたら、本物の fetch と同じく拒否する。
+    const slow = (ms: number) =>
+      fakeFetch(
+        (_url, init) =>
+          new Promise((resolve, reject) => {
+            const timer = setTimeout(() => resolve(reply(200, { appleRevoked: true })), ms);
+            init.signal.addEventListener('abort', () => {
+              clearTimeout(timer);
+              reject(new Error('aborted'));
+            });
+          }),
+      ).fetchImpl;
+
+    it('既定の上限（ほかの呼び出し）では中断する遅さでも、削除は待って結果を受け取る', async () => {
+      // 既定の上限（ここでは 10ms）を超える 60ms。削除の上限（200ms）には収まる。
+      const repository = createAuthRepository(slow(60), { timeoutMs: 10, deleteTimeoutMs: 200 });
+      assert.deepEqual(await repository.deleteAccount(SESSION, native), { appleRevoked: true });
+      await rejectsWith(repository.logoutOthers(SESSION), 'network');
+    });
+
+    it('削除の上限を超えたら、network', async () => {
+      await rejectsWith(
+        createAuthRepository(slow(200), { timeoutMs: 1000, deleteTimeoutMs: 20 }).deleteAccount(SESSION, native),
+        'network',
+      );
+    });
+
+    it('既定では、削除の上限はほかより長い（Workerが Appleを3回待つ最悪の合計に足りる）', () => {
+      assert.ok(DELETE_TIMEOUT_MS >= 3 * 5000 + 5000);
+    });
   });
 
   it('403 は、本文の error で reauth-failed と account-mismatch に分ける。知らない 403・読めない本文は invalid-request', async () => {

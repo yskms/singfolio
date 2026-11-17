@@ -7,7 +7,9 @@
 // 再認証しても通さない）。
 //
 // 守ること:
-// - 順序: セッションの認証 → `T` → IDトークンの検証 → `sub` の一致 → `T` を使用済みに → **D1の行を消す** → Apple のトークンの失効。
+// - 順序: セッションの認証 → `T` → IDトークンの検証 → `sub` の一致 → `T` を使用済みに → （iOSのApple: 認可コードの交換）→
+//   **D1の行を消す** → Apple のトークンの失効。外部への待ちは、消す前に済ませる（失効の1回を除く）。アプリが先に打ち切る・切断すると、
+//   Workerは、消したあとの処理を打ち切りうる。消す前なら、何も消えず、やり直せる。
 //   D1が失敗しうるのは、止められる前（やり直せる）まで。**失効は、あとから、削除を止めずに行う**（Appleの案内は、失効を
 //   「すべき」とするもので、削除を難しくしないことが優先）。失効できなかったときは、`appleRevoked: false` で伝える（アプリが、
 //   利用者に、Appleの設定から連携を解除できると案内できる）。
@@ -101,21 +103,30 @@ export async function deleteAccount(
   if (!verified.ok) return failed(verified.reason === 'unavailable' ? 'unavailable' : 'reauth_failed');
   if (verified.sub !== session.sub) return failed('account_mismatch');
 
-  // 4. ここから先が書き込み。`T` を使用済みにする（2回目は弾く）。
+  // 4. ここから先が書き込み。`T` を使用済みにする（2回目は弾く。リプレイでは、Appleを呼ばない）。
   if (!(await consumeNonce(env.DB, verifiedNonce.nonceHash, verifiedNonce.expiresAt, now))) return failed('reauth_failed');
 
-  // 5. アカウントを消す（R2のスナップショットなどは、7.4 以降で `deleteUserAccount` に足す）。
-  await deleteUserAccount(env.DB, session.userId);
-
-  // 6. Appleのトークンの失効（削除を止めない。ここで例外が出ても、アカウントはもう消えているので、失敗にしない）。
-  //    ネイティブは、ここで認可コードを交換して、失効するトークンを得る（コードは、IDトークンの検証には使わない）。
-  if (input.provider !== 'apple') return { ok: true, appleRevoked: null };
-  try {
-    if (input.kind === 'native' && nativeCode !== undefined) {
+  // 5. iOSのAppleは、失効に使うトークンを得るために、認可コードを交換する（コードは、IDトークンの検証には使わない）。
+  //    **D1を消す前に行う**: 消したあとに待つのを、失効の1回（最大5秒）だけにするため。Workerは1回のリクエストの中で、Appleを
+  //    順に待つ（それぞれ最大5秒）。アプリが先に打ち切る・切断すると、消したあとの処理は、打ち切られうる（失効が行われず、
+  //    ログも残らない）。消す前なら、打ち切られても、何も消えず、やり直せる。交換の失敗は、削除を止めない（失効ができないだけ）。
+  if (input.provider === 'apple' && input.kind === 'native' && nativeCode !== undefined) {
+    try {
       const exchanged = await exchanger.exchangeWithToken(appleConfig(env, 'native'), nativeCode, now);
       if (exchanged.ok) revocation = exchanged.revocationToken;
+    } catch {
+      // 鍵の設定の不備（`APPLE_PRIVATE_KEY`）など。例外の中身は出さない。
+      log('apple token revoke failed: unexpected');
     }
-    if (revocation === null) return { ok: true, appleRevoked: false };
+  }
+
+  // 6. アカウントを消す（R2のスナップショットなどは、7.4 以降で `deleteUserAccount` に足す）。
+  await deleteUserAccount(env.DB, session.userId);
+
+  // 7. Appleのトークンの失効（削除を止めない。ここで例外が出ても、アカウントはもう消えているので、失敗にしない）。
+  if (input.provider !== 'apple') return { ok: true, appleRevoked: null };
+  if (revocation === null) return { ok: true, appleRevoked: false };
+  try {
     return { ok: true, appleRevoked: await exchanger.revoke(appleConfig(env, input.kind), revocation, now) };
   } catch {
     // 鍵の設定の不備（`APPLE_PRIVATE_KEY`）など。例外の中身は出さない。

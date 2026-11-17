@@ -42,7 +42,8 @@ describe('POST /auth/delete', () => {
   let jwksFails: boolean;
   let logs: string[];
   // 模擬のApple。/auth/token と /auth/revoke への呼び出しを記録する。
-  let appleCalls: Array<{ url: string; form: URLSearchParams }>;
+  // `present`: その呼び出しの時点で、D1に、再認証したアカウント（`SUB`）の行が残っているか（呼び出しと削除の前後を見る）。
+  let appleCalls: Array<{ url: string; form: URLSearchParams; present: boolean }>;
   let tokenResponse: ((form: URLSearchParams) => Response | Promise<Response>) | null;
   let revokeResponse: (() => Response | Promise<Response>) | null;
 
@@ -67,7 +68,8 @@ describe('POST /auth/delete', () => {
   const exchanger = createAppleCodeExchanger({
     fetch: async (url, init) => {
       const form = new URLSearchParams(String(init.body));
-      appleCalls.push({ url, form });
+      const row = await db.prepare('SELECT COUNT(*) AS n FROM identities WHERE sub = ?').bind(SUB).first<{ n: number }>();
+      appleCalls.push({ url, form, present: row!.n > 0 });
       if (url.endsWith('/auth/revoke')) return revokeResponse ? revokeResponse() : new Response('', { status: 200 });
       return tokenResponse!(form);
     },
@@ -209,6 +211,32 @@ describe('POST /auth/delete', () => {
       assert.equal(revoke.form.get('token_type_hint'), 'refresh_token');
       assert.ok((revoke.form.get('client_secret') ?? '').length > 0);
       assert.deepEqual(logs, []);
+    });
+
+    it('Apple（iOS）: 認可コードの交換は、D1を消す前。失効だけが、消したあと（消したあとに待つのを、1回にする）', async () => {
+      const { session } = await signedIn();
+      tokenResponse = () => Response.json({ id_token: 'UNUSED', refresh_token: REFRESH });
+      assert.equal((await call(session, (await appleNative()).body)).status, 200);
+      assert.deepEqual(
+        appleCalls.map((c) => [c.url.endsWith('/auth/token') ? 'exchange' : 'revoke', c.present]),
+        [
+          ['exchange', true],
+          ['revoke', false],
+        ],
+      );
+    });
+
+    it('Apple（Android）: 交換（本人確認に要る）はD1を消す前、失効は消したあと', async () => {
+      const { session } = await signedIn();
+      const { body } = await appleWeb();
+      assert.equal((await call(session, body)).status, 200);
+      assert.deepEqual(
+        appleCalls.map((c) => [c.url.endsWith('/auth/token') ? 'exchange' : 'revoke', c.present]),
+        [
+          ['exchange', true],
+          ['revoke', false],
+        ],
+      );
     });
 
     it('Apple（Android）: 認可コードの交換（Services ID・redirect_uri）で本人確認し、同じ応答のトークンを失効させる（交換は1回）', async () => {
