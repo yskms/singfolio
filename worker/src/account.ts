@@ -28,7 +28,8 @@ export async function deleteUserAccount(db: D1Database, userId: string): Promise
  * 選んだあとにログインしたアカウントを消してしまう。この文は、消す瞬間に `last_active_at < cutoff` を見る
  * （1文なので、見るのと消すのの間に他の書き込みが入らない）。**削除できたかは、変更行数が 0 より大きいか**で見る
  * （条件に外れれば 0）。「1 のとき」にしない: D1 の `meta.changes` は、外部キーのカスケードで消えた `identities`・`sessions` の
- * 行も数える（ユーザー1・ログイン手段1・セッション1で 3。test/inactiveAccounts.test.ts で確かめた）ので、件数を足し上げる用途にも使えない。
+ * 行も数えた（ローカルの D1 で、ユーザー1・ログイン手段1・セッション1で 3。本番は未確認）ので、件数を足し上げる用途には使えない。
+ * 0 より大きいかで見れば、本番が 1 を返しても動く。
  * `last_active_at` が NULL のアカウントは消さない（`<` は NULL で偽）。
  */
 export function deleteInactiveUserStatement(db: D1Database, userId: string, cutoff: number): D1PreparedStatement {

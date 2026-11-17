@@ -11,7 +11,7 @@ import {
 import { resolveIdentity } from '../src/identity.ts';
 import { deleteInactiveAccounts, MAX_DELETIONS_PER_RUN } from '../src/inactiveAccounts.ts';
 import worker from '../src/index.ts';
-import { authenticateSession, createSession, revokeSession } from '../src/session.ts';
+import { authenticateSession, createSession, revokeSession, SESSION_TTL_MS } from '../src/session.ts';
 import { openLocalDatabase, workerDir, type LocalDatabase } from './localDatabase.ts';
 
 const NOW = 1_900_000_000_000;
@@ -115,11 +115,12 @@ describe('未使用のアカウントの自動削除', () => {
       assert.equal(await count('sessions'), 1);
     });
 
-    it('条件に合えば、変更行数は 0 より大きい（D1 は、カスケードで消えたログイン手段・セッションの行も数える）', async () => {
+    it('条件に合えば、変更行数は 0 より大きい（カスケードで消えた行を数えるかは、環境に依らない見方にする）', async () => {
       const user = await addUser(NOW - YEAR - 1);
       const result = await deleteInactiveUserStatement(db, user.userId, NOW - YEAR).run();
-      // ユーザー1行 + ログイン手段1行 + セッション1行。「1 のとき成功」とは読めない。
-      assert.equal(result.meta.changes, 3);
+      // ローカルの D1 では 3(ユーザー1行 + ログイン手段1行 + セッション1行)で、カスケードの行も数える。本番は未確認。
+      // 1 でも 3 でも成り立つ見方(0 より大きい)に固定する: 「1 のとき成功」にしない。
+      assert.ok(result.meta.changes > 0);
       assert.equal(await exists(user.userId), false);
     });
 
@@ -185,6 +186,22 @@ describe('未使用のアカウントの自動削除', () => {
       // 2回目（セッションは無い）は、何も進めない。
       await revokeSession(db, token, NOW + 9 * DAY);
       assert.equal(await lastActive(userId), NOW + 3 * DAY);
+    });
+
+    it('ログアウト: 期限切れ（90日以上使っていない）のセッションでは進めない。行は消える', async () => {
+      const { userId, identityId } = await resolveIdentity(db, 'apple', 'active-6', NOW);
+      const token = (await createSession(db, identityId, NOW))!;
+      // authenticateSession が期限切れでは進めないのと揃える。
+      await revokeSession(db, token, NOW + SESSION_TTL_MS);
+      assert.equal(await lastActive(userId), NOW);
+      assert.equal(
+        (await db.prepare('SELECT COUNT(*) AS n FROM sessions WHERE identity_id = ?').bind(identityId).first<{ n: number }>())!.n,
+        0,
+      );
+      // 期限の1ミリ秒前なら、まだ有効なセッション: 進める。
+      const live = (await createSession(db, identityId, NOW))!;
+      await revokeSession(db, live, NOW + SESSION_TTL_MS - 1);
+      assert.equal(await lastActive(userId), NOW + SESSION_TTL_MS - 1);
     });
 
     it('11か月使って、ログアウトした1か月後には消えない。ログアウトの1年後に消える', async () => {

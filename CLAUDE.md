@@ -73,7 +73,7 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
 -   アカウント（7.3。サインイン・サインアウト・削除）は実装済みだが、リリースのビルドでは `ACCOUNT_ENABLED` で閉じている
     （下の「アカウント（アプリ側）」）。**公開中の `docs/privacy-policy.md` は、アカウントを出す版が出るまで書き換えない**
     （main に push した時点で GitHub Pages に出る。出すと、アプリが持たない機能の説明が公開される）。アカウントを出す版のポリシーは
-    `docs/singfolio-privacy-policy-next.md`（`singfolio-*.md` なので公開されない）に下書きがあり、7.3.13 のリリース手順で
+    `docs/singfolio-privacy-policy-next.md`（`singfolio-*.md` なので公開されない）に下書きがあり、アカウントを出す版のリリース手順（7.3.13 の確認用ビルドはリリースしない）で
     `privacy-policy.md` に反映する。ストアの申告の下書きは `docs/singfolio-store-listing.md` §6。
 -   v1.0で実装しない設定項目（Dataなど）は画面に表示しない。
 
@@ -137,11 +137,12 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     基準は `users.last_active_at`（`sessions.last_used_at` や `identities.last_sign_in_at` に「簡略化」しない。ログアウトで消えるセッションの行だけでは、
     「11か月使って、ログアウトの1か月後に消える」穴が残る）。**消す文に条件を入れ直す**（`DELETE … WHERE id=? AND last_active_at < cutoff`。無条件の
     `deleteUserAccount` を使い回さない。候補に選んだあとにログインしたアカウントを消す）。**NULL は消さない側**（`COALESCE(…, created_at)` にしない）。
-    **削除できたかは、文ごとの変更行数が 0 より大きいか**（D1 の `meta.changes` は、外部キーのカスケードで消えた行も数えるので、「1 のとき」にも、合計にもしない）。
+    **削除できたかは、文ごとの変更行数が 0 より大きいか**（ローカルの D1 では、`meta.changes` が外部キーのカスケードで消えた行も数えた。本番は未確認。「1 のとき」にも、合計にもしない）。
     **D1のクエリは2回だけ**（候補の SELECT と、条件つき DELETE の1バッチ。アカウントごとのクエリに分けない。Freeは1回の実行で50回まで、バッチは1回と数える）。
     Cron Trigger を足さない（Freeは5つまで）。ポリシーに書いた「1年」「90日」「30日」を変えるときは、定数・docs・ポリシーを一緒に直す。
-    **7.4 で、公開ページのあるアカウントを自動削除の対象外にするか、利用の記録を足すか、決めてから公開機能を出す**（端末の中だけで使い続ける人は、
-    1年後に公開ページごと消える）。詳細は `docs/singfolio-publishing-backend.md` §8「未使用のアカウントの自動削除」。
+    **端末の中だけの利用は、最後に使った時刻を進めない**（アカウントを出した版から起きる。7.3 のアプリで認証つきの通信は `signOutOthers`・`deleteAccount` だけ）。
+    **7.4 で、公開ページのあるアカウントを自動削除の対象外にするか、利用の記録を足すか、決めてから公開機能を出す**（端末の中だけで使い続ける人は、1年後に公開ページごと消える）。
+    ログアウトは、有効なセッションのときだけ時刻を進める（`authenticateSession` と揃える）。詳細は `docs/singfolio-publishing-backend.md` §8「未使用のアカウントの自動削除」。
 -   Appleのサーバー間通知（`worker/src/appleNotification.ts`）とセッション発行の競合: **`createSession` の INSERT にある `consent_revoked_at` の条件
     （`migrations/0002`）は外さない。** 通知の処理の最中に進んでいたログインが、取り消し後のセッションを作るのを防ぐ唯一の手段で、`last_sign_in_at` と
     `event_time` の比較だけでは吸収できない（確かめた）。通知の `aud` は、バンドルIDとServices IDの**どちらも**受け入れる（ログインの `aud` を1つに決める規則とは

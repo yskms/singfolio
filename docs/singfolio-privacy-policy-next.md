@@ -1,7 +1,8 @@
 <!--
   次のプライバシーポリシー（アカウント機能つきの版）の下書き。公開しない（`singfolio-*.md` は Jekyll の exclude で公開されない）。
 
-  使い方: 7.3.13 のリリース手順で、このファイルの内容を `docs/privacy-policy.md` に反映する（このコメントは写さない）。
+  使い方: アカウントを出す版のリリース手順で、このファイルの内容を `docs/privacy-policy.md` に反映する（このコメントは写さない）。
+  7.3.13 の確認用ビルド（TestFlight・内部テスト）はリリースしない。アカウントを出す版の時期は決めていない。
   反映するときに、施行日（Effective date）を決める。反映する前に `ACCOUNT_ENABLED` を外したビルドを出さない。
   `docs/privacy-policy.md` は main に push した時点で公開される（GitHub Pages）ので、アカウントを出すまでは、そちらを書き換えない。
 
@@ -27,7 +28,7 @@ Singfolio (the “App”) is a repertoire manager for singers, available for And
 - Your song list is stored only on your device. The developer does not receive it, whether or not you have an account.
 - If you choose to create an account (with Apple or Google), the developer’s server stores an identifier for your account and when you last used it. It does not store your name or email address.
 - The App also sends the text you type in the Title and Artist fields of Add / Edit Song to Apple, to find suggestions. You can turn this off.
-- You can delete your account in the App at any time. An account that has not been used for one year is deleted automatically.
+- You can delete your account in the App at any time. An account that has not been used for one year is deleted automatically. Only actions that connect to the developer’s server count as use, such as signing in or out; using the App on your device alone does not.
 - The App has no ads, no analytics, and no tracking.
 
 ### Data stored on your device
@@ -76,9 +77,9 @@ The account is used only to keep you signed in, to sign you out, and to delete t
 - *Sign out* signs you out on this device. *Sign out of other devices* signs you out everywhere else.
 - *Delete account* deletes your account from the developer’s server. To make sure it is you, the App asks you to sign in again with the same Apple or Google account. Deleting removes the account record, the sign-in identifier, and all sessions. **Your songs on your device are not deleted.** If you used Apple, the App also asks Apple to end the connection between your Apple Account and the App; if that fails, you can remove Singfolio under “Sign in with Apple” in your Apple Account settings.
 
-**If you cannot sign in** (for example, your Apple or Google account is no longer available, or you lost your device). The developer’s server does not store names or email addresses, so the developer cannot find your account from an email address, and cannot verify who you are. Instead, an account that has not been used for one year is deleted automatically. “Used” means signing in, using a feature that needs the account, or signing out. When an account is deleted automatically, the connection under “Sign in with Apple” in your Apple Account settings stays until you remove it yourself.
+**If you cannot sign in** (for example, your Apple or Google account is no longer available, or you lost your device). The developer’s server does not store names or email addresses, so the developer cannot find your account from an email address, and cannot verify who you are. Instead, an account that has not been used for one year is deleted automatically. “Used” means signing in, using a feature that needs the account, or signing out, all of which connect to the developer’s server. Using the App only on your device does not count, so an account you never open again can be deleted even if you keep using the App for your songs. When an account is deleted automatically, the connection under “Sign in with Apple” in your Apple Account settings stays until you remove it yourself.
 
-**How long data is kept.** Account data is kept until you delete the account, or for one year after you last used it. After deletion it can remain for up to 30 days in the hosting provider’s automatic database recovery history, and is then gone.
+**How long data is kept.** Account data is kept until you delete the account, or for one year after you last used it as described above. After deletion it can remain for up to 30 days in the hosting provider’s automatic database recovery history, and is then gone.
 
 If you need help with these steps, email yskms.studio@gmail.com with the subject “Singfolio account deletion”. Do not include private information you do not need to share.
 
@@ -114,7 +115,7 @@ Singfolio（以下「本アプリ」）は、歌う人のためのレパート�
 - 曲のリストは端末内にだけ保存され、アカウントの有無にかかわらず、開発者は受け取りません。
 - アカウントを作る場合（AppleまたはGoogleで作ります）、開発者のサーバーは、アカウントの識別子と、最後に使った日時を保存します。名前とメールアドレスは保存しません。
 - 本アプリは、曲の追加・編集の「曲名」「アーティスト」の入力欄に入力した文字を、候補を探すためにAppleへ送ります。これはオフにできます。
-- アカウントは、本アプリの中でいつでも削除できます。1年間使われなかったアカウントは、自動で削除します。
+- アカウントは、本アプリの中でいつでも削除できます。1年間使われなかったアカウントは、自動で削除します。「使った」に数えるのは、サインイン・サインアウトなど、開発者のサーバーにつながる操作だけです。端末の中だけで本アプリを使っても、数えません。
 - 広告・アクセス解析・トラッキングはありません。
 
 ### 端末内に保存するデータ
@@ -163,9 +164,9 @@ Appleから受け取った結果は、候補の表示以外には使いません
 - 「サインアウト」は、この端末でサインアウトします。「ほかの端末をすべてサインアウト」は、ほかのすべての端末でサインアウトします。
 - 「アカウントを削除」は、開発者のサーバーからアカウントを削除します。本人であることを確かめるため、同じAppleまたはGoogleのアカウントで、もう一度サインインしてもらいます。削除すると、アカウントの記録、サインインの識別子、すべてのセッションが消えます。**端末内の曲は消えません。** Appleを使っていた場合は、本アプリは、Apple Accountと本アプリの連携を終わらせるよう、Appleにも依頼します。失敗したときは、Apple Accountの設定の「Appleでサインイン」から、Singfolioを削除できます。
 
-**サインインできない場合**（たとえば、AppleやGoogleのアカウントが使えなくなった、端末をなくした）。開発者のサーバーは、名前もメールアドレスも保存しないため、開発者は、メールアドレスからアカウントを探せず、本人かどうかも確かめられません。代わりに、1年間使われなかったアカウントは、自動で削除します。「使った」とは、サインイン、アカウントが必要な機能の利用、サインアウトのことです。自動で削除したときは、Apple Accountの設定の「Appleでサインイン」の連携は、ご自身で削除するまで残ります。
+**サインインできない場合**（たとえば、AppleやGoogleのアカウントが使えなくなった、端末をなくした）。開発者のサーバーは、名前もメールアドレスも保存しないため、開発者は、メールアドレスからアカウントを探せず、本人かどうかも確かめられません。代わりに、1年間使われなかったアカウントは、自動で削除します。「使った」とは、サインイン、アカウントが必要な機能の利用、サインアウトのことで、どれも開発者のサーバーにつながる操作です。端末の中だけで本アプリを使っても数えないので、サインインの画面を開かなくなったアカウントは、曲の管理を続けていても、削除されることがあります。自動で削除したときは、Apple Accountの設定の「Appleでサインイン」の連携は、ご自身で削除するまで残ります。
 
-**保存期間。** アカウントのデータは、アカウントを削除するまで、または最後に使ってから1年間、保存します。削除したあとも、運用先の自動のデータベース復旧用の履歴に、最大30日間残ることがあり、その後、なくなります。
+**保存期間。** アカウントのデータは、アカウントを削除するまで、または上のとおり最後に使ってから1年間、保存します。削除したあとも、運用先の自動のデータベース復旧用の履歴に、最大30日間残ることがあり、その後、なくなります。
 
 この手順で困ったときは、yskms.studio@gmail.com へ、件名「Singfolio account deletion」でメールしてください。共有の必要がない個人情報は、書かないでください。
 

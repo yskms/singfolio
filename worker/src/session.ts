@@ -112,6 +112,9 @@ export async function authenticateSession(
  * 値を持っている側だけが呼べる）。
  * 消す前に、そのセッションのアカウントの最後に使った時刻を進める（同じバッチ。消すと、アカウントを引けなくなる）。
  * ログアウトは、アプリを使った操作で、これで「ログアウトの1か月後に、未使用1年として消える」穴を塞ぐ。
+ * **期限切れ（`SESSION_TTL_MS` 以上使っていない）のセッションでは進めない**（行は消す）。`authenticateSession` が、期限切れでは
+ * 時刻を進めないのと揃える: 最後に使った時刻は、有効なセッションか、サインインの成功でだけ進む。古い端末に残った値でのログアウトで、
+ * アカウントの期限を延ばさない。期限切れの行は、次の `createSession` まで残りうる。
  */
 export async function revokeSession(db: D1Database, token: string, now: number): Promise<void> {
   if (!isSessionToken(token)) return;
@@ -120,10 +123,11 @@ export async function revokeSession(db: D1Database, token: string, now: number):
     db
       .prepare(
         `UPDATE users SET last_active_at = ?1
-         WHERE id = (SELECT i.user_id FROM sessions s JOIN identities i ON i.id = s.identity_id WHERE s.token_hash = ?2)
+         WHERE id = (SELECT i.user_id FROM sessions s JOIN identities i ON i.id = s.identity_id
+                     WHERE s.token_hash = ?2 AND s.last_used_at > ?3)
            AND (last_active_at IS NULL OR last_active_at < ?1)`,
       )
-      .bind(now, hash),
+      .bind(now, hash, now - SESSION_TTL_MS),
     db.prepare('DELETE FROM sessions WHERE token_hash = ?1').bind(hash),
   ]);
 }
