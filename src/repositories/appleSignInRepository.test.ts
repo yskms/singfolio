@@ -124,6 +124,57 @@ describe('getIdToken', () => {
   });
 });
 
+describe('getIdTokenWithCode（アカウントの削除の再認証）', () => {
+  it('getIdToken と同じ呼び出し（スコープ無し・nonce をそのまま）で、IDトークンと認可コードを返す', async () => {
+    const { apple, requests } = fakeApple({
+      signInAsync: async (options) => {
+        requests.push(options);
+        return { identityToken: 'ID-TOKEN', authorizationCode: 'AUTH-CODE' };
+      },
+    });
+    const hashed = 'x'.repeat(43);
+    assert.deepEqual(await createAppleSignInRepository(apple).getIdTokenWithCode(hashed), {
+      idToken: 'ID-TOKEN',
+      authorizationCode: 'AUTH-CODE',
+    });
+    assert.deepEqual(requests, [{ requestedScopes: [], nonce: hashed }]);
+  });
+
+  it('認可コードが無い・空なら、付けずに返す（失効できないだけで、本人確認はできる）', async () => {
+    for (const authorizationCode of [null, undefined, '']) {
+      const { apple } = fakeApple({ signInAsync: async () => ({ identityToken: 'ID-TOKEN', authorizationCode }) });
+      assert.deepEqual(await createAppleSignInRepository(apple).getIdTokenWithCode('n'), { idToken: 'ID-TOKEN' });
+    }
+  });
+
+  it('getIdToken は、認可コードがあっても返さない', async () => {
+    const { apple } = fakeApple({ signInAsync: async () => ({ identityToken: 'ID-TOKEN', authorizationCode: 'AUTH-CODE' }) });
+    assert.equal(await createAppleSignInRepository(apple).getIdToken('n'), 'ID-TOKEN');
+  });
+
+  it('失敗の分類は getIdToken と同じ（取りやめ・失敗・対応していない・IDトークンが無い）。コードを載せない', async () => {
+    for (const [thrown, code] of [
+      [coded('ERR_REQUEST_CANCELED'), 'cancelled'],
+      [coded('ERR_REQUEST_UNKNOWN'), 'provider-failed'],
+      [new Error('boom SECRET-TOKEN'), 'unexpected'],
+    ] as const) {
+      const { apple } = fakeApple({
+        signInAsync: async () => {
+          throw thrown;
+        },
+      });
+      const failure = await codeOfFailure(createAppleSignInRepository(apple).getIdTokenWithCode('n'));
+      assert.equal(failure.code, code);
+      assert.ok(!failure.message.includes('SECRET-TOKEN'));
+    }
+    const unavailable = fakeApple({ isAvailableAsync: async () => false });
+    assert.equal((await codeOfFailure(createAppleSignInRepository(unavailable.apple).getIdTokenWithCode('n'))).code, 'provider-unavailable');
+    assert.deepEqual(unavailable.requests, []);
+    const noToken = fakeApple({ signInAsync: async () => ({ identityToken: null, authorizationCode: 'AUTH-CODE' }) });
+    assert.equal((await codeOfFailure(createAppleSignInRepository(noToken.apple).getIdTokenWithCode('n'))).code, 'invalid-response');
+  });
+});
+
 describe('isTemporaryAuthError', () => {
   it('timeout は一時的な失敗（やり直せば通りうる）。provider-failed は、設定の確認が要るので含めない', () => {
     assert.equal(isTemporaryAuthError(new AuthError('timeout')), true);

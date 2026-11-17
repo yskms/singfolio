@@ -1,4 +1,4 @@
-// アカウントのHTTP（POST /auth/nonce・/auth/login・/auth/apple/login・/auth/logout）。Serviceからだけ使う。画面・Serviceは、
+// アカウントのHTTP（POST /auth/nonce・/auth/login・/auth/apple/login・/auth/logout・/auth/logout-others・/auth/delete）。Serviceからだけ使う。画面・Serviceは、
 // URLやレスポンスの形を知らない（候補検索の songCatalogRepository と同じ）。リクエスト・レスポンスの
 // 形は docs/singfolio-publishing-backend.md §8「認証の方式」が正で、Worker（worker/）とはコードを共有しない。
 //
@@ -64,6 +64,22 @@ export interface AppleCodeLoginRequest {
   verifier: string;
 }
 
+/**
+ * アカウントの削除の再認証の本文（`POST /auth/delete`）。再認証は、ログインと同じ手順で得た値（`T`・IDトークン、
+ * AndroidのAppleは認可コードと `V`）。ユーザーIDは送らない（サーバーが、セッションから決める）。
+ */
+export type DeleteAccountRequest =
+  /** iOSのApple。`authorizationCode` は、Appleのトークンの失効に使う（無くても削除できるが、失効はできない）。 */
+  | { provider: 'apple'; nonce: string; idToken: string; authorizationCode?: string }
+  /** AndroidのApple（Web経由）。 */
+  | { provider: 'apple'; nonce: string; code: string; verifier: string }
+  | { provider: 'google'; nonce: string; idToken: string };
+
+export interface DeleteAccountResponse {
+  /** Appleのトークンを失効できたか。Googleは `null`（失効するものが無い）。`false` でも、アカウントは消えている。 */
+  appleRevoked: boolean | null;
+}
+
 export function createAuthRepository(
   fetchImpl: AuthFetchLike,
   options: { origin?: string; timeoutMs?: number } = {},
@@ -74,7 +90,12 @@ export function createAuthRepository(
   /** POST して、成功（2xx）の応答を返す。失敗は `AuthError`。 */
   async function post<T>(
     path: string,
-    init: { json?: unknown; session?: string },
+    init: {
+      json?: unknown;
+      session?: string;
+      /** 401・429・5xx 以外の失敗（4xx）を、`AuthError` にする。`undefined` を返すと、`invalid-request`。 */
+      rejected?: (status: number, response: { json(): Promise<unknown> }) => Promise<AuthError | undefined>;
+    },
     read: (response: { json(): Promise<unknown> }) => Promise<T>,
   ): Promise<T> {
     const headers: Record<string, string> = { Accept: 'application/json' };
@@ -105,7 +126,15 @@ export function createAuthRepository(
       if (response.status === 429 || response.status >= 500) {
         throw new AuthError('unavailable', `HTTP ${response.status}`);
       }
-      if (!response.ok) throw new AuthError('invalid-request', `HTTP ${response.status}`);
+      if (!response.ok) {
+        let rejection: AuthError | undefined;
+        try {
+          rejection = await init.rejected?.(response.status, response);
+        } catch {
+          // 本文が読めない（JSONでない）。`invalid-request` のまま
+        }
+        throw rejection ?? new AuthError('invalid-request', `HTTP ${response.status}`);
+      }
       try {
         return await read(response);
       } catch (error) {
@@ -170,6 +199,46 @@ export function createAuthRepository(
      */
     logout(session: string): Promise<void> {
       return post('/auth/logout', { session }, async () => {});
+    },
+
+    /**
+     * `POST /auth/logout-others`。「ほかの端末をすべてログアウト」: このセッション以外の、同じユーザーのセッションを、
+     * サーバーが失効させる。ログアウトと違い、認証が要る: 401（セッションが無効）は `unauthorized`（Serviceが、端末の
+     * セッションを捨てる）。本文は読まない。
+     */
+    logoutOthers(session: string): Promise<void> {
+      return post('/auth/logout-others', { session }, async () => {});
+    },
+
+    /**
+     * `POST /auth/delete`。アカウントを削除する（再認証つき）。成功（200）は `{ appleRevoked }`。失敗:
+     * 401（セッションが無効）は `unauthorized`、403 は本文の `error` で `reauth-failed`（再認証が通らない）か
+     * `account-mismatch`（別のアカウントで再認証した）。503 などは `unavailable`。
+     * 再認証の値（IDトークン・認可コード・`T`・`V`）と、セッションの値を、エラーの `message` にもログにも出さない。
+     */
+    deleteAccount(session: string, request: DeleteAccountRequest): Promise<DeleteAccountResponse> {
+      return post(
+        '/auth/delete',
+        {
+          session,
+          json: request,
+          rejected: async (status, response) => {
+            if (status !== 403) return undefined;
+            const data = await response.json();
+            if (!isRecord(data)) return undefined;
+            if (data.error === 'reauth_failed') return new AuthError('reauth-failed');
+            if (data.error === 'account_mismatch') return new AuthError('account-mismatch');
+            return undefined;
+          },
+        },
+        async (response) => {
+          const data = await response.json();
+          if (!isRecord(data) || (data.appleRevoked !== null && typeof data.appleRevoked !== 'boolean')) {
+            throw new AuthError('invalid-response');
+          }
+          return { appleRevoked: data.appleRevoked };
+        },
+      );
     },
   };
 }

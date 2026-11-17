@@ -1,6 +1,6 @@
 import type { AuthProvider } from '../domain/types.ts';
 import { AuthError } from '../repositories/authError.ts';
-import type { AuthRepository } from '../repositories/authRepository.ts';
+import type { AuthRepository, DeleteAccountRequest } from '../repositories/authRepository.ts';
 import type { SessionRepository, StoredSession } from '../repositories/sessionRepository.ts';
 
 /**
@@ -14,6 +14,12 @@ export interface IdTokenProvider {
    * `AuthError`（トークン・応答の内容は載せない）。
    */
   getIdToken(hashedNonce: string): Promise<string>;
+  /**
+   * アカウントの削除の再認証用。`getIdToken` と同じサインインで、IDトークンと、Appleのトークンを失効させるための認可コードも
+   * 返す。Apple（iOS）だけが持つ（無ければ、`getIdToken` で代える。認可コードが無いので、Appleのトークンは失効できない）。
+   * 失敗・取りやめは `getIdToken` と同じ。
+   */
+  getIdTokenWithCode?(hashedNonce: string): Promise<{ idToken: string; authorizationCode?: string }>;
 }
 
 /**
@@ -76,6 +82,15 @@ export interface SignOutResult {
   serverRevoked: boolean;
 }
 
+export interface DeleteAccountResult {
+  /**
+   * Appleのトークンを失効できたか。Googleは `null`（失効するものが無い）。`false` でも、アカウントは消えている
+   * （失効に失敗しても、削除は止めない）。利用者には、Appleの設定（Apple Account の「Appleでサインイン」）から、
+   * Singfolio との連携を解除できると案内できる。
+   */
+  appleRevoked: boolean | null;
+}
+
 export interface AccountService {
   /**
    * サインイン中のログイン手段。していなければ `null`。セッションの値は渡さない。ローカルDBが読めないなど、
@@ -93,6 +108,20 @@ export interface AccountService {
    * ログアウトする。端末の値は必ず捨てる（捨てられなければ `storage-failed`）。失敗は `AuthError`。
    */
   signOut(): Promise<SignOutResult>;
+  /**
+   * 「ほかの端末をすべてログアウト」。このセッション以外の、同じアカウントのセッションを、サーバーが失効させる。サインイン中に
+   * だけできる（していなければ `not-signed-in`）。サーバーがこのセッションを認めなければ（`unauthorized`）、端末の
+   * セッションを捨てる（ほかの失敗では捨てない）。失敗は `AuthError`。
+   */
+  signOutOthers(): Promise<void>;
+  /**
+   * アカウントを削除する。サインイン中にだけできる（していなければ `not-signed-in`）。**再認証を挟む**: ログインと同じ
+   * 手段のサインインの画面が出る（取りやめは `cancelled`。何も消えない）。再認証のアカウントが、ログイン中のものと違えば
+   * `account-mismatch`、通らなければ `reauth-failed`（どちらも、何も消えず、サインインは保たれる）。成功したら、端末の
+   * セッションを捨てる。端末内のレパートリーは消えない。サーバーがこのセッションを認めなければ（`unauthorized`）、
+   * 端末のセッションを捨てる。失敗は `AuthError`。
+   */
+  deleteAccount(): Promise<DeleteAccountResult>;
 }
 
 /**
@@ -110,6 +139,12 @@ export function createAccountService(deps: AccountServiceDeps | null): AccountSe
         throw new AuthError('provider-unavailable');
       },
       signOut: async () => ({ serverRevoked: true }),
+      signOutOthers: async () => {
+        throw new AuthError('not-signed-in');
+      },
+      deleteAccount: async () => {
+        throw new AuthError('not-signed-in');
+      },
     };
   }
   const { auth, sessions, sha256Base64Url, localDataId, idTokenProviders } = deps;
@@ -171,6 +206,33 @@ export function createAccountService(deps: AccountServiceDeps | null): AccountSe
     return read.value.localDataId === (await localDataId())
       ? { current: read.value, stale: null }
       : { current: null, stale: read.value };
+  }
+
+  /** サインイン中のセッション。していなければ `not-signed-in`（別のローカルDBのもの・読めないものは、していない扱い）。 */
+  async function requireSession(): Promise<StoredSession> {
+    const { current } = await readSession();
+    if (!current) throw new AuthError('not-signed-in');
+    return current;
+  }
+
+  /**
+   * 認証が要るサーバーの呼び出し。サーバーが認めなかったとき（401）だけ、端末のセッションを捨てる（認めない値は二度と
+   * 通らない）。503・5xx・通信の失敗では捨てない（一時的な失敗。セッションは生きている）。捨てられなくても、失敗は
+   * `unauthorized` のまま（次の呼び出しも 401 になり、また捨てようとする）。
+   */
+  async function authorized<T>(task: () => Promise<T>): Promise<T> {
+    try {
+      return await task();
+    } catch (error) {
+      if (error instanceof AuthError && error.code === 'unauthorized') {
+        try {
+          await sessions.clear();
+        } catch {
+          // 捨てられなかった。呼び出し側へは、元の失敗を返す
+        }
+      }
+      throw error;
+    }
   }
 
   /** サーバー側のセッションを失効させる。失敗は無視する（呼び出し側は、結果に依らず進める）。 */
@@ -271,6 +333,75 @@ export function createAccountService(deps: AccountServiceDeps | null): AccountSe
             }
           }
           return { serverRevoked: true };
+        }),
+      );
+    },
+
+    signOutOthers() {
+      return serialize(() =>
+        asAuthError(async () => {
+          const current = await requireSession();
+          await authorized(() => auth.logoutOthers(current.session));
+        }),
+      );
+    },
+
+    deleteAccount() {
+      return serialize(() =>
+        asAuthError(async () => {
+          const current = await requireSession();
+          const { provider } = current;
+          const idTokenProvider = idTokenProviders[provider];
+          const authCodeProvider = idTokenProvider ? undefined : authCodeProviders[provider];
+          if (!idTokenProvider && !authCodeProvider) throw new AuthError('provider-unavailable');
+
+          // 再認証。ログインと同じ手順で、`T` を得て、各社のサインインを開く（`signIn` と同じ時間の上限）。
+          let request: DeleteAccountRequest;
+          if (idTokenProvider) {
+            const nonce = await auth.requestNonce();
+            const hashedNonce = await sha256Base64Url(nonce);
+            if (provider === 'apple') {
+              const credential = await withTimeout(
+                async (): Promise<{ idToken: string; authorizationCode?: string }> =>
+                  idTokenProvider.getIdTokenWithCode
+                    ? idTokenProvider.getIdTokenWithCode(hashedNonce)
+                    : { idToken: await idTokenProvider.getIdToken(hashedNonce) },
+                providerTimeoutMs,
+              );
+              if (typeof credential.idToken !== 'string' || credential.idToken === '') throw new AuthError('invalid-response');
+              request = {
+                provider: 'apple',
+                nonce,
+                idToken: credential.idToken,
+                ...(typeof credential.authorizationCode === 'string' && credential.authorizationCode !== ''
+                  ? { authorizationCode: credential.authorizationCode }
+                  : {}),
+              };
+            } else {
+              const idToken = await withTimeout(() => idTokenProvider.getIdToken(hashedNonce), providerTimeoutMs);
+              if (typeof idToken !== 'string' || idToken === '') throw new AuthError('invalid-response');
+              request = { provider: 'google', nonce, idToken };
+            }
+          } else {
+            if (!authCodeProvider || provider !== 'apple') throw new AuthError('provider-unavailable');
+            const verifier = deps.randomVerifier?.();
+            if (typeof verifier !== 'string' || verifier === '') throw new AuthError('unexpected');
+            const nonce = await auth.requestWebNonce(await sha256Base64Url(verifier));
+            const hashedNonce = await sha256Base64Url(nonce);
+            const code = await withTimeout(() => authCodeProvider.getAuthorizationCode(hashedNonce), providerTimeoutMs);
+            if (typeof code !== 'string' || code === '') throw new AuthError('invalid-response');
+            request = { provider: 'apple', nonce, code, verifier };
+          }
+
+          const result = await authorized(() => auth.deleteAccount(current.session, request));
+          // アカウントは消えた。端末のセッションは、もう使えないので捨てる。捨てられなくても、削除は成功のまま
+          // （残った値は、次に認証が要る呼び出しをしたとき 401 になり、そこで捨てる）。
+          try {
+            await sessions.clear();
+          } catch {
+            // 上のとおり
+          }
+          return { appleRevoked: result.appleRevoked };
         }),
       );
     },

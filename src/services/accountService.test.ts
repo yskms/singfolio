@@ -48,6 +48,13 @@ function fakeAuth(overrides: Partial<AuthRepository> = {}) {
     logout: async (session) => {
       calls.push(`logout:${session}`);
     },
+    logoutOthers: async (session) => {
+      calls.push(`logout-others:${session}`);
+    },
+    deleteAccount: async (session, request) => {
+      calls.push(`delete:${session}:${JSON.stringify(request)}`);
+      return { appleRevoked: true };
+    },
     ...overrides,
   };
   return { auth, calls };
@@ -775,5 +782,349 @@ describe('createServices との結合', () => {
     assert.equal(await second.services.account.getSignedInProvider(), null);
     await second.services.account.signIn('apple'); // already-signed-in にならない
     assert.equal(await second.services.account.getSignedInProvider(), 'apple');
+  });
+});
+
+describe('signOutOthers（ほかの端末をすべてログアウト）', () => {
+  it('サインイン中のセッションで、サーバーに失効を頼む。端末のセッションは残す', async () => {
+    const { account, calls, sessions } = setup();
+    await account.signIn('apple');
+    calls.length = 0;
+    await account.signOutOthers();
+    assert.deepEqual(calls, ['logout-others:SESSION-1']);
+    assert.equal(await account.getSignedInProvider(), 'apple');
+    assert.equal((await sessions.read()).kind, 'found');
+  });
+
+  it('サインインしていなければ not-signed-in。通信しない（別のローカルDBのセッションも、していない扱い）', async () => {
+    const { account, calls, state } = setup();
+    await rejectsWith(account.signOutOthers(), 'not-signed-in');
+    await account.signIn('apple');
+    calls.length = 0;
+    state.id = 'data-2'; // DBを作り直した（再インストール）
+    await rejectsWith(account.signOutOthers(), 'not-signed-in');
+    assert.deepEqual(calls, []);
+  });
+
+  it('401（サーバーがセッションを認めない）は unauthorized で、端末のセッションを捨てる', async () => {
+    const { account, sessions } = setup({
+      auth: {
+        logoutOthers: async () => {
+          throw new AuthError('unauthorized');
+        },
+      },
+    });
+    await account.signIn('apple');
+    await rejectsWith(account.signOutOthers(), 'unauthorized');
+    assert.equal((await sessions.read()).kind, 'none');
+    assert.equal(await account.getSignedInProvider(), null);
+  });
+
+  it('通信の失敗・サーバーの不調では、端末のセッションを捨てない（一時的な失敗）', async () => {
+    for (const code of ['network', 'unavailable'] as const) {
+      const { account, sessions } = setup({
+        auth: {
+          logoutOthers: async () => {
+            throw new AuthError(code);
+          },
+        },
+      });
+      await account.signIn('apple');
+      await rejectsWith(account.signOutOthers(), code);
+      assert.equal((await sessions.read()).kind, 'found');
+      assert.equal(await account.getSignedInProvider(), 'apple');
+    }
+  });
+
+  it('401 のとき、端末のセッションを捨てられなくても、失敗は unauthorized のまま', async () => {
+    const { account, sessions } = setup({
+      auth: {
+        logoutOthers: async () => {
+          throw new AuthError('unauthorized');
+        },
+      },
+    });
+    await account.signIn('apple');
+    sessions.clear = async () => {
+      throw new Error('keystore failed');
+    };
+    await rejectsWith(account.signOutOthers(), 'unauthorized');
+  });
+
+  it('AuthError 以外の失敗は unexpected に包む（元の例外は載せない）', async () => {
+    const { account } = setup({
+      auth: {
+        logoutOthers: async () => {
+          throw new Error('boom SECRET');
+        },
+      },
+    });
+    await account.signIn('apple');
+    await assert.rejects(account.signOutOthers(), (error) => {
+      return error instanceof AuthError && error.code === 'unexpected' && !error.message.includes('SECRET');
+    });
+  });
+
+  it('注入しないとき（deps が null）は not-signed-in', async () => {
+    await rejectsWith(createAccountService(null).signOutOthers(), 'not-signed-in');
+  });
+});
+
+describe('deleteAccount（アカウントの削除）', () => {
+  const googleProvider: IdTokenProvider = { getIdToken: async () => 'GOOGLE-ID-TOKEN' };
+  const appleWithCode: IdTokenProvider = {
+    getIdToken: async () => 'ID-TOKEN',
+    getIdTokenWithCode: async () => ({ idToken: 'ID-TOKEN', authorizationCode: 'AUTH-CODE' }),
+  };
+  const requestOf = (calls: string[]) => {
+    const call = calls.find((value) => value.startsWith('delete:'));
+    return call === undefined ? undefined : JSON.parse(call.slice(call.indexOf(':', 'delete:'.length) + 1));
+  };
+
+  it('Apple（iOS）: T を得て、そのハッシュで再認証し、IDトークンと認可コードを T と一緒に送る。成功したら端末のセッションを捨てる', async () => {
+    const hashed: string[] = [];
+    const provider: IdTokenProvider = {
+      getIdToken: async () => 'unused',
+      getIdTokenWithCode: async (hashedNonce) => {
+        hashed.push(hashedNonce);
+        return { idToken: 'ID-TOKEN', authorizationCode: 'AUTH-CODE' };
+      },
+    };
+    const { account, calls, sessions } = setup({ providers: { apple: provider } });
+    await account.signIn('apple');
+    calls.length = 0;
+    assert.deepEqual(await account.deleteAccount(), { appleRevoked: true });
+    assert.deepEqual(calls, [
+      'nonce',
+      `delete:SESSION-1:${JSON.stringify({ provider: 'apple', nonce: 'T-1', idToken: 'ID-TOKEN', authorizationCode: 'AUTH-CODE' })}`,
+    ]);
+    assert.deepEqual(hashed, [createHash('sha256').update('T-1').digest('base64url')]);
+    assert.equal((await sessions.read()).kind, 'none');
+    assert.equal(await account.getSignedInProvider(), null);
+  });
+
+  it('Apple: getIdTokenWithCode が無ければ getIdToken で再認証する（認可コードは付かない）。コードが空なら付けない', async () => {
+    const plain = setup();
+    await plain.account.signIn('apple');
+    plain.calls.length = 0;
+    await plain.account.deleteAccount();
+    assert.deepEqual(requestOf(plain.calls), { provider: 'apple', nonce: 'T-1', idToken: 'ID-TOKEN' });
+
+    const empty = setup({
+      providers: { apple: { getIdToken: async () => 'x', getIdTokenWithCode: async () => ({ idToken: 'ID-TOKEN', authorizationCode: '' }) } },
+    });
+    await empty.account.signIn('apple');
+    empty.calls.length = 0;
+    await empty.account.deleteAccount();
+    assert.deepEqual(requestOf(empty.calls), { provider: 'apple', nonce: 'T-1', idToken: 'ID-TOKEN' });
+  });
+
+  it('Google: IDトークンで再認証する。appleRevoked は、サーバーの応答のまま（null）', async () => {
+    const { account, calls } = setup({
+      providers: { google: googleProvider },
+      auth: {
+        deleteAccount: async (session, request) => {
+          calls.push(`delete:${session}:${JSON.stringify(request)}`);
+          return { appleRevoked: null };
+        },
+      },
+    });
+    await account.signIn('google');
+    calls.length = 0;
+    assert.deepEqual(await account.deleteAccount(), { appleRevoked: null });
+    assert.deepEqual(requestOf(calls), { provider: 'google', nonce: 'T-1', idToken: 'GOOGLE-ID-TOKEN' });
+  });
+
+  it('Android の Apple（認可コードの経路）: V・web の T・認可コードで再認証する', async () => {
+    const codes: string[] = [];
+    const { account, calls, sessions } = setup({
+      providers: {},
+      codeProviders: {
+        apple: {
+          getAuthorizationCode: async (hashedNonce) => {
+            codes.push(hashedNonce);
+            return 'AUTH-CODE';
+          },
+        },
+      },
+    });
+    await account.signIn('apple');
+    calls.length = 0;
+    await account.deleteAccount();
+    const challenge = createHash('sha256').update('V'.repeat(43)).digest('base64url');
+    assert.equal(calls[0], `web-nonce:${challenge}`);
+    assert.deepEqual(requestOf(calls), { provider: 'apple', nonce: 'T-WEB-1', code: 'AUTH-CODE', verifier: 'V'.repeat(43) });
+    // 認可の画面を開いた回数は、サインインと削除の2回。どちらも `SHA-256(T)` を渡す。
+    assert.deepEqual(codes, Array(2).fill(createHash('sha256').update('T-WEB-1').digest('base64url')));
+    assert.equal((await sessions.read()).kind, 'none');
+  });
+
+  it('appleRevoked が false でも成功（アカウントは消えている）。値はそのまま返す', async () => {
+    const { account } = setup({ auth: { deleteAccount: async () => ({ appleRevoked: false }) } });
+    await account.signIn('apple');
+    assert.deepEqual(await account.deleteAccount(), { appleRevoked: false });
+    assert.equal(await account.getSignedInProvider(), null);
+  });
+
+  it('サインインしていなければ not-signed-in。各社の画面を開かず、通信しない（別のローカルDBのセッションも、していない扱い）', async () => {
+    const { account, calls, hashed, state } = setup();
+    await rejectsWith(account.deleteAccount(), 'not-signed-in');
+    await account.signIn('apple');
+    calls.length = 0;
+    hashed.length = 0;
+    state.id = 'data-2';
+    await rejectsWith(account.deleteAccount(), 'not-signed-in');
+    assert.deepEqual(calls, []);
+    assert.deepEqual(hashed, []);
+  });
+
+  it('再認証の画面を取りやめたら cancelled。何も消さず、サインインも保つ', async () => {
+    const { account, calls, sessions } = setup({
+      providers: {
+        apple: {
+          getIdToken: async () => {
+            throw new AuthError('cancelled');
+          },
+        },
+      },
+    });
+    // 取りやめる版では、サインインできないので、保存済みのセッションを直接置く。
+    await sessions.set({ session: 'SESSION-X', provider: 'apple', localDataId: 'data-1' });
+    await rejectsWith(account.deleteAccount(), 'cancelled');
+    assert.equal(calls.some((call) => call.startsWith('delete:')), false);
+    assert.equal(await account.getSignedInProvider(), 'apple');
+  });
+
+  it('再認証の画面が終わらなければ、上限で timeout。サインインは保つ。あとから返った結果は使わない', async () => {
+    const provider: IdTokenProvider = {
+      getIdToken: () => new Promise((resolve) => setTimeout(() => resolve('LATE'), 40)),
+    };
+    const { account, calls, sessions } = setup({ providers: { apple: provider }, providerTimeoutMs: 10 });
+    await sessions.set({ session: 'SESSION-X', provider: 'apple', localDataId: 'data-1' });
+    await rejectsWith(account.deleteAccount(), 'timeout');
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    assert.equal(calls.some((call) => call.startsWith('delete:')), false);
+    assert.equal(await account.getSignedInProvider(), 'apple');
+  });
+
+  it('IDトークン・コードが空なら invalid-response（削除を呼ばない）', async () => {
+    for (const idToken of ['', undefined, 5]) {
+      const { account, calls, sessions } = setup({
+        providers: { apple: { getIdToken: async () => idToken as unknown as string } },
+      });
+      await sessions.set({ session: 'SESSION-X', provider: 'apple', localDataId: 'data-1' });
+      await rejectsWith(account.deleteAccount(), 'invalid-response');
+      assert.equal(calls.some((call) => call.startsWith('delete:')), false);
+    }
+    const web = setup({ providers: {}, codeProviders: { apple: { getAuthorizationCode: async () => '' } } });
+    await web.sessions.set({ session: 'SESSION-X', provider: 'apple', localDataId: 'data-1' });
+    await rejectsWith(web.account.deleteAccount(), 'invalid-response');
+  });
+
+  it('再認証が通らない（reauth-failed）・別のアカウント（account-mismatch）は、そのまま返す。サインインは保つ', async () => {
+    for (const code of ['reauth-failed', 'account-mismatch'] as const) {
+      const { account, sessions } = setup({
+        auth: {
+          deleteAccount: async () => {
+            throw new AuthError(code);
+          },
+        },
+      });
+      await account.signIn('apple');
+      await rejectsWith(account.deleteAccount(), code);
+      assert.equal((await sessions.read()).kind, 'found');
+      assert.equal(await account.getSignedInProvider(), 'apple');
+    }
+  });
+
+  it('401（サーバーがセッションを認めない）は unauthorized で、端末のセッションを捨てる', async () => {
+    const { account, sessions } = setup({
+      auth: {
+        deleteAccount: async () => {
+          throw new AuthError('unauthorized');
+        },
+      },
+    });
+    await account.signIn('apple');
+    await rejectsWith(account.deleteAccount(), 'unauthorized');
+    assert.equal((await sessions.read()).kind, 'none');
+  });
+
+  it('通信の失敗・サーバーの不調（network・unavailable）では、セッションを捨てない。やり直せる', async () => {
+    for (const code of ['network', 'unavailable'] as const) {
+      const { account, sessions } = setup({
+        auth: {
+          deleteAccount: async () => {
+            throw new AuthError(code);
+          },
+        },
+      });
+      await account.signIn('apple');
+      await rejectsWith(account.deleteAccount(), code);
+      assert.equal((await sessions.read()).kind, 'found');
+    }
+  });
+
+  it('T を得られなければ（通信の失敗）、各社の画面を開かない', async () => {
+    const { account, hashed, sessions } = setup({
+      auth: {
+        requestNonce: async () => {
+          throw new AuthError('network');
+        },
+      },
+    });
+    await sessions.set({ session: 'SESSION-X', provider: 'apple', localDataId: 'data-1' });
+    await rejectsWith(account.deleteAccount(), 'network');
+    assert.deepEqual(hashed, []);
+  });
+
+  it('削除は成功したが、端末のセッションを捨てられなくても、成功を返す（残った値は、次の呼び出しの 401 で捨てる）', async () => {
+    const { account, sessions } = setup();
+    await account.signIn('apple');
+    sessions.clear = async () => {
+      throw new Error('keystore failed');
+    };
+    assert.deepEqual(await account.deleteAccount(), { appleRevoked: true });
+  });
+
+  it('組み込まれていない手段のセッション（手段のサインインが無い）は provider-unavailable。通信しない', async () => {
+    const { account, calls, sessions } = setup({ providers: {}, codeProviders: {} });
+    await sessions.set({ session: 'SESSION-X', provider: 'google', localDataId: 'data-1' });
+    await rejectsWith(account.deleteAccount(), 'provider-unavailable');
+    assert.deepEqual(calls, []);
+  });
+
+  it('AuthError 以外の失敗は unexpected に包む。元の例外は載せない。注入しないとき（null）は not-signed-in', async () => {
+    const { account } = setup({
+      auth: {
+        deleteAccount: async () => {
+          throw new Error('boom SECRET-TOKEN');
+        },
+      },
+    });
+    await account.signIn('apple');
+    await assert.rejects(account.deleteAccount(), (error) => {
+      return error instanceof AuthError && error.code === 'unexpected' && !error.message.includes('SECRET-TOKEN');
+    });
+    await rejectsWith(createAccountService(null).deleteAccount(), 'not-signed-in');
+  });
+
+  it('サインインやログアウトと同じ列で、1本ずつ実行する（サインインの途中の削除は、サインインのあとに走る）', async () => {
+    let release: (value: string) => void = () => {};
+    const slow: IdTokenProvider = { getIdToken: () => new Promise<string>((resolve) => (release = resolve)) };
+    const { account, sessions } = setup({ providers: { apple: slow } });
+    const signingIn = account.signIn('apple');
+    const deleting = account.deleteAccount().catch((error: unknown) => error);
+    // サインインの途中では、削除はまだサインインしていない扱いにならない（列の後ろで待つ）。
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.equal((await sessions.read()).kind, 'none');
+    release('ID-TOKEN');
+    await signingIn;
+    // 削除は、サインインのあとに走る。もう一度、各社の画面を開く（slow の2回目は、止まったまま）。
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.equal((await sessions.read()).kind, 'found');
+    release('ID-TOKEN-2');
+    await deleting;
+    assert.equal((await sessions.read()).kind, 'none');
   });
 });

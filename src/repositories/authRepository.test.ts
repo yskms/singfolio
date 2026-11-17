@@ -265,3 +265,103 @@ describe('loginWithAppleCode（AndroidのAppleログイン）', () => {
     });
   });
 });
+
+describe('logoutOthers（ほかの端末をすべてログアウト）', () => {
+  it('Authorization: Bearer を付けて POST /auth/logout-others を呼ぶ。本文は無い。204 で成功', async () => {
+    const { fetchImpl, calls } = fakeFetch(() => reply(204));
+    await createAuthRepository(fetchImpl).logoutOthers(SESSION);
+    assert.equal(calls[0].url, 'https://singfolio.app/auth/logout-others');
+    assert.equal(calls[0].init.method, 'POST');
+    assert.equal(calls[0].init.credentials, 'omit');
+    assert.equal(calls[0].init.headers.Authorization, `Bearer ${SESSION}`);
+    assert.equal(calls[0].init.body, undefined);
+  });
+
+  it('401 は unauthorized（セッションが無効。logout と違い、認証が要る）。5xx・429 は unavailable、通信の失敗は network', async () => {
+    await rejectsWith(createAuthRepository(fakeFetch(() => reply(401)).fetchImpl).logoutOthers(SESSION), 'unauthorized');
+    await rejectsWith(createAuthRepository(fakeFetch(() => reply(503)).fetchImpl).logoutOthers(SESSION), 'unavailable');
+    await rejectsWith(createAuthRepository(fakeFetch(() => reply(429)).fetchImpl).logoutOthers(SESSION), 'unavailable');
+    await rejectsWith(
+      createAuthRepository(fakeFetch(() => new TypeError('offline')).fetchImpl).logoutOthers(SESSION),
+      'network',
+    );
+  });
+});
+
+describe('deleteAccount（アカウントの削除）', () => {
+  const native = { provider: 'apple', nonce: 'T-1', idToken: 'ID.TOKEN.VALUE', authorizationCode: 'AUTH-CODE' } as const;
+  const web = { provider: 'apple', nonce: 'T-WEB', code: 'the-code', verifier: 'V'.repeat(43) } as const;
+  const google = { provider: 'google', nonce: 'T-1', idToken: 'ID.TOKEN.VALUE' } as const;
+
+  it('Authorization: Bearer と再認証の本文を POST /auth/delete に送る。ユーザーIDは送らない', async () => {
+    for (const request of [native, web, google]) {
+      const { fetchImpl, calls } = fakeFetch(() => reply(200, { appleRevoked: true }));
+      await createAuthRepository(fetchImpl).deleteAccount(SESSION, request);
+      assert.equal(calls[0].url, 'https://singfolio.app/auth/delete');
+      assert.equal(calls[0].init.method, 'POST');
+      assert.equal(calls[0].init.credentials, 'omit');
+      assert.equal(calls[0].init.headers.Authorization, `Bearer ${SESSION}`);
+      assert.deepEqual(JSON.parse(calls[0].init.body ?? ''), request);
+    }
+  });
+
+  it('200 の { appleRevoked }（true・false・null）を返す', async () => {
+    for (const appleRevoked of [true, false, null]) {
+      const { fetchImpl } = fakeFetch(() => reply(200, { appleRevoked }));
+      assert.deepEqual(await createAuthRepository(fetchImpl).deleteAccount(SESSION, native), { appleRevoked });
+    }
+  });
+
+  it('appleRevoked が無い・真偽値でも null でもない応答は invalid-response（消えたか分からない）', async () => {
+    for (const body of [{}, null, 'text', { appleRevoked: 'yes' }, { appleRevoked: 1 }]) {
+      const { fetchImpl } = fakeFetch(() => reply(200, body));
+      await rejectsWith(createAuthRepository(fetchImpl).deleteAccount(SESSION, native), 'invalid-response');
+    }
+  });
+
+  it('403 は、本文の error で reauth-failed と account-mismatch に分ける。知らない 403・読めない本文は invalid-request', async () => {
+    const delete_ = (respond: () => ReturnType<AuthFetchLike>) =>
+      createAuthRepository(fakeFetch(respond).fetchImpl).deleteAccount(SESSION, native);
+    await rejectsWith(delete_(() => reply(403, { error: 'reauth_failed' })), 'reauth-failed');
+    await rejectsWith(delete_(() => reply(403, { error: 'account_mismatch' })), 'account-mismatch');
+    await rejectsWith(delete_(() => reply(403, { error: 'something_else' })), 'invalid-request');
+    await rejectsWith(delete_(() => reply(403, null)), 'invalid-request');
+    await rejectsWith(delete_(() => reply(403, 'HTTPS required')), 'invalid-request');
+    await rejectsWith(
+      delete_(() => Promise.resolve({ ok: false, status: 403, json: async () => Promise.reject(new SyntaxError('not json')) })),
+      'invalid-request',
+    );
+  });
+
+  it('401 は unauthorized（セッションが無効）、400 は invalid-request、503・5xx・429 は unavailable、通信の失敗は network', async () => {
+    for (const [respond, code] of [
+      [() => reply(401, { error: 'unauthorized' }), 'unauthorized'],
+      [() => reply(400, { error: 'invalid_request' }), 'invalid-request'],
+      [() => reply(503, { error: 'service_unavailable' }), 'unavailable'],
+      [() => reply(500, null), 'unavailable'],
+      [() => reply(429), 'unavailable'],
+      [() => new Error('offline https://singfolio.app/x'), 'network'],
+    ] as const) {
+      const { fetchImpl } = fakeFetch(respond);
+      await rejectsWith(createAuthRepository(fetchImpl).deleteAccount(SESSION, native), code);
+    }
+  });
+
+  it('エラーに、セッション・IDトークン・認可コード・T・V を載せない', async () => {
+    const secrets = [SESSION, native.idToken, native.authorizationCode, native.nonce];
+    const { fetchImpl } = fakeFetch(() => new Error(`failed ${secrets.join(' ')}`));
+    await assert.rejects(createAuthRepository(fetchImpl).deleteAccount(SESSION, native), (error) => {
+      const message = error instanceof Error ? error.message : '';
+      for (const secret of secrets) assert.equal(message.includes(secret), false);
+      return true;
+    });
+    for (const status of [403, 400]) {
+      const { fetchImpl: failing } = fakeFetch(() => reply(status, { error: `x ${secrets.join(' ')}` }));
+      await assert.rejects(createAuthRepository(failing).deleteAccount(SESSION, native), (error) => {
+        const message = error instanceof Error ? error.message : '';
+        for (const secret of secrets) assert.equal(message.includes(secret), false);
+        return true;
+      });
+    }
+  });
+});
