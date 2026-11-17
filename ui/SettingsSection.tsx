@@ -24,11 +24,12 @@ const appearanceKeys = {
 } as const satisfies Record<Appearance, MessageKey>;
 
 /**
- * Settings タブ（`app/(tabs)/settings.tsx`）の中身（Appearance・Language・Suggestions・Tags・Artists・About）。
+ * Settings タブ（`app/(tabs)/settings.tsx`）の中身（Appearance・Language・Suggestions・Tags・Artists・Account・About）。
  * Appearance・Language は、下から出るシートで選ぶ。選ぶと保存してから反映し、保存に失敗したら、
- * 表示は変えずに伝える。Tags・Artists・About は、別の画面を開く。
+ * 表示は変えずに伝える。Tags・Artists・Account・About は、別の画面を開く。
  *
  * 「Suggestions」（外部の楽曲検索から候補を出すか）は、外部の検索が使えないビルドでは、項目ごと出さない。
+ * 「Account」も、アカウントが使えないビルド（`account.available` が偽）では、項目ごと出さない。
  */
 export function SettingsSection() {
   const { colors } = useTheme();
@@ -40,8 +41,14 @@ export function SettingsSection() {
 
   // 外部の検索が使えるか（ビルドで決まる）と、今の設定。保存したら、`savedSuggestions` が優先する。
   const loaded = useLoad(async () => {
-    const { settings, suggestions } = await getServices();
-    return { available: suggestions.available, enabled: await settings.getSuggestionsEnabled() };
+    const { account, settings, suggestions } = await getServices();
+    return {
+      available: suggestions.available,
+      enabled: await settings.getSuggestionsEnabled(),
+      // アカウントが使えるビルドか。使えなければ、入口ごと出さない。サインインの状態は、ここでは読まない
+      // （SecureStoreに触れない。状態は Account 画面が読む）。
+      account: account.available,
+    };
   });
   const [savedSuggestions, setSavedSuggestions] = useState<boolean | undefined>(undefined);
   // 保存が重ならないようにする（state は再描画まで古い）。
@@ -141,6 +148,7 @@ export function SettingsSection() {
 
       <SettingsRow label={t('settings.tags')} onPress={() => router.push('/tags')} />
       <SettingsRow label={t('settings.artists')} onPress={() => router.push('/artists')} />
+      {loaded.account && <SettingsRow label={t('settings.account')} onPress={() => router.push('/account')} />}
       <SettingsRow label={t('settings.about')} onPress={() => router.push('/about')} />
 
       <OptionSheet

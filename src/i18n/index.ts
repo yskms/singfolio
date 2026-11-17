@@ -5,6 +5,11 @@ import { createTranslator, type Translator } from './translate.ts';
 import type { Message } from './types.ts';
 
 export {
+  accountErrorMessageKey,
+  type AccountAction,
+  type AccountErrorMessageKey,
+} from './authErrors.ts';
+export {
   errorMessageKey,
   errorScreenContent,
   type ErrorMessageKey,

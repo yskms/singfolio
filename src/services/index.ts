@@ -81,6 +81,18 @@ const authBrowser: AuthBrowser = {
   },
 };
 
+/**
+ * アカウント（サインイン・ログアウト・削除）を、このビルドで使えるようにするか。偽なら `auth` を注入せず、
+ * Settings の「Account」の入口も出ない（`account.available` が偽）。
+ *
+ * **リリースのビルドでは、7.3.13（本物のApple・Googleでの確認）が済むまで偽のまま**にしてある。Workerが
+ * 未デプロイで（本番は nonce と HTTPS の検査だけ）、プライバシーポリシー・ストアの申告も、まだアカウントを
+ * 前提にしていない（7.3.12）ため。開発のビルド（`__DEV__`）では常に使える。署名したビルドで確かめるとき
+ * （7.3.13）は、`EXPO_PUBLIC_SINGFOLIO_ACCOUNT=1` を付けてビルドする（JSバンドルに埋め込まれる）。
+ * 7.3.12・7.3.13 が済んだら、この条件ごと外す。
+ */
+const ACCOUNT_ENABLED = __DEV__ || process.env.EXPO_PUBLIC_SINGFOLIO_ACCOUNT === '1';
+
 let servicesPromise: Promise<Services> | null = null;
 
 /**
@@ -113,24 +125,28 @@ export function getServices(): Promise<Services> {
           // Appleのネイティブのサインインは iOS だけ。AndroidのAppleは Web 経由（Custom Tab。認可コードを返し、
           // IDトークンへの交換はWorkerがする）。Googleは両OS（自作のExpoモジュール。ネイティブ側が無いビルドでも、
           // importでは落ちず、呼んだときに失敗する）。
-          auth: {
-            idTokenProviders: {
-              google: createGoogleSignInRepository({ signInWithGoogle }),
-              ...(Platform.OS === 'ios' ? { apple: createAppleSignInRepository(AppleAuthentication) } : {}),
-            },
-            authCodeProviders:
-              Platform.OS === 'android' ? { apple: createAppleWebSignInRepository(authBrowser) } : {},
-            // 検証用の値 `V`（32バイトの乱数。43字の base64url）。
-            randomVerifier: () => bytesToBase64Url(getRandomBytes(32)),
-            fetch,
-            storage: secureStorage,
-            sha256Base64Url: async (text) =>
-              base64ToBase64Url(
-                await digestStringAsync(CryptoDigestAlgorithm.SHA256, text, {
-                  encoding: CryptoEncoding.BASE64,
-                }),
-              ),
-          },
+          auth: ACCOUNT_ENABLED
+            ? {
+                idTokenProviders: {
+                  google: createGoogleSignInRepository({ signInWithGoogle }),
+                  ...(Platform.OS === 'ios'
+                    ? { apple: createAppleSignInRepository(AppleAuthentication) }
+                    : {}),
+                },
+                authCodeProviders:
+                  Platform.OS === 'android' ? { apple: createAppleWebSignInRepository(authBrowser) } : {},
+                // 検証用の値 `V`（32バイトの乱数。43字の base64url）。
+                randomVerifier: () => bytesToBase64Url(getRandomBytes(32)),
+                fetch,
+                storage: secureStorage,
+                sha256Base64Url: async (text) =>
+                  base64ToBase64Url(
+                    await digestStringAsync(CryptoDigestAlgorithm.SHA256, text, {
+                      encoding: CryptoEncoding.BASE64,
+                    }),
+                  ),
+              }
+            : undefined,
         },
       ),
     )

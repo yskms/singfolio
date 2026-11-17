@@ -6,8 +6,16 @@ import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
 import { LANGUAGES } from '../domain/types.ts';
-import { DatabaseTooNewError, ServiceError } from '../services/errors.ts';
-import { catalogs, createAppTranslator, errorMessageKey, errorScreenContent, type MessageKey } from './index.ts';
+import { AuthError, DatabaseTooNewError, ServiceError, type AuthErrorCode } from '../services/errors.ts';
+import {
+  accountErrorMessageKey,
+  catalogs,
+  createAppTranslator,
+  errorMessageKey,
+  errorScreenContent,
+  type AccountAction,
+  type MessageKey,
+} from './index.ts';
 import { en } from './en.ts';
 import { placeholderNames } from './translate.ts';
 import type { Message } from './types.ts';
@@ -145,5 +153,78 @@ describe('app.json', () => {
 
   it('Androidは宣言しない（OSのアプリごとの言語を出さず、言語の操作をアプリ内に一本化する）。宣言するなら、アプリの言語と同じ', () => {
     assert.deepEqual(sorted(supported?.android ?? LANGUAGES), sorted(LANGUAGES));
+  });
+});
+
+describe('accountErrorMessageKey', () => {
+  // 全コードを挙げる（足し忘れは型エラー）。
+  const codes: Record<AuthErrorCode, true> = {
+    cancelled: true,
+    network: true,
+    unavailable: true,
+    unauthorized: true,
+    'invalid-request': true,
+    'invalid-response': true,
+    'provider-unavailable': true,
+    'provider-failed': true,
+    timeout: true,
+    'already-signed-in': true,
+    'not-signed-in': true,
+    'reauth-failed': true,
+    'account-mismatch': true,
+    'storage-failed': true,
+    unexpected: true,
+  };
+  const actions: AccountAction[] = ['signIn', 'signOut', 'signOutOthers', 'deleteAccount'];
+
+  it('すべての操作・失敗の種類で、英語・日本語の文言があるキー（または、何も出さない null）に決まる', () => {
+    for (const action of actions) {
+      for (const code of Object.keys(codes) as AuthErrorCode[]) {
+        const key = accountErrorMessageKey(new AuthError(code), action);
+        if (key === null) continue;
+        for (const language of LANGUAGES) {
+          assert.ok(key in catalogs[language], `${action}/${code}: ${key}`);
+        }
+      }
+    }
+  });
+
+  it('取りやめは、サインインと削除では何も出さない', () => {
+    assert.equal(accountErrorMessageKey(new AuthError('cancelled'), 'signIn'), null);
+    assert.equal(accountErrorMessageKey(new AuthError('cancelled'), 'deleteAccount'), null);
+  });
+
+  it('provider-failed は、取りやめと同じ扱いにも、アプリの不具合にもしない（原因を言い切らない文言）', () => {
+    assert.equal(accountErrorMessageKey(new AuthError('provider-failed'), 'signIn'), 'account.error.providerFailed');
+    assert.equal(
+      accountErrorMessageKey(new AuthError('provider-failed'), 'deleteAccount'),
+      'account.error.providerFailed',
+    );
+  });
+
+  it('削除の network は、削除が済んでいるかもしれないと伝える専用の文言。ほかの操作の network とは別', () => {
+    assert.equal(accountErrorMessageKey(new AuthError('network'), 'deleteAccount'), 'account.error.deleteNetwork');
+    assert.equal(accountErrorMessageKey(new AuthError('network'), 'signIn'), 'account.error.network');
+    assert.equal(accountErrorMessageKey(new AuthError('network'), 'signOutOthers'), 'account.error.network');
+  });
+
+  it('削除の再試行の 401 は「サインアウトされた。削除が済んでいるかもしれない」。ほかの操作の 401 とは別', () => {
+    assert.equal(accountErrorMessageKey(new AuthError('unauthorized'), 'deleteAccount'), 'account.error.deleteSignedOut');
+    assert.equal(accountErrorMessageKey(new AuthError('unauthorized'), 'signOutOthers'), 'account.error.signedOut');
+    assert.equal(accountErrorMessageKey(new AuthError('unauthorized'), 'signIn'), 'account.error.signInFailed');
+  });
+
+  it('再認証の失敗と、別のアカウントでの再認証は、削除されていないと伝える文言', () => {
+    assert.equal(accountErrorMessageKey(new AuthError('reauth-failed'), 'deleteAccount'), 'account.error.reauthFailed');
+    assert.equal(accountErrorMessageKey(new AuthError('account-mismatch'), 'deleteAccount'), 'account.error.accountMismatch');
+    assert.match(en['account.error.reauthFailed'], /wasn’t deleted/);
+    assert.match(en['account.error.accountMismatch'], /wasn’t deleted/);
+  });
+
+  it('アプリの不具合（invalid-request など）と、AuthError 以外の失敗は、汎用の文言', () => {
+    assert.equal(accountErrorMessageKey(new AuthError('invalid-request'), 'signIn'), 'error.unexpected');
+    assert.equal(accountErrorMessageKey(new AuthError('unexpected'), 'deleteAccount'), 'error.unexpected');
+    assert.equal(accountErrorMessageKey(new Error('boom'), 'signIn'), 'error.unexpected');
+    assert.equal(accountErrorMessageKey(undefined, 'signOut'), 'error.unexpected');
   });
 });

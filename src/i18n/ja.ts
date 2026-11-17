@@ -70,6 +70,7 @@ export const ja: Record<MessageKey, Message> = {
     '入力中の曲名・アーティスト名を Apple に送って、候補を探します。それ以外は送りません。',
   'settings.tags': 'タグ',
   'settings.artists': 'アーティスト',
+  'settings.account': 'アカウント',
   'settings.about': 'このアプリについて',
   'settings.saveFailedTitle': '設定を保存できませんでした',
 
@@ -164,6 +165,58 @@ export const ja: Record<MessageKey, Message> = {
   'songForm.suggestionA11yRegistered': '{artist}の{title}、登録済み',
   'songForm.suggestionSongHint': '曲名を入力します',
   'songForm.suggestionArtistHint': 'アーティストを入力します',
+
+  // Account（app/account.tsx。設定の「アカウント」から開く）。ログインを要求しないので、説明は
+  // 「アカウントが無くても使える」ことを先に伝える。失敗の文言は account.error.*（対応は src/i18n/authErrors.ts）。
+  // 「Apple」「Google」は、ログイン手段の名前で、翻訳しない。
+  'account.title': 'アカウント',
+  'account.signedOutNote': 'Singfolio はアカウントなしで使えます。曲はこの端末に保存されます。',
+  'account.signInApple': 'Appleでサインイン',
+  'account.signInGoogle': 'Googleでサインイン',
+  'account.providerApple': 'Apple',
+  'account.providerGoogle': 'Google',
+  'account.signedInWith': '{provider} でサインイン中',
+  'account.signingIn': 'サインインしています…',
+  'account.signOut': 'サインアウト',
+  'account.signOutConfirmTitle': 'サインアウトしますか？',
+  'account.signOutConfirmMessage': 'いつでもサインインし直せます。曲はこの端末に残ります。',
+  'account.signingOut': 'サインアウトしています…',
+  'account.signedOutLocalOnly':
+    'この端末ではサインアウトしました。サーバー側のサインインは終了できませんでした（時間が経つと自動で切れます）。',
+  'account.signOutOthers': 'ほかの端末をすべてサインアウト',
+  'account.signOutOthersNote': 'ほかのすべての端末のサインインを終了します。この端末はサインインしたままです。',
+  'account.signOutOthersConfirmTitle': 'ほかの端末をサインアウトしますか？',
+  'account.signOutOthersConfirmMessage':
+    'ほかのすべての端末がサインアウトされます。この端末はサインインしたままです。',
+  'account.signingOutOthers': 'ほかの端末をサインアウトしています…',
+  'account.signedOutOthers': 'ほかのすべての端末をサインアウトしました。',
+  'account.deleteAccount': 'アカウントを削除',
+  'account.deleteNote': 'この端末の曲は削除されません。',
+  'account.deleteConfirmTitle': 'アカウントを削除しますか？',
+  'account.deleteConfirmMessage':
+    'Singfolio のアカウントを完全に削除します。元に戻せません。最初に、{provider} での本人確認があります。この端末の曲は削除されません。',
+  'account.deleteConfirmAction': '続ける',
+  'account.deleting': 'アカウントを削除しています。最大30秒ほどかかります。',
+  'account.deleted': 'アカウントを削除しました。',
+  'account.deletedAppleNotRevoked':
+    'アカウントを削除しました。Appleでサインインの連携も解除するには、Apple Account の設定を開いてください。',
+  'account.loadFailed': 'サインインの状態を確認できませんでした。',
+  'account.retry': 'もう一度試す',
+  'account.error.network': '接続できませんでした。通信を確認して、もう一度お試しください。',
+  'account.error.unavailable': 'Singfolio のサーバーが今は使えません。しばらくしてから、もう一度お試しください。',
+  'account.error.signInFailed': 'サインインできませんでした。もう一度お試しください。',
+  'account.error.providerFailed': 'サインインが完了しませんでした。もう一度お試しください。',
+  'account.error.providerUnavailable': 'このサインインは、この端末では使えません。',
+  'account.error.timeout': 'サインインに時間がかかりすぎました。もう一度お試しください。',
+  'account.error.signInStorageFailed': 'サインインをこの端末に保存できませんでした。もう一度お試しください。',
+  'account.error.signOutFailed': 'この端末でサインアウトできませんでした。もう一度お試しください。',
+  'account.error.signedOut': 'サインアウトされました。もう一度サインインしてください。',
+  'account.error.reauthFailed': '本人確認ができなかったため、アカウントは削除されていません。もう一度お試しください。',
+  'account.error.accountMismatch':
+    'サインインしているアカウントと違うため、アカウントは削除されていません。同じアカウントを選んでください。',
+  'account.error.deleteNetwork':
+    'サーバーに接続できず、アカウントが削除されたかどうか分かりません。もう一度お試しください。サインアウトされた場合は、すでに削除されている可能性があります。',
+  'account.error.deleteSignedOut': 'サインアウトされました。アカウントはすでに削除されている可能性があります。',
 
   'error.titleRequired': '曲名を入力してください。',
   'error.artistRequired': 'アーティスト名を入力してください。',

@@ -90,6 +90,7 @@ export const en = {
     'What you type in Title and Artist is sent to Apple to find suggestions. Nothing else is sent.',
   'settings.tags': 'Tags',
   'settings.artists': 'Artists',
+  'settings.account': 'Account',
   'settings.about': 'About',
   'settings.saveFailedTitle': 'Couldn’t save the setting',
 
@@ -204,6 +205,61 @@ export const en = {
   'songForm.suggestionA11yRegistered': '{title} by {artist}, already in your songs',
   'songForm.suggestionSongHint': 'Fills in the title',
   'songForm.suggestionArtistHint': 'Fills in the artist',
+
+  // Account（app/account.tsx。Settings の Account から開く）。ログインを要求しないので、説明は
+  // 「アカウントが無くても使える」ことを先に伝える。失敗の文言は account.error.*（対応は src/i18n/authErrors.ts）。
+  // 「Apple」「Google」は、ログイン手段の名前で、翻訳しない。
+  'account.title': 'Account',
+  'account.signedOutNote': 'You don’t need an account to use Singfolio. Your songs stay on this device.',
+  'account.signInApple': 'Sign in with Apple',
+  'account.signInGoogle': 'Sign in with Google',
+  'account.providerApple': 'Apple',
+  'account.providerGoogle': 'Google',
+  'account.signedInWith': 'Signed in with {provider}',
+  'account.signingIn': 'Signing in…',
+  'account.signOut': 'Sign out',
+  'account.signOutConfirmTitle': 'Sign out?',
+  'account.signOutConfirmMessage': 'You can sign in again at any time. Your songs stay on this device.',
+  'account.signingOut': 'Signing out…',
+  // サーバーに届かなかったとき。端末は、ログアウトできている。
+  'account.signedOutLocalOnly':
+    'Signed out on this device. Couldn’t end the sign-in on the server, so it will expire on its own.',
+  'account.signOutOthers': 'Sign out of other devices',
+  'account.signOutOthersNote': 'Ends the sign-in on every other device. You stay signed in here.',
+  'account.signOutOthersConfirmTitle': 'Sign out of other devices?',
+  'account.signOutOthersConfirmMessage': 'Every other device will be signed out. You stay signed in on this one.',
+  'account.signingOutOthers': 'Signing out other devices…',
+  'account.signedOutOthers': 'Signed out of all other devices.',
+  'account.deleteAccount': 'Delete account',
+  'account.deleteNote': 'Songs on this device are not deleted.',
+  'account.deleteConfirmTitle': 'Delete your account?',
+  'account.deleteConfirmMessage':
+    'Your Singfolio account will be deleted permanently and can’t be restored. First, you’ll be asked to confirm with {provider}. Songs on this device are not deleted.',
+  'account.deleteConfirmAction': 'Continue',
+  'account.deleting': 'Deleting your account. This can take up to 30 seconds.',
+  'account.deleted': 'Your account was deleted.',
+  // Appleのトークンを失効できなかったとき。アカウントは消えている。
+  'account.deletedAppleNotRevoked':
+    'Your account was deleted. To also stop using Sign in with Apple with Singfolio, open your Apple Account settings.',
+  'account.loadFailed': 'Couldn’t check your sign-in status.',
+  'account.retry': 'Try again',
+  // 失敗。取りやめは何も出さない。providerFailed は、原因を言い切らず、強く出さない（OSのシートを「閉じる」もこれになる）。
+  'account.error.network': 'Couldn’t connect. Check your connection and try again.',
+  'account.error.unavailable': 'Singfolio’s server isn’t available right now. Please try again later.',
+  'account.error.signInFailed': 'Couldn’t sign in. Please try again.',
+  'account.error.providerFailed': 'Sign-in didn’t finish. Please try again.',
+  'account.error.providerUnavailable': 'This sign-in isn’t available on this device.',
+  'account.error.timeout': 'Sign-in took too long. Please try again.',
+  'account.error.signInStorageFailed': 'Couldn’t save your sign-in on this device. Please try again.',
+  'account.error.signOutFailed': 'Couldn’t sign out on this device. Please try again.',
+  'account.error.signedOut': 'You’re no longer signed in. Please sign in again.',
+  'account.error.reauthFailed': 'Couldn’t confirm it’s you, so your account wasn’t deleted. Please try again.',
+  'account.error.accountMismatch':
+    'That’s not the account you signed in with, so your account wasn’t deleted. Please choose the same account.',
+  // 削除の通信が途中で切れたとき。サーバーで削除が済んでいるかもしれない（やり直すと、サインアウトされる）。
+  'account.error.deleteNetwork':
+    'Couldn’t reach the server, so we can’t tell whether your account was deleted. Please try again. If you get signed out, it may already be deleted.',
+  'account.error.deleteSignedOut': 'You were signed out. Your account may already have been deleted.',
 
   // ServiceErrorCode → 文言の対応は errors.ts。
   'error.titleRequired': 'Enter a title.',

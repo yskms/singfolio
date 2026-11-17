@@ -734,6 +734,7 @@ describe('直列化', () => {
 describe('createServices との結合', () => {
   it('auth を渡さなければ、ログアウト中のままで、signIn は provider-unavailable。signOut は何もしない', async () => {
     const { services } = await createTestServices();
+    assert.equal(services.account.available, false); // 画面は入口ごと出さない
     assert.equal(await services.account.getSignedInProvider(), null);
     await rejectsWith(services.account.signIn('apple'), 'provider-unavailable');
     assert.deepEqual(await services.account.signOut(), { serverRevoked: true });
@@ -761,6 +762,7 @@ describe('createServices との結合', () => {
     const { storage, items } = memoryStorage();
     const { requests, auth } = authOptions(storage);
     const { services, sqlite } = await createTestServices({ auth });
+    assert.equal(services.account.available, true);
     await services.account.signIn('apple');
     assert.equal(await services.account.getSignedInProvider(), 'apple');
     assert.deepEqual(requests, ['https://singfolio.app/auth/nonce', 'https://singfolio.app/auth/login']);

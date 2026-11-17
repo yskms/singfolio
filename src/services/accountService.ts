@@ -93,6 +93,11 @@ export interface DeleteAccountResult {
 
 export interface AccountService {
   /**
+   * アカウントが使えるビルドか。`false` なら（`auth` を注入していない）、画面は入口ごと出さない
+   * （候補検索の `suggestions.available` と同じ「注入しなければ無効」）。
+   */
+  readonly available: boolean;
+  /**
    * サインイン中のログイン手段。していなければ `null`。セッションの値は渡さない。ローカルDBが読めないなど、
    * 判断できなかったときは `AuthError('unexpected')`（`null` にはしない: 「ログアウト中」と「分からない」を
    * 画面が取り違えないため）。**画面は、これを捕まえて**「分からない」として扱い、アカウントの欄を隠すなどに
@@ -134,6 +139,7 @@ export interface AccountService {
 export function createAccountService(deps: AccountServiceDeps | null): AccountService {
   if (deps === null) {
     return {
+      available: false,
       getSignedInProvider: async () => null,
       signIn: async () => {
         throw new AuthError('provider-unavailable');
@@ -245,6 +251,7 @@ export function createAccountService(deps: AccountServiceDeps | null): AccountSe
   }
 
   return {
+    available: true,
     getSignedInProvider() {
       return asAuthError(async () => (await readSession()).current?.provider ?? null);
     },
