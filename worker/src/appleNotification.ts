@@ -8,8 +8,9 @@
 // 守ること:
 // - 検証に通る前は、D1に触れない。通ったあとも、知らない種類（`email-enabled` など）は何もしない。
 // - 同じ通知が何度届いても、結果は同じにする（Apple は同じ通知を繰り返し送る、という報告がある）。
-// - `consent-revoked` は、その行の最後のサインインより前の通知だけを処理する。あとでサインインし直した（連携が
-//   戻った）利用者を、届くのが遅れた古い通知で、ログアウトさせない。
+// - `consent-revoked` は、取り消しの時点（`event_time`）より前に作られたセッションだけを消す。あとでサインインし直した
+//   （連携が戻った）端末を、届くのが遅れた古い通知で、ログアウトさせない。サインインし直した行があっても、取り消しの前から
+//   生きていたほかの端末のセッションは消す。
 // - `account-deleted` は、順序を見ずに処理する（消えた Apple Account は戻らない）。
 // - 通知の中身（`sub`・`event_time`）・JWSを、ログに出さない。失敗の分類だけを、`console.error` に1行出す。
 import { deleteUserAccount } from './account.ts';
@@ -69,24 +70,40 @@ export async function applyAppleEvent(db: D1Database, event: AppleNotificationEv
 }
 
 /**
- * `consent-revoked`。1つのバッチ（トランザクション）で、セッションの削除と記録を行う。どちらにも同じ条件を付ける:
- * - `last_sign_in_at <= eventTime`: 通知のあとにサインインし直した行は、触らない（遅れて届いた、または再送された古い通知）。
- * - `consent_revoked_at` が無い、または `eventTime` より前: 同じ通知（同じ `event_time`）の再送は、何もしない。
- * `consent_revoked_at` は、`createSession` が、この通知より前に始まったログインのセッションを作らないために見る
- * （通知の処理の最中に進んでいたログイン。migrations/0002）。
+ * `consent-revoked`。1つのバッチ（トランザクション）で、セッションの削除と記録を行う。
+ * - 削除: `created_at <= eventTime` の**セッション**（取り消しの時点で、すでにあったもの）。セッションの単位で判定するので、
+ *   通知が届く前にサインインし直した（連携が戻った）端末のセッションは、残る。一方、取り消しの前から生きていたほかの端末のセッション
+ *   （盗まれた端末のものなど）は、サインインし直した行があっても、消える。同じ通知の再送は、あとのセッションを消さない。
+ *   `created_at` は、ログインの開始時刻（`createSession` に渡す `now`）。
+ * - 記録: `last_sign_in_at <= eventTime`（通知のあとにサインインし直した行は、記録しない）で、`consent_revoked_at` が無い、または
+ *   `eventTime` より前（同じ通知の再送は、何もしない）。`consent_revoked_at` は、`createSession` が、この通知より前に始まったログインの
+ *   セッションを作らないために見る（通知の処理の最中に進んでいたログイン。migrations/0002）。
  */
 async function revokeConsent(db: D1Database, event: AppleNotificationEvent): Promise<AppleEventOutcome> {
-  const condition = `provider = 'apple' AND sub = ?1 AND last_sign_in_at <= ?2 AND (consent_revoked_at IS NULL OR consent_revoked_at < ?2)`;
-  const [, update] = await db.batch([
+  const identity = `provider = 'apple' AND sub = ?1`;
+  const [deleted, update] = await db.batch([
     db
-      .prepare(`DELETE FROM sessions WHERE identity_id IN (SELECT id FROM identities WHERE ${condition})`)
+      .prepare(`DELETE FROM sessions WHERE created_at <= ?2 AND identity_id IN (SELECT id FROM identities WHERE ${identity})`)
       .bind(event.sub, event.eventTime),
-    db.prepare(`UPDATE identities SET consent_revoked_at = ?2 WHERE ${condition}`).bind(event.sub, event.eventTime),
+    db
+      .prepare(
+        `UPDATE identities SET consent_revoked_at = ?2
+         WHERE ${identity} AND last_sign_in_at <= ?2 AND (consent_revoked_at IS NULL OR consent_revoked_at < ?2)`,
+      )
+      .bind(event.sub, event.eventTime),
   ]);
-  return update!.meta.changes === 1 ? 'sessions-revoked' : 'nothing';
+  return deleted!.meta.changes > 0 || update!.meta.changes === 1 ? 'sessions-revoked' : 'nothing';
 }
 
-/** `account-deleted`。その Apple の `sub` の行を消す（セッションも、外部キーで消える）。最後のログイン手段なら、アカウントごと。 */
+/**
+ * `account-deleted`。その Apple の `sub` の行を消す（セッションも、外部キーで消える）。最後のログイン手段なら、アカウントごと。
+ *
+ * **件数の確認（SELECT）と削除は、1つのトランザクションに入っていない。** 今は、`identities` の行を足すのは、ログインでの
+ * `resolveIdentity`（ユーザーと行を同時に作る）だけで、既存のユーザーにログイン手段を足す処理が無いので、確認と削除の間に件数が増えない。
+ * 「アカウントのつなぎ方」（既存のユーザーにログイン手段をつなぐ処理）を作るときは、ここを見直す: 確認のあとにつながった手段ごと
+ * アカウントが消える、または、最後の手段だけが消えて `users` の行が残る。7.4 で `deleteUserAccount` に足す、R2を消す順序
+ * （`username` を読む → R2 → D1）とも合わせて、確認と削除を1文（条件つきの DELETE）か1バッチにできるかを決める。
+ */
 async function deleteAppleIdentity(db: D1Database, sub: string): Promise<AppleEventOutcome> {
   const row = await db
     .prepare(

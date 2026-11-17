@@ -213,6 +213,29 @@ describe('POST /auth/apple/notifications', () => {
       assert.notEqual(await authenticateSession(db, again, NOW + 1000), null);
     });
 
+    it('通知が届く前にサインインし直していても、取り消しの前から生きていた別の端末のセッションは消す。サインインし直したセッションは残す', async () => {
+      const { identityId, session: before } = await newSignedIn(NOW - 100_000); // 端末A（取り消しの前から）
+      // 取り消し（NOW）のあと、通知が届く前に、端末Bでサインインし直した（連携が戻った）。
+      await resolveIdentity(db, 'apple', SUB, NOW + 1000);
+      const again = (await createSession(db, identityId, NOW + 1000))!;
+      assert.equal((await notify({ eventTime: NOW })).status, 200);
+      assert.equal(await authenticateSession(db, before, NOW + 1000), null);
+      assert.notEqual(await authenticateSession(db, again, NOW + 1000), null);
+      // サインインし直した行は、取り消しとして記録しない（サインインし直した利用者を、再送で動かさない）。
+      assert.deepEqual(await identityRow(), { last_sign_in_at: NOW + 1000, consent_revoked_at: null });
+      assert.equal((await notify({ eventTime: NOW })).status, 200);
+      assert.notEqual(await authenticateSession(db, again, NOW + 1000), null);
+      assert.deepEqual(await counts(), { users: 1, identities: 1, sessions: 1 });
+    });
+
+    it('取り消しと同じ時刻に作られたセッションも消す（安全側）。1ミリ秒あとのものは残す', async () => {
+      const { identityId, session: atEvent } = await newSignedIn(NOW);
+      const after = (await createSession(db, identityId, NOW + 1))!;
+      assert.equal((await notify({ eventTime: NOW })).status, 200);
+      assert.equal(await authenticateSession(db, atEvent, NOW + 1), null);
+      assert.notEqual(await authenticateSession(db, after, NOW + 1), null);
+    });
+
     it('より古い取り消しの通知で、記録した時刻を戻さない', async () => {
       await newSignedIn(NOW - 100_000);
       await notify({ eventTime: NOW });
