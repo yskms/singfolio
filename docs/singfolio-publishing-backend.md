@@ -695,8 +695,8 @@ AppleとGoogleの仕様は、各社の公式資料で確かめた（Appleは、I
     ユーザーIDは出さない。何も無い日は出さない。`skipped` は、候補に選んだが、消す瞬間に条件から外れた数。
 -   **Appleのトークンは失効できない。** `refresh_token` を保存していないため、自動削除では失効しない。利用者の Apple Account の「Appleでサインイン」に、Singfolio が
     残る（利用者が、そこから解除できる）。ポリシーに書く。Googleは失効するものが無い。
--   **Cron Trigger は、次の `wrangler deploy` で登録される。** 本番は 7.3.3 のままで、ログインが無く、ユーザーは居ない。デプロイのあと、`wrangler tail` で
-    `scheduled` が動くか確かめる（ローカルは `wrangler dev --test-scheduled` で `/cdn-cgi/handler/scheduled` を呼べる。workerd で、古いユーザーが消え、
+-   **Cron Trigger は、7.3.13 のデプロイで登録した**（デプロイの出力に schedule `17 3 * * *`）。実行は、UTC 03:17 に `wrangler tail` を開いて、
+    `scheduled` が Ok になるのを見る（未確認。ユーザーが居ないので、件数の行は出ない。ローカルは `wrangler dev --test-scheduled` で `/cdn-cgi/handler/scheduled` を呼べる。workerd で、古いユーザーが消え、
     新しいユーザーと NULL が残ることを確かめた）。
 -   **7.4 の宿題（決めずに公開機能を出さない）。** 上の「端末の中だけの利用は数えない」は、アカウントを出した版から起きる（7.3 の機能だけでも）。公開ページが載ると、
     失うものが増える: 端末の中だけで使い続ける人は、サーバーとの通信が無く、1年後に公開ページごと消える。

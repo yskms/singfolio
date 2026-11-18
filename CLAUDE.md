@@ -211,7 +211,7 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     アプリの外へ移ると破棄する（SMSの確認コードを別のアプリで開く経路が壊れる）。
 -   **Account 画面（`app/account.tsx`・`ui/AccountSection.tsx`。7.3.11）。** 入口は Settings の `Account` で、`account.available` が真のビルドだけ。
     **`src/services/index.ts` の `ACCOUNT_ENABLED` は、7.3.12・7.3.13 が済むまで外さない**（リリースのビルドでは `auth` を注入せず、入口の行も、ルート `singfolio://account` も閉じる。
-    Workerが未デプロイで、ポリシー・申告もアカウントを前提にしていないため。署名したビルドで確かめるときだけ、`eas.json` の `account-test` プロファイル
+    ポリシー・申告がアカウントを前提にしていないため（Workerは 7.3.13 でデプロイした）。署名したビルドで確かめるときだけ、`eas.json` の `account-test` プロファイル
     （`EXPO_PUBLIC_SINGFOLIO_ACCOUNT=1`）でビルドし、**そのビルドを製品版・審査へ昇格させない**）。
     Settings の行に、サインイン中の手段（値）を出さない（Settings が SecureStore を読まない）。この画面の失敗は ErrorBoundary に伝えず、画面の中で出す。
     操作のあとは、成功・失敗とも、サインインの状態を読み直す。実行中は戻れない（`usePreventRemove`。削除の結果を伝えられなくなる）。iOS の Apple は
