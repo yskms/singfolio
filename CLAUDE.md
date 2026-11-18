@@ -530,7 +530,9 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     Appleのボタンは 7.3.11 で使った（iOSのサインイン前の画面）。端末の言語とずれたときの扱いは 7.3.13。`nativeConfig.test.ts` が検出する。
 -   ビルド番号（iOSの buildNumber・AndroidのversionCode）は、EAS が持つ（`eas.json` の
     `appVersionSource: "remote"`、`production` の `autoIncrement`）。`app.json` に書かない
-    （書いても無視される）。`app.json` の `version`（ストアの表示版）は手で上げる。`eas init` は
+    （書いても無視される）。`app.json` の `version`（ストアの表示版）は手で上げる（EAS は上げない）。
+    **公開済みの版の番号には、App Store Connect・TestFlight がビルドを受け付けない。** ストアへ上げるビルド（`account-test` を含む）の前に、
+    今の番号が公開済みなら、**ユーザーに聞かずに**上げる（新機能を含む版は minor、不具合修正だけなら patch。上げた番号は報告する）。`eas init` は
     `app.json` に、プラグインの展開結果（`CFBundleLocalizations` など）まで書き込むので、
     やり直すときは `projectId` と `owner` 以外の差分を戻す。
 -   `react-native-reanimated` / `react-native-gesture-handler` /
