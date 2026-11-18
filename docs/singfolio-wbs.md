@@ -285,7 +285,8 @@ v1.0より後（公開機能・Requests）の実装順序は、
         例外が Worker の外へ出て 1101（500）になる（503 ではない）。503 は Apple に届かない・想定外の応答で、tail の1行で切り分ける。この確認で分かるのは鍵の形式までで、Key ID・Team ID の正しさは本物のコードまで分からない。
         `wrangler tail` の出力は、ヘッダーとクエリ（`code`・`state` が付く）を除いて見る（`--format json` を jq で絞る。出力を共有・保存しない）。
         **進捗**: Worker のデプロイまで済んだ（`APPLE_PRIVATE_KEY` の登録、マイグレーション 0002・0003、デプロイ、HTTP 403、HTTPS 200、偽の `code` で 401。偽の `code` の確認は、`V` が合う呼び出し（約0.8秒）と合わない呼び出し（約0.07秒）の所要時間の差で、Apple まで届いたことを確かめた）。
-        残り: WAF のルール、Apple の通知エンドポイントの登録、`account-test` のビルド、実機の確認。
+        WAF のレート制限ルール（Path が `/auth/apple/login`、IP、5件/10秒、Block）も作って確かめた（本文が空の呼び出しを10件続けると、1〜5件目は 400、6件目以降は 429 `error code: 1015`。`/auth/nonce` は 200 のまま、10秒余り待つと 400 に戻る）。
+        残り: Apple の通知エンドポイントの登録、`account-test` のビルド、実機の確認。
         7.3.11 の画面の未確認（英語、Android、実行中に戻れないこと、VoiceOver・TalkBack、文字を大きくした端末、削除の成功と `appleRevoked: false`・`sessionCleared: false` の文言）も、ここで見る。
         7.3.10 の分: 削除でAppleのトークンが失効するか（iOSの認可コードを `redirect_uri` 無しで交換できるか、Appleの設定の「Appleでサインイン」の一覧からSingfolioが消えるか。
         AndroidのServices IDで得たトークンの失効が、iOS側も消すか）、Appleのサーバー間通知（エンドポイントの登録のあと、「Appleでサインインの利用を停止」で `consent-revoked` が届き、セッションが消えるか。
