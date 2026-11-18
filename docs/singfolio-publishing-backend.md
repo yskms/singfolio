@@ -1329,7 +1329,14 @@ Repositoryを、同じコミットで直せるため）。
     -   `wrangler tail` は、Workers Logs を無効にしたまま使える（実測。リクエストのURL・ヘッダー・`exceptions` の欄が出る。
         例外が実際に出ることは、本番では試していない）。出力にはリクエストのヘッダー（接続元のIPなど）が含まれ、認証の値
         （`Authorization` など）が付くリクエストが流れる段階では、それも出うる。端末に出すだけで保存はされないが、出力を
-        共有・保存しない。
+        共有・保存しない。AIのセッションなど、出力が記録に残る場で見るときは、`--format json` を jq で絞り、ヘッダーとURLのクエリ
+        （Appleのコールバックは `code`・`state` が付く）を除く。
+    -   **`APPLE_PRIVATE_KEY` が入ったことの確認（AndroidのAppleログイン。7.3.13）。** 上の確認（403・200・nonce）は、どれも鍵を使わない。
+        `kind: web` の `T` を取り、でたらめな `code` と、合う `V` を付けて `/auth/apple/login` を呼ぶ。401 なら、鍵を読めて署名もできている
+        （Appleは常に `invalid_grant`。D1には何も書かれない）。鍵が無い・形式が違うと、`AppleClientSecretConfigError` が Worker の外へ出て、
+        1101（500）になる（503ではない。`worker/test/appleWeb.test.ts` が固定）。503 は、Appleに届かない・想定外の応答で、
+        `wrangler tail` の `apple token exchange failed: …` の1行で切り分ける。分かるのは鍵の形式まで。Key ID・Team ID・Services ID の
+        組が合うか（`invalid_client`）は、本物のコードで交換するまで分からない。
     -   ローカルの開発だけ、ホスト名が `localhost`・`127.0.0.1`・`[::1]` のものを通す（完全一致）。エッジでは、Custom Domainは
         `singfolio.app` に一致するリクエストだけを受けるので、`localhost` のHostは届かない（資料）。環境変数などで検査を切る口は
         作らない。`wrangler dev` は、既定で `routes` のホスト（`singfolio.app`）を `request.url` に入れ、`localhost` が見えず403に

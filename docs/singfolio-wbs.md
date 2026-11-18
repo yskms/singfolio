@@ -278,11 +278,18 @@ v1.0より後（公開機能・Requests）の実装順序は、
         検証済みのドメインに置けるか。`yskms.github.io` で足りるか不明。足りないなら `singfolio.app` にポリシーを置く）。(3) Play Console の申告
         （データ セーフティ、アカウントの削除のURL・保存期間）と App Store Connect の申告・App Review のメモ。メールの窓口がPlayの審査で通るかは未確認。
         (4) ポリシーの施行日と、公開後のアンカー（`#delete-account`）の確認。(5) `ACCOUNT_ENABLED` とプロファイル `account-test` を外すのは、7.3.13 のあと。
-    -   [ ] 7.3.13 確認。実機と署名したビルド（TestFlight・Playの内部テスト。`eas build --local --profile account-test` で作る。`env` が `--local` のビルドに埋め込まれるかも、入口が出ることで確かめる。このビルドは製品版・審査へ昇格させない）で、ログイン・キャンセル・再ログイン・ログアウト・削除。
+    -   [ ] 7.3.13 確認。実機と署名したビルド（TestFlight・Playの内部テスト。`eas build --local --profile account-test` で作る。`env` が `--local` のビルドに埋め込まれるかも、入口が出ることで確かめる。このビルドは製品版・審査へ昇格させない。TestFlight は内部テスターだけに配る。Android の versionCode も `production` と同じ番号列を使う）で、ログイン・キャンセル・再ログイン・ログアウト・削除。
+        **デプロイの確認**（利用者が `APPLE_PRIVATE_KEY` を登録したあと。§8「デプロイ後の確認」に足す）: マイグレーション（0002・0003。`ADD COLUMN` と `UPDATE` だけで、`wrangler rollback` で 7.3.3 のコードに戻しても整合する）の直前に
+        `wrangler d1 time-travel info` で bookmark を控える。デプロイの出力で schedule（`17 3 * * *`）を確かめる（登録の確認。実行の確認は UTC 03:17 に tail を開き、`scheduled` が Ok になるのを見る。ユーザーが居ないので件数の行は出ない）。
+        HTTP が 403、HTTPS が 200 のあと、**偽の `code` で `/auth/apple/login` を呼ぶ**（`kind: web` の `T` と、合う `V` を付ける）: 401 なら鍵を読めて署名もできている（D1 には何も書かれない）。鍵が無い・壊れていると、
+        例外が Worker の外へ出て 1101（500）になる（503 ではない）。503 は Apple に届かない・想定外の応答で、tail の1行で切り分ける。この確認で分かるのは鍵の形式までで、Key ID・Team ID の正しさは本物のコードまで分からない。
+        `wrangler tail` の出力は、ヘッダーとクエリ（`code`・`state` が付く）を除いて見る（`--format json` を jq で絞る。出力を共有・保存しない）。
         7.3.11 の画面の未確認（英語、Android、実行中に戻れないこと、VoiceOver・TalkBack、文字を大きくした端末、削除の成功と `appleRevoked: false`・`sessionCleared: false` の文言）も、ここで見る。
         7.3.10 の分: 削除でAppleのトークンが失効するか（iOSの認可コードを `redirect_uri` 無しで交換できるか、Appleの設定の「Appleでサインイン」の一覧からSingfolioが消えるか。
-        AndroidのServices IDで得たトークンの失効が、iOS側も消すか）、Appleのサーバー間通知（エンドポイントの登録のあと、`wrangler tail` で、実際の通知の `events` の形・`event_time` の単位・`aud`・
-        `account-deleted` の綴りを見る。「Appleでサインインの利用を停止」で `consent-revoked` が届き、セッションが消えるか）、「ほかの端末をすべてログアウト」（2台で）。
+        AndroidのServices IDで得たトークンの失効が、iOS側も消すか）、Appleのサーバー間通知（エンドポイントの登録のあと、「Appleでサインインの利用を停止」で `consent-revoked` が届き、セッションが消えるか。
+        **通知の中身は `wrangler tail` では見えない**（`appleNotification.ts` の方針で本文を出さず、tail にも本文は出ない）。結果だけを見る: 拒否なら tail に `reason=`（固定の語彙）が1行出る。
+        成功なら 200 で、D1 のセッションが消え、`identities.consent_revoked_at` に正規化後の `event_time` が入る（実時刻と合うか見る。`event_time` は秒でもミリ秒でも読めるので、元の単位は分からなくてよい）。
+        `account-deleted` の綴りは、Apple Account を実際に消さない限り確かめられないので、未確認のまま残す（コードは両方の綴りを読む）。中身を出す一時的なコードは入れない）、「ほかの端末をすべてログアウト」（2台で）。
         最初に、AppleのIDトークンの `nonce` が、渡した値（`SHA-256(T)` の base64url）そのままか（7.3.7 から移した。違うなら、Workerを直してから
         ほかを確かめる）。サインインの成功・取りやめ・失敗の、実際のエラーコード（`appleSignInRepository` の分類）。
         Appleの `sub` がiOSとAndroidで同じか、Services IDで得たトークンを失効させたときの連携、AndroidのWebのフロー全体、
@@ -293,10 +300,13 @@ v1.0より後（公開機能・Requests）の実装順序は、
         場合がある。エミュレータの測定は §8「Chrome の Custom Tab での戻り方」。Appleの実際のページからの戻りが、確認なし・確認ありのどちらになるか）、
         取りやめ（`user_cancelled_authorize`）と、Appleが取りやめに `state` を付けるか、SMSの確認コードを別のアプリで開いて入力して戻る経路（Custom Tab に戻れるか）を確かめる。
         設定の不備（`invalid_client`）は、本物のコードの交換で初めて出る（でたらめなコードでは常に `invalid_grant`）。503 が続いたら、`wrangler dev` の出力か
-        `wrangler tail` の1行（`apple token exchange failed: ...`）で切り分ける（デプロイしたWorkerでの `wrangler tail` は未確認）。Googleは、Androidの成功経路（本番用のクライアントIDと、署名の鍵ごと
+        `wrangler tail` の1行（`apple token exchange failed: ...`）で切り分ける（デプロイしたWorkerでの `wrangler tail` は未確認）。鍵の不備（無い・形式が違う）は 503 ではなく 1101（500）になる。Googleは、Androidの成功経路（本番用のクライアントIDと、署名の鍵ごと
         （debug・EASのlocal build・Play App Signing）のSHA-1）、プロジェクトの所有者でもテストユーザーでもないアカウントで入れるか
         （同意画面は「テスト中」）。Androidの成功経路は、**R8 入りの release で**確かめる（結果の解析 `GoogleIdTokenCredential.createFrom` と
-        トークンの返却。googleid のクラスは R8 で改名される）。実機
+        トークンの返却。googleid のクラスは R8 で改名される）。
+        **Android の経路は、Play の内部テスト1本**（`account-test` の AAB。全アーキ入り。出荷と同じ Play App Signing の鍵で、R8 入りを確かめる）。署名の鍵ごとのSHA-1は、Google Cloud の Android クライアントに登録済み
+        （debug・EASのlocal build・Play App Signing）。成功経路で通らなければ、まず疑う。確認用のアカウントは、プロジェクトの所有者でもテストユーザーでもないものを使う（同意画面が「テスト中」でも入れるか。
+        先にテストユーザーへ登録しない: 確かめられなくなる）。
 -   [ ] 7.4 Public ProfileとPublish（Auto Publishを含む）。アカウントの削除（`worker/src/account.ts` の `deleteUserAccount`。自己削除とAppleの `account-deleted` が使う）に、
     R2のスナップショット・`profiles`・Requestの削除を足す（順序: `username` を読む → R2を消す → D1の行を消す。R2に失敗したらD1の行を残して失敗にする。§8）。
     **未使用のアカウントの自動削除（1年）を見直す**: 公開ページが載ると、端末の中だけで使い続ける人は、サーバーとの通信が無く、1年後に公開ページごと消える。
