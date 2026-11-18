@@ -286,7 +286,21 @@ v1.0より後（公開機能・Requests）の実装順序は、
         `wrangler tail` の出力は、ヘッダーとクエリ（`code`・`state` が付く）を除いて見る（`--format json` を jq で絞る。出力を共有・保存しない）。
         **進捗**: Worker のデプロイまで済んだ（`APPLE_PRIVATE_KEY` の登録、マイグレーション 0002・0003、デプロイ、HTTP 403、HTTPS 200、偽の `code` で 401。偽の `code` の確認は、`V` が合う呼び出し（約0.8秒）と合わない呼び出し（約0.07秒）の所要時間の差で、Apple まで届いたことを確かめた）。
         WAF のレート制限ルール（Path が `/auth/apple/login`、IP、5件/10秒、Block）も作って確かめた（本文が空の呼び出しを10件続けると、1〜5件目は 400、6件目以降は 429 `error code: 1015`。`/auth/nonce` は 200 のまま、10秒余り待つと 400 に戻る）。
-        残り: Apple の通知エンドポイントの登録、`account-test` のビルド、実機の確認。
+        **実機の確認の結果**（iPhone 8: TestFlight。公開済みの 1.0.0 の番号には TestFlight が受け付けないため、`app.json` の `version` を上げた 1.1.0 で上げた。Android 実機: Play の内部テスト。R8 入りで全アーキの AAB）:
+        -   iOS の Apple（ネイティブ）: `nonce` が一致（`/auth/login` 200）。シートの外をタップする取りやめは何も出ず、シートを出したまま画面を消灯・復帰すると `provider-failed` の文言（「サインインが完了しませんでした」）。
+            サインアウトはサーバー側で消せたときは文言なし（端末だけのときだけ1行出す設計どおり）。取り消しのあとの再サインインも成功。
+        -   Android の Google: Play App Signing の鍵で、R8 入りの release で成功。プロジェクトの所有者でもテストユーザーでもない2つのアカウントで、同意画面が「テスト中」のまま入れた。同じアカウントの再サインインは同じユーザー。
+        -   Android の Apple（Web 経由）: 認可コードの交換が通った（`client_secret`・`redirect_uri` をAppleが受け付けた）。`nonce` が一致。Chrome の確認ダイアログは出ず（出たのは Apple のページの確認だけ）、そのままアプリに戻った。
+            取りやめは2通りで、どちらも静かに元の画面へ戻る（Apple のページのキャンセルはコールバック経由、ブラウザを閉じるとコールバックを通らない）。
+        -   Apple の `sub` は iOS と Android で同じ（同じユーザーに結び付く）。
+        -   ほかの端末をすべてサインアウト（2台）: 操作した側は 204、もう片方は次の呼び出しで 401 になり、端末のセッションを捨てて「サインアウトされました。もう一度サインインしてください。」を赤字で出した。
+        -   Apple のサーバー間通知: 「Apple ID の使用を停止する」で `consent-revoked` が届き、200 でセッションが消え、`consent_revoked_at` が入った（1分未満）。取り消しのあとの再サインインも成功。
+            通知の中身は tail では見えないので、結果で確かめた（拒否の `reason=` が出ず、セッションが消えた）。
+        -   アカウントの削除: iOS の Apple（認可コードを `redirect_uri` 無しで交換）・Android の Apple（Web）・Google の3経路とも 200。Apple は、設定の「Appleでサインイン」の一覧から Singfolio が消えた
+            （Android の Services ID の経路でも、iOS 側の一覧から消えた）。削除の直後に、`/auth/apple/notifications` へ通知が届く（失効に伴うものと推測。中身は見えない）。
+        -   全体: tail にログ・例外・`ok` 以外の結果は無かった。テストのあと、本番の D1 は全件を削除して空に戻した。
+        **未確認（残り）**: 英語表示、VoiceOver・TalkBack、文字を大きくした端末、実行中に戻れないこと、SMS の確認コードを別のアプリで開く経路、`account-deleted` の綴り（Apple Account を実際に消さない限り確かめられない）、
+        Cron の実行（UTC 03:17 に tail で `scheduled` が Ok になるのを見る）、Apple が取りやめに `state` を付けるか（tail のクエリを除いているので見えない）。
         7.3.11 の画面の未確認（英語、Android、実行中に戻れないこと、VoiceOver・TalkBack、文字を大きくした端末、削除の成功と `appleRevoked: false`・`sessionCleared: false` の文言）も、ここで見る。
         7.3.10 の分: 削除でAppleのトークンが失効するか（iOSの認可コードを `redirect_uri` 無しで交換できるか、Appleの設定の「Appleでサインイン」の一覧からSingfolioが消えるか。
         AndroidのServices IDで得たトークンの失効が、iOS側も消すか）、Appleのサーバー間通知（エンドポイントの登録のあと、「Appleでサインインの利用を停止」で `consent-revoked` が届き、セッションが消えるか。
