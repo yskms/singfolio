@@ -278,7 +278,7 @@ v1.0より後（公開機能・Requests）の実装順序は、
         検証済みのドメインに置けるか。`yskms.github.io` で足りるか不明。足りないなら `singfolio.app` にポリシーを置く）。(3) Play Console の申告
         （データ セーフティ、アカウントの削除のURL・保存期間）と App Store Connect の申告・App Review のメモ。メールの窓口がPlayの審査で通るかは未確認。
         (4) ポリシーの施行日と、公開後のアンカー（`#delete-account`）の確認。(5) `ACCOUNT_ENABLED` とプロファイル `account-test` を外すのは、7.3.13 のあと。
-    -   [ ] 7.3.13 確認。実機と署名したビルド（TestFlight・Playの内部テスト。`eas build --local --profile account-test` で作る。`env` が `--local` のビルドに埋め込まれるかも、入口が出ることで確かめる。このビルドは製品版・審査へ昇格させない。TestFlight は内部テスターだけに配る。Android の versionCode も `production` と同じ番号列を使う）で、ログイン・キャンセル・再ログイン・ログアウト・削除。
+    -   [x] 7.3.13 確認。実機と署名したビルド（TestFlight・Playの内部テスト。`eas build --local --profile account-test` で作る。`env` が `--local` のビルドに埋め込まれるかも、入口が出ることで確かめる。このビルドは製品版・審査へ昇格させない。TestFlight は内部テスターだけに配る。Android の versionCode も `production` と同じ番号列を使う）で、ログイン・キャンセル・再ログイン・ログアウト・削除。
         **デプロイの確認**（利用者が `APPLE_PRIVATE_KEY` を登録したあと。§8「デプロイ後の確認」に足す）: マイグレーション（0002・0003。`ADD COLUMN` と `UPDATE` だけで、`wrangler rollback` で 7.3.3 のコードに戻しても整合する）の直前に
         `wrangler d1 time-travel info` で bookmark を控える。デプロイの出力で schedule（`17 3 * * *`）を確かめる（登録の確認。実行の確認は UTC 03:17 に tail を開き、`scheduled` が Ok になるのを見る。ユーザーが居ないので件数の行は出ない）。
         HTTP が 403、HTTPS が 200 のあと、**偽の `code` で `/auth/apple/login` を呼ぶ**（`kind: web` の `T` と、合う `V` を付ける）: 401 なら鍵を読めて署名もできている（D1 には何も書かれない）。鍵が無い・壊れていると、
@@ -299,7 +299,7 @@ v1.0より後（公開機能・Requests）の実装順序は、
         -   アカウントの削除: iOS の Apple（認可コードを `redirect_uri` 無しで交換）・Android の Apple（Web）・Google の3経路とも 200。Apple は、設定の「Appleでサインイン」の一覧から Singfolio が消えた
             （Android の Services ID の経路でも、iOS 側の一覧から消えた）。削除の直後に、`/auth/apple/notifications` へ通知が届く（失効に伴うものと推測。中身は見えない）。
         -   全体: tail にログ・例外・`ok` 以外の結果は無かった。テストのあと、本番の D1 は全件を削除して空に戻した。
-        **未確認（残り）**: 英語表示、VoiceOver・TalkBack、文字を大きくした端末、実行中に戻れないこと、SMS の確認コードを別のアプリで開く経路、`account-deleted` の綴り（Apple Account を実際に消さない限り確かめられない）、
+        **アカウントを出す版のリリース前に見る**（主要な経路が済んだので、7.3.13 はここで区切った）: 英語表示、VoiceOver・TalkBack、文字を大きくした端末、実行中に戻れないこと、SMS の確認コードを別のアプリで開く経路、`account-deleted` の綴り（Apple Account を実際に消さない限り確かめられない）、
         Cron の実行（UTC 03:17 に tail で `scheduled` が Ok になるのを見る）、Apple が取りやめに `state` を付けるか（tail のクエリを除いているので見えない）。
         7.3.11 の画面の未確認（英語、Android、実行中に戻れないこと、VoiceOver・TalkBack、文字を大きくした端末、削除の成功と `appleRevoked: false`・`sessionCleared: false` の文言）も、ここで見る。
         7.3.10 の分: 削除でAppleのトークンが失効するか（iOSの認可コードを `redirect_uri` 無しで交換できるか、Appleの設定の「Appleでサインイン」の一覧からSingfolioが消えるか。
