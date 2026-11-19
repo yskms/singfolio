@@ -345,5 +345,8 @@ describe('publicProfileErrorMessageKey', () => {
   it('公開の確認の文言は、秘密の項目は公開しないと明示する', () => {
     assert.match(en['publicProfile.sharedNote'], /My Key, Private Note, and status are never shared/);
     assert.match(en['publicProfile.publishConfirmMessage'], /never shared/);
+    // 非公開に戻っていたときの「もう一度公開」も、公開の確認と同じことを伝える（公開される、秘密の項目は公開しない）
+    assert.match(en['publicProfile.republishMessage'], /Anyone can see/);
+    assert.match(en['publicProfile.republishMessage'], /never shared/);
   });
 });

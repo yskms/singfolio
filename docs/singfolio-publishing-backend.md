@@ -1421,11 +1421,19 @@ Publishのリクエストの本文は、`baseVersion`（7.4.4）に、`profile` 
     公開中の更新（Publish Now）は、確認なしで送る。
 -   **版の食い違い（`version-conflict`）。** 画面の状態（公開中か・最終公開）を、`PublishError.profile`（サーバーの今の内容）に合わせ、入力中の下書きはそのままにして、
     「置き換えますか」を出す。置き換えるなら、`replaceVersion` に `profile.version` を渡して送り直す。応答を受け取れなかった Publish のあとの送り直しも、ここを通る。
+    **公開の確認（人に見える状態になる）を済ませていない Publish**（公開中と見て確認なしで送ったもの）が、非公開のサーバーに当たったときは、置き換えの文言を使わず、「もう一度公開しますか」
+    （公開の確認と同じ内容）を出す（レビューで指摘。置き換えの文言は、公開ページが再び人に見えることを伝えない）。`confirmReplace` の `visibleConfirmed` が、その区別
+    （公開の確認を出したあとの Publish は真）。
+-   **Unpublish が `null`（サーバーに `username` が無い）を返したときは、`username-required` の失敗として扱う**（文言を出し、サーバーの状態を読み直す。何も伝えずに画面が変わらないように）。
+-   **戻る操作を止める `usePreventRemove` は、`busy` の間も有効**で、実行が終わった直後の1描画は、まだ有効なまま。そのため、コールバックは、変更が無ければ（`isDirty` が偽）、確認を出さずに
+    戻す（実行中は、何も出さずに止める）。
 -   **失敗の文言は `src/i18n/publishErrors.ts`**（`publicProfileErrorMessageKey`。Nodeのテストで、全コード・全操作が英語・日本語の文言に決まることを確かめる）。**Publish の `network` だけは
     「公開できたか分からない」と伝える**（サーバーで済んでいることがある）。`needsProfileReload`（401・`username-required`・`username-already-set`）のときは、失敗の文言を出したうえで、
     サーバーの状態を読み直す。
 -   **`username` の形の確認は `src/services/username.ts`**（Worker の `USERNAME_PATTERN` と同じ値を別に持つ。`username.test.ts` が一致を確かめる）。確認は形だけで、小文字にして送る
     （`publishService.claimUsername` も同じ `normalizeUsernameInput` を通す）。入力欄は自動修正・自動大文字を切り、iOS は `ascii-capable` のキーボードにする。
+-   **入力欄の長さ・Bio のカウンタは UTF-16 の単位**（`maxLength` の数え方）。送る側（`publishSnapshot.ts`。コードポイント）より厳しい側で、超えることは無い（絵文字などは、上限の半分で止まる）。
+    入力欄に入る値は、この画面の入力か、そこから送った公開済みの値だけなので、`maxLength` を超えた値が入ることは無い。確保前の `username` の入力は、破棄の確認の対象にしない（確認は Display Name・Bio だけ）。
 -   **日時は `Intl` を使わず `YYYY-MM-DD HH:mm`**（`src/i18n/dateTime.ts`。Hermes の `Intl` が機種で揃うかを確かめていない）。
 -   **Android のキーボード**: `ui/useKeyboardHeight.ts`（`SongForm` と同じ理由・同じやり方。Bio にフォーカスが入ったら、末尾までスクロールする）。
 -   **確かめたこと / 確かめていないこと。** iOS Simulator で、メモリ上の偽の Service（一時的なもの。コミットしていない）を差し込み、`username` の入力（形のエラー・小文字化・確認）→ 確保 →

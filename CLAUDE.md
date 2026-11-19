@@ -241,7 +241,7 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
 -   **Public Profile 画面（`app/public-profile.tsx`・`ui/PublicProfileSection.tsx`。7.4.7）。** 詳細は `docs/singfolio-publishing-backend.md` §8「アプリ側の Public Profile 画面」。
     入口（Profile）もルートも `account.available` のゲートの後ろ（Account と同じ。リリースのビルドでは閉じる）。**Display Name・Bio の下書きは、この画面だけが持ち、保存しない**
     （初期値はサーバーの `PublicProfile`。端末の `publish_state` ではない）。保存先を先に足さない（Auto Publish との関係は 7.4.9 で決める）。最初の公開・Unpublish・`username` の確保・
-    版の食い違いの置き換えの確認は外さない（人に見える状態になる・変更できない）。`username` の形の規則は `src/services/username.ts` に、Workerと同じ値を別に持つ。日時は `Intl` を使わない
+    版の食い違いの置き換えの確認は外さない（人に見える状態になる・変更できない）。公開中と見て確認なしで送ったのにサーバーが非公開だったときは、置き換えの文言にせず、公開の確認の文言にする。`username` の形の規則は `src/services/username.ts` に、Workerと同じ値を別に持つ。日時は `Intl` を使わない
     （`src/i18n/dateTime.ts`）。失敗の文言は `src/i18n/publishErrors.ts`（Publish の `network` だけ「公開できたか分からない」）。
 -   `expo-secure-store` の config plugin を `app.json` に足さない。Androidのバックアップ規則が `<include>` で、v1.0で今
     バックアップされているSQLiteを外す。

@@ -150,6 +150,11 @@ export function PublicProfileSection() {
   // 実行中は、確認を出さずに止める（結果を伝える画面を残す）。
   usePreventRemove(isDirty || busy !== null, ({ data }) => {
     if (busyRef.current) return;
+    // 実行が終わった直後の1描画は、まだ止めたまま（`busy` が戻る前）。変更が無ければ、確認なしで戻す。
+    if (!isDirty) {
+      navigation.dispatch(data.action);
+      return;
+    }
     Alert.alert(t('publicProfile.discardTitle'), t('publicProfile.discardMessage'), [
       { text: t('publicProfile.keepEditing'), style: 'cancel' },
       { text: t('publicProfile.discard'), style: 'destructive', onPress: () => navigation.dispatch(data.action) },
@@ -195,7 +200,7 @@ export function PublicProfileSection() {
     }
   };
 
-  const applyProfile = (profile: PublicProfile | null) => {
+  const applyProfile = (profile: PublicProfile) => {
     setView((current) => (current.kind === 'ready' ? { ...current, profile } : current));
     resetForm(profile);
   };
@@ -221,16 +226,31 @@ export function PublicProfileSection() {
     );
   };
 
-  const confirmReplace = (server: PublicProfile, publishAgain: (replaceVersion: number) => void) => {
+  /**
+   * 版が食い違ったときの確認。`visibleConfirmed` は、「人に見える状態になる」確認（最初の公開・非公開にしたあとの公開の確認）を、
+   * この Publish のために済ませているか。**公開中と見て確認なしで送ったのに、サーバーは非公開だった**（別の端末で、画面を開いたあとに非公開にされた）
+   * ときは、置き換えではなく、もう一度公開する確認を出す（置き換えるだけの文言では、公開ページが再び人に見えることを伝えられない）。
+   */
+  const confirmReplace = (server: PublicProfile, visibleConfirmed: boolean) => {
     // 画面の状態（公開中か・最終公開）は、サーバーの今の内容に合わせる。入力中の Display Name・Bio は、そのまま。
     setView((current) => (current.kind === 'ready' ? { ...current, profile: server } : current));
-    Alert.alert(t('publicProfile.replaceTitle'), t('publicProfile.replaceMessage'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      { text: t('publicProfile.replaceAction'), onPress: () => publishAgain(server.version) },
-    ]);
+    const republish = !server.published && !visibleConfirmed;
+    Alert.alert(
+      republish ? t('publicProfile.republishTitle') : t('publicProfile.replaceTitle'),
+      republish
+        ? t('publicProfile.republishMessage', { address: publicAddress(server.username) })
+        : t('publicProfile.replaceMessage'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: republish ? t('publicProfile.publishConfirmAction') : t('publicProfile.replaceAction'),
+          onPress: () => publishNow(server.version, true),
+        },
+      ],
+    );
   };
 
-  const publishNow = (replaceVersion?: number) =>
+  const publishNow = (replaceVersion?: number, visibleConfirmed = false) =>
     void run('publish', async () => {
       const { publish } = await getServices();
       try {
@@ -239,7 +259,7 @@ export function PublicProfileSection() {
       } catch (error) {
         // 別の端末が Publish した・非公開にした、再インストール後、応答を受け取れなかった Publish のあと。確認のうえ、置き換える。
         if (error instanceof PublishError && error.code === 'version-conflict' && error.profile) {
-          confirmReplace(error.profile, publishNow);
+          confirmReplace(error.profile, visibleConfirmed);
           return null;
         }
         throw error;
@@ -258,7 +278,7 @@ export function PublicProfileSection() {
       t('publicProfile.publishConfirmMessage', { address: publicAddress(profile.username) }),
       [
         { text: t('common.cancel'), style: 'cancel' },
-        { text: t('publicProfile.publishConfirmAction'), onPress: () => publishNow() },
+        { text: t('publicProfile.publishConfirmAction'), onPress: () => publishNow(undefined, true) },
       ],
     );
   };
@@ -273,11 +293,9 @@ export function PublicProfileSection() {
           void run('unpublish', async () => {
             const { publish } = await getServices();
             const profile = await publish.unpublish();
-            if (profile === null) {
-              // サーバーに `username` が無かった（アカウントを作り直したなど）。`username` の確保から始める。
-              applyProfile(null);
-              return null;
-            }
+            // サーバーに `username` が無かった（アカウントを作り直したなど）。何も伝えずに画面が変わらないよう、`username-required` の
+            // 失敗として扱う（文言を出して、サーバーの状態を読み直し、`username` の確保から始める）。
+            if (profile === null) throw new PublishError('username-required');
             // 入力中の下書きは、そのまま残す（非公開にしても、Display Name・Bio の控えはサーバーに残る）。
             setView((current) => (current.kind === 'ready' ? { ...current, profile } : current));
             return 'publicProfile.unpublished';
@@ -362,6 +380,8 @@ export function PublicProfileSection() {
               onFocus={() => {
                 revealBottom.current = false;
               }}
+              // 長さは UTF-16 の単位で数える（`maxLength` の数え方）。送る側の上限（コードポイント）より厳しい側で、超えることは無い
+              // （絵文字などは、上限の半分で止まる）。値の出どころは、この画面の入力か、そこから送った公開済みの値だけ。
               maxLength={PUBLISH_LIMITS.displayNameChars}
               accessibilityLabel={t('publicProfile.displayName')}
               returnKeyType="done"
@@ -378,6 +398,7 @@ export function PublicProfileSection() {
                 revealBottom.current = true;
                 scrollRef.current?.scrollToEnd({ animated: true });
               }}
+              // 数え方は Display Name と同じ。下のカウンタも、同じ（UTF-16 の単位）数え方で、入力欄が止まる数と一致する。
               maxLength={PUBLISH_LIMITS.bioChars}
               accessibilityLabel={t('publicProfile.bio')}
               editable={!disabled}

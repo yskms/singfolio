@@ -309,6 +309,10 @@ export const en = {
   'publicProfile.replaceMessage':
     'This profile was changed somewhere else, or your last publish didn’t finish. Continue to replace it with this device’s Display Name, Bio, and Ready songs.',
   'publicProfile.replaceAction': 'Replace',
+  // 公開中と見て確認なしで送ったのに、サーバーは非公開だったとき（別の端末で、画面を開いたあとに非公開にされた）。公開の確認と同じことを伝える。
+  'publicProfile.republishTitle': 'Publish again?',
+  'publicProfile.republishMessage':
+    'This profile was unpublished since you opened this screen. Continue to publish it again with this device’s Display Name, Bio, and Ready songs. Anyone can see them at {address}. My Key, Private Note, and status are never shared.',
   'publicProfile.unpublish': 'Unpublish Profile',
   'publicProfile.unpublishNote': 'Hides your public page. Songs on this device are not deleted.',
   'publicProfile.unpublishConfirmTitle': 'Unpublish your profile?',

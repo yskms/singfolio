@@ -256,6 +256,9 @@ export const ja: Record<MessageKey, Message> = {
   'publicProfile.replaceMessage':
     'このプロフィールは、ほかの場所で変更されたか、前回の公開が完了していません。続けると、この端末の表示名・自己紹介・歌える曲に置き換わります。',
   'publicProfile.replaceAction': '置き換える',
+  'publicProfile.republishTitle': 'もう一度公開しますか？',
+  'publicProfile.republishMessage':
+    'この画面を開いたあとに、このプロフィールは非公開になりました。続けると、この端末の表示名・自己紹介・歌える曲で、もう一度公開します。{address} で、誰でも見られるようになります。キー・プライベートメモ・ステータスは公開されません。',
   'publicProfile.unpublish': '公開をやめる',
   'publicProfile.unpublishNote': '公開ページを見えなくします。この端末の曲は削除されません。',
   'publicProfile.unpublishConfirmTitle': '公開をやめますか？',
