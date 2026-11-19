@@ -1,7 +1,7 @@
 import { useNavigation, useRouter } from 'expo-router';
 import { usePreventRemove } from 'expo-router/react-navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { PublicProfile, UnpublishedChanges } from '../src/domain/types';
@@ -13,6 +13,7 @@ import {
 } from '../src/i18n';
 import { formatDateTime } from '../src/i18n/dateTime';
 import { getServices } from '../src/services';
+import type { AutoPublishStatus } from '../src/services/autoPublishService';
 import { PublishError } from '../src/services/errors';
 import { PUBLISH_LIMITS } from '../src/services/publishSnapshot';
 import { isValidUsername, normalizeUsernameInput, publicAddress } from '../src/services/username';
@@ -40,6 +41,8 @@ type ScreenState =
       readyCount: number;
       publicTagCount: number | null;
       changes: UnpublishedChanges | null;
+      // Auto Publish の設定（端末のもの）。読めなければ `null` で、行を出さない（補助の設定。Publish Now は使える）。
+      autoPublish: boolean | null;
     };
 
 type NoticeKey = PublicProfileErrorMessageKey | 'publicProfile.published' | 'publicProfile.unpublished';
@@ -89,6 +92,10 @@ export function PublicProfileSection() {
   // 画面が準備できているときの、サーバーの公開の状態（フォーカスが戻ったときの数え直しに使う）。
   const profileRef = useRef<PublicProfile | null>(null);
   const changesIdRef = useRef(0);
+  // Auto Publish の最後の確認の結果（通信の失敗で再送を待っている・止まっている、を伝える）。
+  const [autoStatus, setAutoStatus] = useState<AutoPublishStatus>({ kind: 'idle' });
+  // 設定を保存している間は、スイッチを操作させない（連打で、保存の順序が入れ替わらないように）。
+  const autoSavingRef = useRef(false);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -121,7 +128,7 @@ export function PublicProfileSection() {
     let nextNotice: Notice | null = null;
     let profile: PublicProfile | null = null;
     try {
-      const { account, publish, songs } = await getServices();
+      const { account, publish, songs, autoPublish: auto } = await getServices();
       const provider = await account.getSignedInProvider();
       if (provider === null) {
         next = { kind: 'signedOut' };
@@ -133,7 +140,9 @@ export function PublicProfileSection() {
         const publicTagCount = await publish.countPublicTags().catch(() => null);
         // 未公開の変更の数も同じ（補助の情報。数えられなければ出さない）。
         const changes = profile === null ? null : await publish.countUnpublishedChanges(profile).catch(() => null);
-        next = { kind: 'ready', profile, readyCount: counts.ready, publicTagCount, changes };
+        // Auto Publish の設定も同じ（読めなければ、行を出さない）。
+        const autoPublish = await auto.getEnabled().catch(() => null);
+        next = { kind: 'ready', profile, readyCount: counts.ready, publicTagCount, changes, autoPublish };
       }
     } catch (error) {
       if (needsProfileReload(error)) {
@@ -181,6 +190,36 @@ export function PublicProfileSection() {
       .then(({ publish }) => publish.countUnpublishedChanges(profile))
       .then(apply, () => apply(null));
   }, []);
+
+  // Auto Publish の状態と、自動で Publish できたことを受け取る（7.4.9b）。自動で Publish すると、サーバーの版が進むので、画面が持つ公開の状態（`profile`）も
+  // 合わせる（合わせないと、次の数え直しが「記録の版と合わない」で、数えられなくなる）。入力中の Display Name・Bio には触れない（自動の Publish が送るのは、
+  // 端末が最後に Publish した値で、サーバーの値は変わらない）。別の `username`（アカウントが変わった）の通知は使わない。
+  useEffect(() => {
+    let cancelled = false;
+    let unsubscribe = () => {};
+    getServices().then(
+      ({ autoPublish }) => {
+        if (cancelled) return;
+        setAutoStatus(autoPublish.getStatus());
+        unsubscribe = autoPublish.subscribe((event) => {
+          if (!mountedRef.current) return;
+          if (event.type === 'status') {
+            setAutoStatus(event.status);
+            return;
+          }
+          const published = event.profile;
+          if (profileRef.current?.username !== published.username) return;
+          setView((current) => (current.kind === 'ready' ? { ...current, profile: published } : current));
+          refreshChanges(published);
+        });
+      },
+      () => {},
+    );
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [refreshChanges]);
 
   // Public Tags から戻ったとき（選んだタグの数が変わったかもしれない）、数だけを読み直す。入力中の下書きには触れない。
   // 読めなくても、前の数のまま（行の値が古くなるだけ。選択そのものは Public Tags 画面が持つ）。選んだタグが変わると、そのタグが付いた曲が
@@ -269,6 +308,25 @@ export function PublicProfileSection() {
     refreshChanges(profile);
   };
 
+  // Auto Publish の設定を切り替える（端末の設定。保存した結果は、すぐ反映して、保存できなかったら戻す）。オンにすると、たまっていた変更はすぐ確認される。
+  const toggleAutoPublish = (next: boolean) => {
+    if (autoSavingRef.current || busyRef.current) return;
+    autoSavingRef.current = true;
+    const setValue = (value: boolean) =>
+      setView((current) => (current.kind === 'ready' ? { ...current, autoPublish: value } : current));
+    setValue(next);
+    getServices()
+      .then(({ autoPublish }) => autoPublish.setEnabled(next))
+      .catch(() => {
+        if (!mountedRef.current) return;
+        setValue(!next);
+        setNotice({ kind: 'error', key: 'publicProfile.error.autoSave' });
+      })
+      .finally(() => {
+        autoSavingRef.current = false;
+      });
+  };
+
   const confirmClaim = () => {
     const username = normalizeUsernameInput(usernameInput);
     if (!isValidUsername(username) || busyRef.current) return;
@@ -320,9 +378,11 @@ export function PublicProfileSection() {
 
   const publishNow = (replaceVersion?: number, visibleConfirmed = false) =>
     void run('publish', async () => {
-      const { publish } = await getServices();
+      const { publish, autoPublish } = await getServices();
       try {
         applyProfile(await publish.publish({ displayName, bio, replaceVersion }));
+        // Publish Now で、止まっていた Auto Publish（別の端末の公開との食い違いなど）が解決していれば、状態を戻す（待たずに確認する。通信するのは、変更があるときだけ）。
+        void autoPublish.flush();
         return 'publicProfile.published';
       } catch (error) {
         // 別の端末が Publish した・非公開にした、再インストール後、応答を受け取れなかった Publish のあと。確認のうえ、置き換える。
@@ -384,6 +444,7 @@ export function PublicProfileSection() {
   const readyCount = view.kind === 'ready' ? view.readyCount : 0;
   const publicTagCount = view.kind === 'ready' ? view.publicTagCount : null;
   const changes = view.kind === 'ready' ? view.changes : null;
+  const autoEnabled = view.kind === 'ready' ? view.autoPublish : null;
   const tooManySongs = readyCount > PUBLISH_LIMITS.songs;
 
   return (
@@ -497,6 +558,47 @@ export function PublicProfileSection() {
               if (!busyRef.current) router.push('/public-tags');
             }}
           />
+
+          {autoEnabled !== null && (
+            <View style={styles.auto}>
+              <View style={styles.switchRow}>
+                <Text style={[styles.rowLabel, styles.switchLabel, { color: colors.textPrimary }]}>
+                  {t('publicProfile.auto.label')}
+                </Text>
+                <Switch
+                  accessibilityLabel={t('publicProfile.auto.label')}
+                  value={autoEnabled}
+                  disabled={disabled}
+                  onValueChange={toggleAutoPublish}
+                  trackColor={{ false: colors.border, true: colors.primary }}
+                  // Android のつまみの色・iOS の背景は、Settings の Suggestions と同じ理由（`SettingsSection`）。
+                  thumbColor={
+                    Platform.OS === 'android' ? (autoEnabled ? colors.textPrimary : colors.textSecondary) : undefined
+                  }
+                  ios_backgroundColor={colors.border}
+                  style={styles.switch}
+                />
+              </View>
+              <Text style={[styles.note, { color: colors.textSecondary }]}>{t('publicProfile.auto.note')}</Text>
+              {autoEnabled && !profile.published && (
+                <Text style={[styles.note, { color: colors.textSecondary }]}>{t('publicProfile.auto.notYet')}</Text>
+              )}
+              {autoEnabled && profile.published && autoStatus.kind === 'retrying' && (
+                <Text accessibilityLiveRegion="polite" style={[styles.note, { color: colors.textSecondary }]}>
+                  {t('publicProfile.auto.retrying')}
+                </Text>
+              )}
+              {autoEnabled && profile.published && autoStatus.kind === 'stopped' && (
+                <Text accessibilityLiveRegion="polite" style={[styles.note, { color: colors.error }]}>
+                  {autoStatus.reason === 'version-conflict'
+                    ? t('publicProfile.auto.stoppedConflict')
+                    : autoStatus.reason === 'too-many-songs'
+                      ? t('publicProfile.auto.stoppedTooMany', { limit: PUBLISH_LIMITS.songs })
+                      : t('publicProfile.auto.stoppedOther')}
+                </Text>
+              )}
+            </View>
+          )}
 
           <Text style={[styles.note, { color: colors.textSecondary }]}>{t('publicProfile.sharedNote')}</Text>
           <Text
@@ -659,6 +761,10 @@ const styles = StyleSheet.create({
   address: { fontSize: 15, lineHeight: 22 },
   counter: { fontSize: 13, lineHeight: 18, textAlign: 'right' },
   changes: { fontSize: 15, lineHeight: 22 },
+  auto: { gap: 4 },
+  switchRow: { minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  switchLabel: { flexShrink: 1 },
+  switch: { alignSelf: 'center' },
   unpublish: { gap: 0 },
   row: { minHeight: 48, justifyContent: 'center' },
   rowLabel: { fontSize: 16, lineHeight: 22 },

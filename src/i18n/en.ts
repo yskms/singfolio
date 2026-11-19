@@ -298,6 +298,16 @@ export const en = {
   // 最後に Publish したあとの、Ready の曲の変更の数（追加・変更・取り下げ。7.4.9a）。
   'publicProfile.changes.none': 'No unpublished changes',
   'publicProfile.changes.count': { one: '{count} unpublished change', other: '{count} unpublished changes' },
+  // Auto Publish（7.4.9b）。曲の変更を、公開中のページへ自動で送る設定。Display Name・Bio は載せない。
+  'publicProfile.auto.label': 'Publish changes automatically',
+  'publicProfile.auto.note':
+    'Sends song changes to your public page a short while after you stop editing. Display Name and Bio are only updated with Publish Now.',
+  'publicProfile.auto.notYet': 'This starts after you publish your profile for the first time.',
+  'publicProfile.auto.retrying': 'Couldn’t send your changes. Trying again automatically.',
+  'publicProfile.auto.stoppedConflict':
+    'Paused: your public page was changed from another device. Use Publish Now to replace it.',
+  'publicProfile.auto.stoppedTooMany': 'Paused: you have more than {limit} Ready songs.',
+  'publicProfile.auto.stoppedOther': 'Paused: couldn’t publish automatically. Use Publish Now to see why.',
   'publicProfile.tooManySongs':
     'You have {count} Ready songs, but a public profile can show up to {limit}. Move some to Practice or Want to publish.',
   'publicProfile.publish': 'Publish Now',
@@ -333,6 +343,7 @@ export const en = {
   'publicProfile.error.usernameAlreadySet': 'This account already has a username.',
   'publicProfile.error.usernameRequired': 'Choose a username first.',
   'publicProfile.error.displayNameRequired': 'Enter a Display Name.',
+  'publicProfile.error.autoSave': 'Couldn’t save this setting.',
   'publicProfile.error.tooManySongs':
     'You have too many Ready songs to publish. Move some to Practice or Want and try again.',
   'publicProfile.error.tooLarge':

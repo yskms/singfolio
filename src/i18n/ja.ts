@@ -245,6 +245,15 @@ export const ja: Record<MessageKey, Message> = {
   'publicProfile.readyCount': { other: '歌える曲{count}曲を公開します。' },
   'publicProfile.changes.none': '未公開の変更はありません',
   'publicProfile.changes.count': { other: '未公開の変更が{count}件あります' },
+  'publicProfile.auto.label': '変更を自動で公開',
+  'publicProfile.auto.note':
+    '曲の変更は、編集を止めてしばらくしてから、公開ページへ送ります。表示名と自己紹介は、「今すぐ公開」したときだけ更新されます。',
+  'publicProfile.auto.notYet': '自動での公開は、プロフィールを最初に公開してから始まります。',
+  'publicProfile.auto.retrying': '変更を送れませんでした。自動でやり直します。',
+  'publicProfile.auto.stoppedConflict':
+    '停止中: 別の端末から公開ページが変更されました。「今すぐ公開」で置き換えられます。',
+  'publicProfile.auto.stoppedTooMany': '停止中: 歌える曲が{limit}曲を超えています。',
+  'publicProfile.auto.stoppedOther': '停止中: 自動で公開できませんでした。「今すぐ公開」で理由を確かめてください。',
   'publicProfile.tooManySongs':
     '歌える曲が{count}曲あります。公開プロフィールに載せられるのは{limit}曲までです。一部を練習中か歌いたいに移すと公開できます。',
   'publicProfile.publish': '今すぐ公開',
@@ -278,6 +287,7 @@ export const ja: Record<MessageKey, Message> = {
   'publicProfile.error.usernameAlreadySet': 'このアカウントにはすでにユーザー名があります。',
   'publicProfile.error.usernameRequired': '先にユーザー名を決めてください。',
   'publicProfile.error.displayNameRequired': '表示名を入力してください。',
+  'publicProfile.error.autoSave': 'この設定を保存できませんでした。',
   'publicProfile.error.tooManySongs':
     '歌える曲が多すぎて公開できません。一部を練習中か歌いたいに移して、もう一度お試しください。',
   'publicProfile.error.tooLarge':
