@@ -390,3 +390,108 @@ describe('unpublish', () => {
     assert.deepEqual(await t.service.getState(), { username: 'karaoke_fan', baseVersion: 5, displayName: '', bio: '' });
   });
 });
+
+describe('別のアカウントに切り替えたあと（レビュー指摘）', () => {
+  it('前のアカウントの記録と版がたまたま同じでも、確認なしに上書きしない（version-conflict。アップロードしない）', async () => {
+    const t = await setup();
+    await t.add('A', 'X');
+    await t.service.publish(INPUT); // karaoke_fan: 版1。端末の記録も base 1
+    assert.equal((await t.service.getState())?.baseVersion, 1);
+    const uploaded = t.server.published.length;
+
+    // サインアウトして、別のアカウントでサインインした。そのアカウントは、別の端末で公開済み（版も1で偶然同じ）。
+    t.server.profile = profileV(1, 'other');
+    const error = await rejectsPublish(t.service.publish(INPUT), 'version-conflict');
+    assert.equal(error.profile?.username, 'other');
+    assert.equal(t.server.published.length, uploaded, '内容を送っていない');
+    assert.equal(await t.service.getState(), null, '前のアカウントの記録は捨てる');
+    assert.equal((await t.state.listHashes(t.db)).size, 0);
+  });
+
+  it('置き換えを確認すれば、新しいアカウントとして公開できる。記録も新しいアカウントのものになる', async () => {
+    const t = await setup();
+    await t.add('A', 'X');
+    await t.service.publish(INPUT);
+    t.server.profile = profileV(1, 'other');
+    const conflict = await rejectsPublish(t.service.publish(INPUT), 'version-conflict');
+
+    await t.service.publish({ ...INPUT, replaceVersion: conflict.profile!.version });
+    assert.equal(t.server.published.at(-1)!.baseVersion, 1);
+    assert.deepEqual(await t.service.getState(), { username: 'other', baseVersion: 2, displayName: 'Karaoke Fan', bio: 'bio' });
+  });
+
+  it('新しいアカウントがまだ公開していなければ（版0・username あり）、そのまま公開できる', async () => {
+    const t = await setup();
+    await t.add('A', 'X');
+    await t.service.publish(INPUT);
+    t.server.profile = profileV(0, 'other');
+    assert.equal((await t.service.publish(INPUT)).version, 1);
+    assert.equal((await t.service.getState())?.username, 'other');
+  });
+
+  it('新しいアカウントに username が無ければ username-required。アップロードせず、前の記録は捨てる', async () => {
+    const t = await setup();
+    await t.add('A', 'X');
+    await t.service.publish(INPUT);
+    const uploaded = t.server.published.length;
+    t.server.profile = null;
+    await rejectsPublish(t.service.publish(INPUT), 'username-required');
+    assert.equal(t.server.published.length, uploaded);
+    assert.equal(await t.service.getState(), null);
+  });
+
+  it('版の食い違いは、アップロードの前に見つける（本文を送らない）', async () => {
+    const t = await setup();
+    await t.add('A', 'X');
+    await t.service.publish(INPUT);
+    t.server.profile = profileV(5);
+    t.server.calls.length = 0;
+    await rejectsPublish(t.service.publish(INPUT), 'version-conflict');
+    assert.deepEqual(t.server.calls, ['getProfile']);
+  });
+});
+
+describe('サーバーで済んだ操作を、記録の失敗で失敗に見せない（レビュー指摘）', () => {
+  it('unpublish: 成功のあとに端末の記録を読めなくても、成功として返す', async () => {
+    const t = await setup();
+    await t.add('A', 'X');
+    await t.service.publish(INPUT);
+    const service = createPublishService({
+      db: t.db,
+      access: signedIn,
+      publish: t.repo,
+      state: {
+        ...t.state,
+        get: async () => {
+          throw new Error('disk error');
+        },
+      },
+      show: t.services.show,
+    });
+    const profile = await service.unpublish();
+    assert.equal(profile?.published, false);
+    assert.equal(t.server.profile?.published, false);
+  });
+});
+
+describe('refreshProfile も直列に実行する（レビュー指摘）', () => {
+  it('claimUsername と重なっても、確保した直後の記録を消さない', async () => {
+    const t = await setup({ profile: null });
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const originalGet = t.repo.getProfile;
+    t.repo.getProfile = async (session) => {
+      const result = await originalGet(session); // 確保の前の状態（null）を受け取る
+      await gate; // 返すのを遅らせる
+      return result;
+    };
+
+    const refreshing = t.service.refreshProfile();
+    const claiming = t.service.claimUsername('karaoke_fan'); // refresh が終わるまで待つ（直列）
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    release();
+    await Promise.all([refreshing, claiming]);
+
+    assert.deepEqual(await t.service.getState(), { username: 'karaoke_fan', baseVersion: 0, displayName: '', bio: '' });
+  });
+});

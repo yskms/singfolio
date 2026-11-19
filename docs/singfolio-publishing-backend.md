@@ -1384,13 +1384,25 @@ Publishのリクエストの本文は、`baseVersion`（7.4.4）に、`profile` 
     `claimUsername` も、すでに同じ `username` の記録があれば触れない（同じ名前の確保のやり直しで進めない）。サーバーに公開がある状態で、端末の記録が無い（再インストール後）と、
     `baseVersion` は 0 になり、Publish は 409（`version-conflict`）で止まる。画面（7.4.7）は「別の端末から公開した内容があります。置き換えますか」を出し、確認を受けたら
     `replaceVersion` に `profile.version` を渡して送り直す。
--   **端末の記録は、サーバーのアカウントと合わなければ捨てる**（`refreshProfile`: サーバーに `username` が無い、別の `username`）。別のアカウントでサインインし直した、アカウントを
-    削除した、のあとの記録を引き継がないため。`publish` は `refreshProfile` を挟まない（通信を1回に保つ）。記録が別のアカウントのものでも、版が合わなければ 409 で止まり、
-    合っていたとしても、送った内容で記録を作り直す。
+-   **端末の記録は、サーバーのアカウントと合わなければ捨てる**（サーバーに `username` が無い、別の `username`。別のアカウントでサインインし直した、アカウントを
+    削除した）。この確認は、`refreshProfile` だけでなく **`publish` も、本文を送る前に行う**: 同じセッションで `GET /me/profile` を読み、記録を合わせてから `baseVersion` を決める。
+    確かめずに記録の `baseVersion` を使うと、前のアカウントの版が、たまたま今のアカウントの版と同じとき、確認なしに別の端末の公開を上書きする（レビューで指摘。
+    サインアウト・削除・別のアカウントでのサインインは、記録を消さない。Serviceが保証し、画面の約束事に頼らない）。サーバーに `username` が無ければ `username-required`、
+    版が食い違えば `version-conflict`（今の `profile` つき）を、本文を送らずに返す（大きな本文を無駄に送らない）。読んだあとに別の端末が Publish しても、サーバーの照合が 409 にする。
+    代償は、Publish ごとに読み取りが1回増えること（D1の読み取りは小さい）。
+    **7.4.9 の「N unpublished changes」の数え方は、`refreshProfile` で記録が今のアカウントのものと確かめたあとで使う**（確かめる前の `getState`・`published_songs` は、
+    前のアカウントのものでありうる）。
 -   **記録に失敗しても、サーバーで済んだ操作は成功として返す**（`publish`・`unpublish`）。記録できなければ、次の Publish が版の食い違いの確認を通る。
 -   **`publish`・`unpublish`・`claimUsername` は1本ずつ順に実行する。** 同じ端末の Publish が重なると、2つ目が1つ目の版を知らずに送って、自分自身と食い違う。
 -   **応答を受け取れなかった Publish**（`network`。Publish だけ待つ上限は30秒）は、サーバーで済んでいることがある。送り直すと `version-conflict` になり、置き換えの確認で解決する
     （「Publish と Unpublish のエンドポイント」）。
+-   **`refreshProfile` も、`publish`・`unpublish`・`claimUsername` と直列に実行する**（記録を捨てる処理を持つ。`claimUsername` が書いた直後の記録を、確保の前に読んだ状態で消さない）。
+-   **曲のIDは小文字のUUIDでなければならない**（Workerは、それ以外が1つでもあると Publish 全体を 400 にする）。アプリは確かめない: 今は `expo-crypto` の `randomUUID`（小文字）だけが曲のIDを作る。
+    インポートなど、曲のIDを別の経路で作る機能を足すときは、注意する。
+-   **アプリのテストが `worker/src/snapshot.ts` を import する**（`publishSnapshot.test.ts`。数字と、整えた本文がWorkerの検証を通ることの確認）。実行時のコードの共有ではない。
+    ルートの `tsc` と `npm test` がそのファイルを読むので、`snapshot.ts` に Workers の型や `worker/` の依存を持ち込まない（ファイルの先頭のコメントにも書いてある）。
+-   **正規表現の後読み（`(?<!…)`）を使わない**（`publishSnapshot.ts`）。Hermes で解釈できるかを確かめていない。解釈できないと、ファイルを読み込んだ時点でアプリの起動が失敗する
+    （Nodeのテストでは検出できない）。対になっていないサロゲートは、1文字ずつ見て取り除く。`publishSnapshot.test.ts` が、ソースに後読みが無いことを確かめる。
 -   **曲ごとのハッシュ**（`songContentHash`。cyrb53。暗号ではなく、変更の検出用）は曲名・アーティスト・公開タグから作り、`sortOrder` を含めない（曲を足すと、あとの曲の番号がずれて、
     全部が「変更あり」になる）。Publish の成功のとき、送った内容（整えたあと）から作って、`published_songs` を丸ごと差し替える。「N unpublished changes」の数え方は 7.4.9。
 

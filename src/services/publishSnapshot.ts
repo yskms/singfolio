@@ -59,8 +59,27 @@ export type BuildPublishResult =
 // 文字の向きを強制する制御。自己紹介は、改行（\n）だけを通す。
 const SINGLE_LINE_FORBIDDEN = /[\u0000-\u001F\u007F-\u009F\u2028\u2029\u202A-\u202E\u2066-\u2069]+/g;
 const BIO_FORBIDDEN = /[\u0000-\u0009\u000B-\u001F\u007F-\u009F\u2028\u2029\u202A-\u202E\u2066-\u2069]+/g;
-// 対になっていないサロゲート（表示のとき壊れる。Workerは拒否する）。
-const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
+// 対になっていないサロゲート（表示のとき壊れる。Workerは拒否する）を取り除く。**正規表現の後読み（`(?<!…)`）は使わない**: アプリの
+// JavaScriptエンジン（Hermes）で、正規表現のリテラルを解釈できないと、このファイルを読み込んだ時点でアプリの起動が失敗する
+// （Nodeのテストでは検出できない）。1文字ずつ見る。サロゲートを含まない文字列（大半）は、最初の1回の走査で返す。
+const HAS_SURROGATE = /[\uD800-\uDFFF]/;
+function stripLoneSurrogates(text: string): string {
+  if (!HAS_SURROGATE.test(text)) return text;
+  let result = '';
+  for (let i = 0; i < text.length; i += 1) {
+    const unit = text.charCodeAt(i);
+    if (unit >= 0xd800 && unit <= 0xdbff) {
+      const next = text.charCodeAt(i + 1); // 範囲外は NaN（下の比較は偽）
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        result += text.slice(i, i + 2);
+        i += 1;
+      }
+    } else if (unit < 0xdc00 || unit > 0xdfff) {
+      result += text[i];
+    }
+  }
+  return result;
+}
 
 /** コードポイントの数で `max` 字までに切る（サロゲートペアの途中では切らない）。 */
 function truncate(text: string, max: number): string {
@@ -71,17 +90,13 @@ function truncate(text: string, max: number): string {
 
 /** 1行の文字列に整える: 使えない文字は空白にして、前後の空白を落とし、長ければ切る。空になったら空文字。 */
 function toLine(value: string, maxChars: number): string {
-  const text = value.replace(LONE_SURROGATE, '').replace(SINGLE_LINE_FORBIDDEN, ' ').trim();
+  const text = stripLoneSurrogates(value).replace(SINGLE_LINE_FORBIDDEN, ' ').trim();
   return truncate(text, maxChars).trim();
 }
 
 /** 自己紹介に整える: 改行は `\n` にそろえ、使えない文字は取り除き、前後の空白を落とし、長ければ切る。空でもよい。 */
 function toBio(value: string): string {
-  const text = value
-    .replace(/\r\n?/g, '\n')
-    .replace(LONE_SURROGATE, '')
-    .replace(BIO_FORBIDDEN, ' ')
-    .trim();
+  const text = stripLoneSurrogates(value.replace(/\r\n?/g, '\n')).replace(BIO_FORBIDDEN, ' ').trim();
   return truncate(text, PUBLISH_LIMITS.bioChars).trim();
 }
 

@@ -148,8 +148,8 @@ UIの表示名「My Key」は、モデル・DBでは `keyOffset` / `key_offset` 
 -   `base_version` を、サーバーの今の版に**黙って進めない**（別の端末の Publish を、確認なしに上書きしてしまう）。進めるのは、この端末が
     Publish した（応答の版）、非公開にした（応答の版）、置き換えを確認した（`replaceVersion`）ときだけ。再インストール後の空のローカルは、
     行が無く `base_version` が 0 になるので、サーバーに公開があれば Publish は 409（`version-conflict`）で止まる（空で公開を上書きしない）。
--   サーバーのアカウントと合わなくなったら、2つの表とも捨てる（`publishService.refreshProfile`: サーバーに `username` が無い、別の `username`。
-    別のアカウントでサインインし直した、アカウントを削除した）。
+-   サーバーのアカウントと合わなくなったら、2つの表とも捨てる（サーバーに `username` が無い、別の `username`。別のアカウントでサインインし直した、アカウントを削除した）。
+    `publishService` の `refreshProfile` と `publish`（本文を送る前）が確かめる。サインアウトなどでは消さないので、確かめる前の記録は、前のアカウントのものでありうる。
 -   書き込みは、Publish の成功のあと。端末に記録できなくても、Publish は成功として返す（次の Publish が、版の食い違いの確認を通る）。
 -   値の意味は Service 層（`publishService`）。Repository は `publishStateRepository`。
 

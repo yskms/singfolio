@@ -43,8 +43,8 @@ function publicTagNames(_tags: readonly ShowTag[]): string[] {
  * 公開する曲は、`show`（Show Mode の Service）から取る: Ready の曲だけが、My Key・Private Note・ステータスを持たない形で来る。
  * 順序は Show Mode のアーティスト順で、これが公開ページの既定の並び（`sortOrder`）になる。
  *
- * `publish`・`unpublish`・`claimUsername` は1本ずつ順に実行する（同じ端末の Publish が重なると、2つ目が1つ目の版を知らずに送って、
- * 自分自身と食い違う）。
+ * `publish`・`unpublish`・`claimUsername`・`refreshProfile` は1本ずつ順に実行する（同じ端末の Publish が重なると、2つ目が1つ目の版を知らずに
+ * 送って、自分自身と食い違う。`refreshProfile` は記録を捨てる処理を持つ）。
  */
 export function createPublishService({ db, access, publish, state, show }: PublishServiceDeps) {
   let tail: Promise<unknown> = Promise.resolve();
@@ -73,6 +73,18 @@ export function createPublishService({ db, access, publish, state, show }: Publi
     }
   }
 
+  /**
+   * 端末の記録を、サーバーのこのアカウントの状態に合わせる: サーバーに `username` が無い、または記録の `username` と違えば、記録を捨てる
+   * （別のアカウントでサインインし直した、アカウントを削除した）。`baseVersion` は進めない。直列化の外から呼ばない（呼ぶ側が
+   * `serialize` の中にいる）。
+   */
+  async function reconcile(profile: PublicProfile | null): Promise<void> {
+    const current = await state.get(db);
+    if (current !== null && (profile === null || current.username !== profile.username)) {
+      await db.transaction((tx) => state.clear(tx));
+    }
+  }
+
   return {
     /** この端末が最後に合意した公開の状態。まだ（`username` を確保していない、別のアカウントになった）なら `null`。通信しない。 */
     getState(): Promise<PublishState | null> {
@@ -86,14 +98,14 @@ export function createPublishService({ db, access, publish, state, show }: Publi
      * 進めない（別の端末の Publish を、確認なしに上書きしないため）。
      */
     refreshProfile(): Promise<PublicProfile | null> {
-      return known(async () => {
-        const profile = await access.withSession((session) => publish.getProfile(session));
-        const current = await state.get(db);
-        if (current !== null && (profile === null || current.username !== profile.username)) {
-          await db.transaction((tx) => state.clear(tx));
-        }
-        return profile;
-      });
+      // 記録を捨てる処理を持つので、ほかの操作と直列にする（`claimUsername` が書いた直後の記録を、確保の前に読んだ状態で消さない）。
+      return serialize(() =>
+        known(async () => {
+          const profile = await access.withSession((session) => publish.getProfile(session));
+          await reconcile(profile);
+          return profile;
+        }),
+      );
     },
 
     /**
@@ -124,13 +136,14 @@ export function createPublishService({ db, access, publish, state, show }: Publi
      * （通信の前に断る）、`username-required`、`version-conflict`（`profile` が今の公開内容。別の端末が Publish した、または非公開にした。
      * 確認のうえ、`replaceVersion` に `profile.version` を渡して送り直す）、`invalid-snapshot`、`too-large`、通信の失敗（`AuthError`）。
      * 通信が切れた（`network`）ときは、サーバーで済んでいることがある（送り直すと `version-conflict` になる）。
+     *
+     * 本文を送る前に、同じセッションでサーバーの状態を読み、端末の記録が今のアカウントのものと確かめてから `baseVersion` を決める
+     * （別のアカウントでサインインし直したあと、前のアカウントの版で、確認なしに上書きしないため）。サーバーに `username` が無い、または
+     * 版が食い違うときは、本文を送らずに断る。
      */
     publish(input: PublishInput): Promise<PublicProfile> {
       return serialize(() =>
         known(async () => {
-          const current = await state.get(db);
-          const baseVersion = input.replaceVersion ?? current?.baseVersion ?? 0;
-
           const view = await show.getShowView({ sort: 'artist' });
           const sources: PublishSongSource[] = view.groups.flatMap((group) =>
             group.songs.map((song) => ({
@@ -140,25 +153,38 @@ export function createPublishService({ db, access, publish, state, show }: Publi
               publicTags: publicTagNames(song.tags),
             })),
           );
-          const built = buildPublishBody({ baseVersion, displayName: input.displayName, bio: input.bio, songs: sources });
+          // 通信の前に、内容を確かめる（`baseVersion` は、サーバーの状態を見てから入れる）。
+          const built = buildPublishBody({ baseVersion: 0, displayName: input.displayName, bio: input.bio, songs: sources });
           if (!built.ok) {
             throw built.reason === 'too-many-songs'
               ? new PublishError('too-many-songs', { songCount: built.songCount })
               : new PublishError('display-name-required');
           }
-          const { body } = built;
+          const { body: draft } = built;
 
-          const profile = await access.withSession((session) => publish.publish(session, body));
+          // サーバーの今の状態を読み、端末の記録が**今のアカウントのもの**だと確かめてから、`baseVersion` を決める（同じセッションで続ける）。
+          // 確かめずに記録の `baseVersion` を使うと、別のアカウントでサインインし直したあと、前のアカウントの版が、たまたま今のアカウントの
+          // 版と同じとき、確認なしに別の端末の公開を上書きする。版の食い違いは、本文を送る前に見つける（大きな本文を無駄に送らない）。
+          // 読んだあとに別の端末が Publish しても、サーバーの照合（`baseVersion`）が 409 にする。
+          const profile = await access.withSession(async (session) => {
+            const server = await publish.getProfile(session);
+            await reconcile(server);
+            if (server === null) throw new PublishError('username-required');
+            const current = await state.get(db);
+            const baseVersion = input.replaceVersion ?? current?.baseVersion ?? 0;
+            if (baseVersion !== server.version) throw new PublishError('version-conflict', { profile: server });
+            return publish.publish(session, { ...draft, baseVersion });
+          });
 
           // 送った内容（整えたあと）の記録。ここでの失敗は、Publish の失敗に見せない。
-          const hashes = new Map(body.songs.map((song) => [song.id, songContentHash(song)]));
+          const hashes = new Map(draft.songs.map((song) => [song.id, songContentHash(song)]));
           await recordQuietly(() =>
             db.transaction(async (tx) => {
               await state.set(tx, {
                 username: profile.username,
                 baseVersion: profile.version,
-                displayName: body.profile.displayName,
-                bio: body.profile.bio,
+                displayName: draft.profile.displayName,
+                bio: draft.profile.bio,
               });
               await state.replaceHashes(tx, hashes);
             }),
@@ -177,13 +203,14 @@ export function createPublishService({ db, access, publish, state, show }: Publi
       return serialize(() =>
         known(async () => {
           const profile = await access.withSession((session) => publish.unpublish(session));
-          const current = await state.get(db);
+          // 端末の記録は、サーバーで済んだあとの後始末。読めなくても、非公開にできたことは変わらない。
           await recordQuietly(() =>
             db.transaction(async (tx) => {
               if (profile === null) {
                 await state.clear(tx);
                 return;
               }
+              const current = await state.get(tx);
               const same = current !== null && current.username === profile.username;
               await state.set(tx, {
                 username: profile.username,

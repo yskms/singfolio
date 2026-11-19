@@ -235,9 +235,9 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     公開する曲は **`show`（Show Mode の Service）から取る**（Readyの曲だけが、My Key・Private Note・ステータスを持たない形で来る）。`songs` / `Song` から作る形に「簡略化」しない。
     `publishSnapshot.ts` の `PUBLISH_LIMITS` は、Workerの `SNAPSHOT_LIMITS` と同じ数字を**別に持つ**（コードは共有しない。`publishSnapshot.test.ts` が一致と、整えた本文が
     Workerの検証を通ることを確かめる）。曲数が1000を超えるときは**断る**（切り詰めない）。長さ・文字は整えて切る（1曲の事情で全体の Publish を止めない）。
-    **`publish_state.base_version` は、`refreshProfile` や `claimUsername` のやり直しで、サーバーの今の版へ進めない**（別の端末の Publish を、確認なしに上書きする。再インストール後の
+    **`publish` は、本文を送る前に、同じセッションで `GET /me/profile` を読み、端末の記録が今のアカウントのものと確かめてから `baseVersion` を決める**（「通信を1回にする」ために外さない。サインアウト・別のアカウントでのサインインは記録を消さないので、確かめずに使うと、前のアカウントの版がたまたま同じとき、別の端末の公開を確認なしに上書きする）。**`publish_state.base_version` は、`refreshProfile` や `claimUsername` のやり直しで、サーバーの今の版へ進めない**（別の端末の Publish を、確認なしに上書きする。再インストール後の
     空のローカルから公開を消す事故を、これが止める）。進めるのは、Publish・Unpublish の応答と、置き換えの確認（`replaceVersion`）だけ。曲ごとのハッシュに `sortOrder` を含めない
-    （曲を足すと、あとの曲が全部「変更あり」になる）。`published_songs` を `songs` の外部キーにしない（曲を消したあとも、公開した記録を残す）。公開タグは 7.4.8 まで空（安全側）。
+    （曲を足すと、あとの曲が全部「変更あり」になる）。`published_songs` を `songs` の外部キーにしない（曲を消したあとも、公開した記録を残す）。公開タグは 7.4.8 まで空（安全側）。`publishSnapshot.ts` に正規表現の後読みを書かない（Hermes で未確認。起動の失敗になりうる。テストが検出する）。`publishSnapshot.test.ts` は `worker/src/snapshot.ts` を import する（実行時のコードは共有しない）ので、そのファイルに Workers の型や `worker/` の依存を持ち込まない。
 -   `expo-secure-store` の config plugin を `app.json` に足さない。Androidのバックアップ規則が `<include>` で、v1.0で今
     バックアップされているSQLiteを外す。
 

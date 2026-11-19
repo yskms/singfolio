@@ -368,11 +368,14 @@ v1.0より後（公開機能・Requests）の実装順序は、
         en / ja の文言。`singfolio-screen-flow.md` を更新する。Preview・Copy Link は公開ページ（7.5）ができてから
     -   [ ] 7.4.8 アプリ: 公開するタグ（`publicTags`）の選び方。ローカルのタグに `isPublic` を足さず、別の設定として持つ
     -   [ ] 7.4.9 アプリ: 未公開の変更の数え方（「N unpublished changes」）と Auto Publish（debounce、Pending の保持、再送）。いちばん重いので、必要なら
-        7.4.9a（数え方）と 7.4.9b（自動送信）に分ける
+        7.4.9a（数え方）と 7.4.9b（自動送信）に分ける。
+        数えるのは、`refreshProfile` で端末の記録が今のアカウントのものと確かめたあと（確かめる前の記録は、前のアカウントのものでありうる。§8「アプリ側の Publish の土台」）
     -   [ ] 7.4.10 文書。`singfolio-privacy-policy-next.md` と `singfolio-store-listing.md` §6 に、公開される内容（Display Name・Bio・Ready の曲・公開タグ・`username`）を足し、
         自動削除の説明を直す。公開中の `privacy-policy.md` は、アカウントを出す版が出るまで書き換えない
     -   [ ] 7.4.11 確認。マイグレーション 0004 と R2 を本番へ適用する。実機から Publish。R2 のオブジェクトの中身に My Key・Private Note が無いこと。Unpublish。2台での衝突。
         空のローカルからの Publish の保護。オフライン・Pending・Auto Publish。削除で R2 が消えること。公開ページ（7.5）が無い間は `wrangler r2 object get` で中身を見る
+        Hermes（実機）でしか確かめられないこと: 絵文字（サロゲートペア）を含む長い曲名が、ペアの途中で切れずに切り詰められること、対になっていないサロゲートを含む曲名で Publish が 400 に
+        ならないこと（`publishSnapshot.ts`。後読みの正規表現は使っていない）。1000曲の Publish のあとの `published_songs` の書き込み（`replaceHashes` は1曲ごとに `runAsync` を呼ぶ）の所要時間
 -   [ ] 7.5 公開Web（`singfolio.app/username`）。プライバシーポリシーを直す（視聴者のアクセス）
 -   [ ] 7.6 Requests（所有者がアプリ内の一覧で受け取る）。プライバシーポリシー・ストアの申告を直す
     （視聴者のRequest。Turnstileとレート制限が扱う情報、ニックネーム）

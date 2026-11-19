@@ -9,6 +9,11 @@
 // （`PublishedSong` に My Key・Private Note・status を足さない）。
 //
 // 検証の失敗は、固定の語彙（`ContentProblem`）で返す。入力の値（曲名など）は、結果にもエラーにも載せない。
+//
+// **アプリのテスト（`src/services/publishSnapshot.test.ts`）が、このファイルを import する**（アプリの組み立てが、数字の上でも、整えた本文の上でも、
+// Workerの検証と食い違わないことを確かめるため。アプリの実行時のコードは、Workerとコードを共有しない）。ルートの型チェック（`tsc`）と `npm test` が、
+// このファイルと、これが import するものを読む。**Workers の型（`D1Database` など）や、`worker/` の依存を、このファイルに持ち込まない**
+// （持ち込むと、ルートの `tsc` と `npm test` が壊れる）。
 
 /** スナップショットの形の版。公開ページ（7.5）が、読めない版を見分けるための番号。形を変えるときに上げる。 */
 export const SNAPSHOT_SCHEMA = 1;

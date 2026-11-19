@@ -116,9 +116,24 @@ describe('buildPublishBody: 文字の整え方', () => {
     assert.equal(body.songs[0]!.artist, 'x y');
   });
 
-  it('対になっていないサロゲートは取り除く', () => {
-    const body = bodyOf(build([song(1, { title: 'a\uD800b\uDC00c' })]));
-    assert.equal(body.songs[0]!.title, 'abc');
+  it('対になっていないサロゲートは取り除き、対になっているもの（絵文字・𠮷）は残す', () => {
+    const title = (text: string) => bodyOf(build([song(1, { title: text })])).songs[0]!.title;
+    assert.equal(title('a\uD800b\uDC00c'), 'abc');
+    assert.equal(title('a😀b𠮷'), 'a😀b𠮷');
+    assert.equal(title('x\uD800'), 'x'); // 末尾の上位だけ
+    assert.equal(title('\uDC00x'), 'x'); // 先頭の下位だけ
+    assert.equal(title('\uD800\uD83D\uDE00'), '\uD83D\uDE00'); // 上位が2つ続いたあとの対は残る
+    assert.equal(title('\uD83D\uDE00\uDE00'), '\uD83D\uDE00'); // 対のあとの下位だけは取り除く
+  });
+
+  it('正規表現の後読み（Hermesで解釈できるか未確認）を、ソースに書かない', async () => {
+    const { readFileSync } = await import('node:fs');
+    const source = readFileSync(new URL('./publishSnapshot.ts', import.meta.url), 'utf8');
+    const code = source
+      .split('\n')
+      .filter((line) => !line.trimStart().startsWith('//'))
+      .join('\n');
+    assert.equal(/\(\?<[!=]/.test(code), false);
   });
 
   it('長いものは切り詰める。サロゲートペア（絵文字・𠮷）の途中では切らない', () => {
