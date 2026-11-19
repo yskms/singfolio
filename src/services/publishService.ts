@@ -46,7 +46,8 @@ export interface PublishInput {
  * 公開（Public Profile・Publish・Unpublish）。**ログインを要求しない**（サインインしていなければ、どの操作も `not-signed-in`
  * で、端末の機能は何も変わらない）。サーバーとやりとりする操作の失敗は、すべて `AuthError`（通信・認証）か `PublishError`（サーバーが断った、
  * アプリ側の前提の不備）。**端末の中だけの操作は例外**: 公開タグの選択（`listPublicTagChoices`・`countPublicTags`・`setTagPublic`）と、未公開の変更の数え方
- * （`countUnpublishedChanges`）は、通信もサインインも要らず、失敗は `ServiceError`・DBのエラーのまま（画面は、補助の情報として受ける）。
+ * （`countUnpublishedChanges`）は、通信もサインインも要らず、失敗は `ServiceError`・DBのエラーのまま（数の2つ、`countPublicTags`・`countUnpublishedChanges` は、画面が補助の情報として受ける。
+ * `setTagPublic` は Public Tags 画面の本来の操作で、失敗は画面が伝える）。
  *
  * 公開する曲は、`show`（Show Mode の Service）から取る: Ready の曲だけが、My Key・Private Note・ステータスを持たない形で来る。
  * 順序は Show Mode のアーティスト順で、これが公開ページの既定の並び（`sortOrder`）になる。
