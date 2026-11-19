@@ -1,4 +1,4 @@
-import type { Database } from '../db/appDatabase.ts';
+import { observeCommits, type Database } from '../db/appDatabase.ts';
 import type { AuthProvider } from '../domain/types.ts';
 import { createArtistRepository } from '../repositories/artistRepository.ts';
 import { createAuthRepository, type AuthFetchLike } from '../repositories/authRepository.ts';
@@ -21,6 +21,7 @@ import {
   type IdTokenProvider,
 } from './accountService.ts';
 import { createArtistService, type ArtistService } from './artistService.ts';
+import { createAutoPublishService, type AutoPublishService, type AutoPublishTimers } from './autoPublishService.ts';
 import { createPublishService, type PublishService } from './publishService.ts';
 import { createSettingsService, type SettingsService } from './settingsService.ts';
 import { createShowService, type ShowService } from './showService.ts';
@@ -49,6 +50,11 @@ export interface Services {
    * 偽のビルドでは、画面が入口ごと出さない）。画面が呼ぶまで、何も送らない
    */
   publish: PublishService;
+  /**
+   * Auto Publish（公開中のページへ、曲の変更を、待ってまとめて自動で送る。7.4.9b）。設定（既定はオフ）・状態・購読。`auth` を注入しないビルドでは、
+   * 何も監視せず、何も送らない（`start`・`flush` も、呼ばれない）。
+   */
+  autoPublish: AutoPublishService;
 }
 
 /** アカウントの通信・保存に使うもの。渡さなければ、`account` はサインインできない（常にログアウト中）。 */
@@ -82,6 +88,8 @@ export interface ServicesOptions {
    * 渡す側は `index.ts`（アプリ）とテストだけ。
    */
   auth?: AuthOptions;
+  /** Auto Publish の待ち時間の計り方。テストだけが渡す（既定は `setTimeout`） */
+  autoPublishTimers?: AutoPublishTimers;
 }
 
 /**
@@ -91,10 +99,15 @@ export interface ServicesOptions {
  * （Expoに依存する組み立ては `index.ts`）。
  */
 export function createServices(
-  db: Database,
+  baseDb: Database,
   env: RepositoryEnv,
   options: ServicesOptions = {},
 ): Services {
+  const { auth } = options;
+  // 端末のDBへの書き込みを、Auto Publish のきっかけにする（どの Service が書いても漏れない。`auth` を注入しないビルドは、監視しない）。
+  // Auto Publish は、Service を組み立てたあとに作る（Service が使う `db` を、先に作る必要がある）ので、通知の宛先は、あとから入れる。
+  const changeListener: { current: () => void } = { current: () => {} };
+  const db = auth ? observeCommits(baseDb, () => changeListener.current()) : baseDb;
   const songRepository = createSongRepository(env);
   const tagRepository = createTagRepository(env);
   const artistRepository = createArtistRepository(env);
@@ -107,7 +120,6 @@ export function createServices(
     artists: artistRepository,
   });
   const tags = createTagService({ db, tags: tagRepository });
-  const { auth } = options;
   const show = createShowService({ songs, tags });
   // `access`（セッションの値を渡す入口）は公開の Service だけに渡し、画面へ届く `account` には含めない。
   const { access, ...account } = createAccountService(
@@ -123,6 +135,19 @@ export function createServices(
         }
       : null,
   );
+  const publish = createPublishService({
+    db,
+    access,
+    // `auth` を注入しないビルドでは、`access` が `not-signed-in` で断るので、この `fetch` は呼ばれない。
+    publish: createPublishRepository(auth ? auth.fetch : noFetch, { origin: auth?.origin }),
+    state: createPublishStateRepository(),
+    show,
+    publicTags: createPublicTagRepository(),
+    tags: tagRepository,
+    settings: settingsRepository,
+  });
+  const autoPublish = createAutoPublishService({ settings, publish, timers: options.autoPublishTimers });
+  changeListener.current = () => autoPublish.notifyChanged();
   return {
     songs,
     tags,
@@ -138,15 +163,7 @@ export function createServices(
       now: env.now,
     }),
     account,
-    publish: createPublishService({
-      db,
-      access,
-      // `auth` を注入しないビルドでは、`access` が `not-signed-in` で断るので、この `fetch` は呼ばれない。
-      publish: createPublishRepository(auth ? auth.fetch : noFetch, { origin: auth?.origin }),
-      state: createPublishStateRepository(),
-      show,
-      publicTags: createPublicTagRepository(),
-      tags: tagRepository,
-    }),
+    publish,
+    autoPublish,
   };
 }

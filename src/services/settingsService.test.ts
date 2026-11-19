@@ -120,6 +120,27 @@ describe('suggestions', () => {
   });
 });
 
+describe('Auto Publish の設定（7.4.9b）', () => {
+  it('未設定ならオフ（勝手に公開しない。候補の設定とは逆の向き）', async () => {
+    const { services } = await createTestServices();
+    assert.equal(await services.settings.getAutoPublishEnabled(), false);
+  });
+
+  it('設定した値を読み戻せる', async () => {
+    const { services } = await createTestServices();
+    for (const enabled of [true, false, true]) {
+      await services.settings.setAutoPublishEnabled(enabled);
+      assert.equal(await services.settings.getAutoPublishEnabled(), enabled);
+    }
+  });
+
+  it('on 以外の保存値（将来のバージョンが書いた値など）は、オフとして読む', async () => {
+    const { services, sqlite } = await createTestServices();
+    sqlite.exec("INSERT INTO settings (key, value) VALUES ('auto_publish', 'yes')");
+    assert.equal(await services.settings.getAutoPublishEnabled(), false);
+  });
+});
+
 describe('ローカルデータの識別子（ensureLocalDataId）', () => {
   it('最初の呼び出しで作って保存し、以後は同じ値を返す', async () => {
     const { services, sqlite } = await createTestServices();

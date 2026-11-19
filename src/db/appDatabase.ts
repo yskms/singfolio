@@ -71,3 +71,24 @@ export function createDatabase(raw: RawDatabase): Database {
     },
   };
 }
+
+/**
+ * 書き込み（`transaction`）がコミットされるたびに `onCommit` を呼ぶ `Database` を返す（失敗した・ロールバックしたときは呼ばない）。
+ * どの Service が書いても漏れず拾うための、1か所の通知（Auto Publish が「公開内容が変わったかもしれない」と知る。7.4.9b）。
+ * 何が変わったかは伝えない（呼ぶ側が、必要なら読んで確かめる）。`onCommit` の例外・戻りは、書き込みの結果に影響させない。
+ */
+export function observeCommits(db: Database, onCommit: () => void): Database {
+  return {
+    getAllAsync: (sql, params) => db.getAllAsync(sql, params),
+    getFirstAsync: (sql, params) => db.getFirstAsync(sql, params),
+    async transaction<T>(task: (tx: WriteExecutor) => Promise<T>): Promise<T> {
+      const result = await db.transaction(task);
+      try {
+        onCommit();
+      } catch {
+        // 通知の失敗で、成功した書き込みを失敗にしない
+      }
+      return result;
+    },
+  };
+}

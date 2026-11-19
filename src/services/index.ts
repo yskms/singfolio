@@ -96,6 +96,22 @@ const ACCOUNT_ENABLED = __DEV__ || process.env.EXPO_PUBLIC_SINGFOLIO_ACCOUNT ===
 let servicesPromise: Promise<Services> | null = null;
 
 /**
+ * Auto Publish を動かし始める（アカウントを使えるビルドだけ。そうでなければ、何も監視せず、何も送らない）。起動の少しあとに、前回送れていない
+ * 変更を確認し、アプリが**前面に戻ったとき**にも確認する。背景に移るときは送らない（通信の途中でアプリが止まると、サーバーでは済んでいるのに、
+ * 端末は結果を記録できず、次が版の食い違いになる）。`getServices()` が成功したときに1回だけ呼ばれる（Service を使い回す）。
+ */
+function startAutoPublish(services: Services): Services {
+  if (!ACCOUNT_ENABLED) return services;
+  services.autoPublish.start();
+  let previous = AppState.currentState;
+  AppState.addEventListener('change', (state) => {
+    if (state === 'active' && previous !== 'active') void services.autoPublish.flush();
+    previous = state;
+  });
+  return services;
+}
+
+/**
  * 画面が使う Service を返す。初回呼び出し時にDBを開いてマイグレーションを実行し、
  * 以降は同じものを返す。失敗した場合は次の呼び出しで再試行する。
  * （`createDatabase` は接続ごとに1つだけ作る必要があるため、ここで使い回す。）
@@ -150,6 +166,7 @@ export function getServices(): Promise<Services> {
         },
       ),
     )
+    .then(startAutoPublish)
     .catch((error) => {
       servicesPromise = null;
       throw error;

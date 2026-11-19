@@ -10,6 +10,7 @@ import { PublishError } from '../repositories/publishError.ts';
 import type { PublishRepository } from '../repositories/publishRepository.ts';
 import { createPublicTagRepository } from '../repositories/publicTagRepository.ts';
 import { createPublishStateRepository } from '../repositories/publishStateRepository.ts';
+import { createSettingsRepository } from '../repositories/settingsRepository.ts';
 import { createTagRepository } from '../repositories/tagRepository.ts';
 import { createTestServices } from '../testing/testDatabase.ts';
 import { ServiceError } from './errors.ts';
@@ -89,6 +90,7 @@ async function setup(options: { profile?: PublicProfile | null; access?: Session
     show: t.services.show,
     publicTags,
     tags: tagRepository,
+    settings: createSettingsRepository(),
   });
   const add = (title: string, artist: string, status: SongStatus = 'ready', extra: { privateNote?: string; keyOffset?: number } = {}) =>
     t.services.songs.createSong({ title, artist, status, ...extra });
@@ -451,6 +453,7 @@ describe('publish: 端末の記録と版', () => {
       show: t.services.show,
       publicTags: t.publicTags,
       tags: t.tagRepository,
+      settings: createSettingsRepository(),
     });
     const result = await service.publish(INPUT);
     assert.equal(result.version, 1);
@@ -672,6 +675,7 @@ describe('サーバーで済んだ操作を、記録の失敗で失敗に見せ�
       show: t.services.show,
       publicTags: t.publicTags,
       tags: t.tagRepository,
+      settings: createSettingsRepository(),
     });
     const profile = await service.unpublish();
     assert.equal(profile?.published, false);
@@ -836,5 +840,248 @@ describe('countUnpublishedChanges（未公開の変更の数え方。7.4.9a）',
     // Publish のあとの記録で数える（版が合わなければ null。ここでは古い profile を渡しているので null）。
     assert.equal(await counting, null);
     assert.deepEqual(await t.service.countUnpublishedChanges(second), zero);
+  });
+});
+
+describe('publishPendingChanges（Auto Publish が使う。7.4.9b）', () => {
+  /** 最初の公開まで済ませた状態（記録の版 1 = サーバーの版 1）。 */
+  async function published() {
+    const t = await setup();
+    await t.add('A', 'X');
+    await t.service.publish({ displayName: 'Karaoke Fan', bio: 'my bio' });
+    t.server.calls.length = 0;
+    t.server.published.length = 0;
+    return t;
+  }
+  const autoOn = (t: Awaited<ReturnType<typeof setup>>) =>
+    t.sqlite.exec("INSERT OR REPLACE INTO settings (key, value) VALUES ('auto_publish', 'on')");
+
+  it('変更があれば、端末が最後に Publish した Display Name・Bio で送り、記録を進める。送るのは曲の変更だけで、Display Name・Bio の編集は載せない', async () => {
+    const t = await published();
+    await t.add('B', 'X');
+
+    const result = await t.service.publishPendingChanges();
+
+    assert.equal(result.kind, 'published');
+    if (result.kind !== 'published') return;
+    assert.equal(result.changeCount, 1);
+    assert.equal(result.profile.version, 2);
+    const body = t.server.published[0]!;
+    assert.deepEqual([body.profile.displayName, body.profile.bio], ['Karaoke Fan', 'my bio']);
+    assert.deepEqual(body.songs.map((song) => song.title), ['A', 'B']);
+    assert.equal(body.baseVersion, 1);
+    assert.deepEqual(await t.service.getState(), { username: 'karaoke_fan', baseVersion: 2, displayName: 'Karaoke Fan', bio: 'my bio' });
+    // 送ったあとの差は 0（次は通信しない）
+    assert.deepEqual(await t.service.countUnpublishedChanges(result.profile), { added: 0, changed: 0, removed: 0, total: 0 });
+  });
+
+  it('変更が無ければ、通信しない（サーバーを読みにも行かない）', async () => {
+    const t = await published();
+    assert.deepEqual(await t.service.publishPendingChanges(), { kind: 'idle', reason: 'no-changes' });
+    assert.deepEqual(t.server.calls, []);
+  });
+
+  it('Practice・Want の追加や My Key・Private Note の変更は変更に数えない（通信しない）', async () => {
+    const t = await published();
+    await t.add('P', 'X', 'practice', { privateNote: 'memo', keyOffset: 2 });
+    assert.deepEqual(await t.service.publishPendingChanges(), { kind: 'idle', reason: 'no-changes' });
+    assert.deepEqual(t.server.calls, []);
+  });
+
+  it('この端末が公開していなければ（記録が無い）、通信しない', async () => {
+    const t = await setup();
+    await t.add('A', 'X');
+    assert.deepEqual(await t.service.publishPendingChanges(), { kind: 'idle', reason: 'no-record' });
+    assert.deepEqual(t.server.calls, []);
+  });
+
+  it('username を確保しただけ（まだ公開していない）なら、自動では公開しない。最初の公開は確認つきの Publish Now だけ', async () => {
+    const t = await setup();
+    await t.add('A', 'X');
+    await t.service.claimUsername('karaoke_fan');
+    t.server.calls.length = 0;
+
+    assert.deepEqual(await t.service.publishPendingChanges(), { kind: 'idle', reason: 'not-published' });
+    assert.deepEqual(t.server.calls, ['getProfile']);
+    assert.equal(t.server.published.length, 0);
+  });
+
+  it('非公開にしたあとは、自動で公開し直さない（サーバーを読んで、公開中でないと分かったら送らない）', async () => {
+    const t = await published();
+    await t.service.unpublish();
+    await t.add('B', 'X');
+    t.server.calls.length = 0;
+
+    assert.deepEqual(await t.service.publishPendingChanges(), { kind: 'idle', reason: 'not-published' });
+    assert.deepEqual(t.server.calls, ['getProfile']);
+    assert.equal(t.server.published.length, 0);
+  });
+
+  it('別の端末が Publish していたら（版の食い違い）、上書きせず stopped(version-conflict)。本文を送らず、記録の版も進めない', async () => {
+    const t = await published();
+    await t.add('B', 'X');
+    t.server.profile = { ...t.server.profile!, version: 2, displayName: 'Other' };
+
+    assert.deepEqual(await t.service.publishPendingChanges(), { kind: 'stopped', reason: 'version-conflict' });
+    assert.deepEqual(t.server.calls, ['getProfile']);
+    assert.equal((await t.service.getState())?.baseVersion, 1);
+  });
+
+  it('読んだあとに別の端末が Publish しても（サーバーの照合が 409）、stopped(version-conflict)', async () => {
+    const t = await published();
+    await t.add('B', 'X');
+    const original = t.repo.publish;
+    t.repo.publish = async (session, body) => {
+      t.server.profile = { ...t.server.profile!, version: 2 }; // 読んだあとに、別の端末が Publish した
+      return original(session, body);
+    };
+    assert.deepEqual(await t.service.publishPendingChanges(), { kind: 'stopped', reason: 'version-conflict' });
+    assert.equal((await t.service.getState())?.baseVersion, 1);
+  });
+
+  it('端末の記録が別のアカウントのもの: 送らずに記録を捨て、Auto Publish の設定をオフに戻す', async () => {
+    const t = await published();
+    autoOn(t);
+    await t.add('B', 'X');
+    t.server.profile = { ...profileV(1, 'someone_else'), published: true };
+
+    assert.deepEqual(await t.service.publishPendingChanges(), { kind: 'idle', reason: 'no-record' });
+    assert.equal(t.server.published.length, 0);
+    assert.equal(await t.service.getState(), null);
+    assert.equal(await t.services.settings.getAutoPublishEnabled(), false);
+  });
+
+  it('サーバーに username が無い（アカウントを削除した）なら、記録を捨て、設定をオフに戻す', async () => {
+    const t = await published();
+    autoOn(t);
+    await t.add('B', 'X');
+    t.server.profile = null;
+
+    assert.deepEqual(await t.service.publishPendingChanges(), { kind: 'idle', reason: 'no-record' });
+    assert.equal(await t.service.getState(), null);
+    assert.equal(await t.services.settings.getAutoPublishEnabled(), false);
+  });
+
+  it('同じアカウントのままなら、設定には触れない（サインアウトしても、サインインし直せば同じ）', async () => {
+    const t = await published();
+    autoOn(t);
+    await t.add('B', 'X');
+    await t.service.publishPendingChanges();
+    assert.equal(await t.services.settings.getAutoPublishEnabled(), true);
+  });
+
+  it('別のアカウントの username を確保し直すときも、設定をオフに戻す。同じ username のやり直しでは触れない', async () => {
+    const t = await published();
+    autoOn(t);
+    await t.service.claimUsername('karaoke_fan'); // 同じ名前
+    assert.equal(await t.services.settings.getAutoPublishEnabled(), true);
+
+    t.server.profile = null; // 別のアカウント（まだ username が無い）
+    await t.service.claimUsername('another_one');
+    assert.equal(await t.services.settings.getAutoPublishEnabled(), false);
+  });
+
+  it('サインインしていなければ、通信しない（not-signed-in）。端末の記録には触れない', async () => {
+    const t = await setup({ access: signedOut });
+    await t.add('A', 'X');
+    t.sqlite.exec(`INSERT INTO publish_state (id, username, base_version, display_name, bio) VALUES (1, 'karaoke_fan', 1, 'Karaoke Fan', '')`);
+
+    assert.deepEqual(await t.service.publishPendingChanges(), { kind: 'idle', reason: 'not-signed-in' });
+    assert.deepEqual(t.server.calls, []);
+    assert.equal((await t.service.getState())?.baseVersion, 1);
+  });
+
+  it('401（セッションが外れた）は、signed-out として扱う。通信の失敗（network・unavailable）は、投げる（呼ぶ側が再送する）。端末の記録は変えない', async () => {
+    const t = await published();
+    await t.add('B', 'X');
+
+    for (const code of ['network', 'unavailable'] as const) {
+      t.repo.publish = async () => {
+        throw new AuthError(code);
+      };
+      await rejectsAuth(t.service.publishPendingChanges(), code);
+      assert.equal((await t.service.getState())?.baseVersion, 1);
+    }
+    t.repo.getProfile = async () => {
+      throw new AuthError('unauthorized');
+    };
+    assert.deepEqual(await t.service.publishPendingChanges(), { kind: 'idle', reason: 'not-signed-in' });
+  });
+
+  it('通信の失敗のあとも、差は残る。次の呼び出しが、同じ変更をまとめて送る（Pending の保持）', async () => {
+    const t = await published();
+    await t.add('B', 'X');
+    const original = t.repo.publish;
+    t.repo.publish = async () => {
+      throw new AuthError('network');
+    };
+    await rejectsAuth(t.service.publishPendingChanges(), 'network');
+    await t.add('C', 'X'); // 失敗している間に、さらに変更
+
+    t.repo.publish = original;
+    const result = await t.service.publishPendingChanges();
+    assert.equal(result.kind, 'published');
+    if (result.kind === 'published') assert.equal(result.changeCount, 2);
+    assert.deepEqual(t.server.published.at(-1)!.songs.map((song) => song.title), ['A', 'B', 'C']);
+  });
+
+  it('端末の記録の Display Name が空なら、送らず stopped(display-name-required)。曲が1000を超えるなら stopped(too-many-songs)（通信の前に断る）', async () => {
+    const t = await published();
+    await t.add('B', 'X');
+    t.sqlite.exec("UPDATE publish_state SET display_name = ''");
+    assert.deepEqual(await t.service.publishPendingChanges(), { kind: 'stopped', reason: 'display-name-required' });
+    assert.equal(t.server.published.length, 0);
+
+    t.sqlite.exec("UPDATE publish_state SET display_name = 'Karaoke Fan'");
+    for (let i = 0; i < PUBLISH_LIMITS.songs; i += 1) {
+      t.sqlite.exec(`INSERT INTO songs (id, title, artist_id, status, key_offset, private_note, created_at, updated_at)
+        SELECT 'extra-${i}', 'Extra ${i}', artist_id, 'ready', 0, '', 1, 1 FROM songs LIMIT 1`);
+    }
+    assert.deepEqual(await t.service.publishPendingChanges(), { kind: 'stopped', reason: 'too-many-songs' });
+    assert.equal(t.server.published.length, 0);
+  });
+
+  it('サーバーが本文を断ったら（invalid-snapshot・too-large）、stopped(rejected)', async () => {
+    const t = await published();
+    await t.add('B', 'X');
+    t.repo.publish = async () => {
+      throw new PublishError('invalid-snapshot');
+    };
+    assert.deepEqual(await t.service.publishPendingChanges(), { kind: 'stopped', reason: 'rejected' });
+  });
+
+  it('送るのは、公開に選んだタグだけ。My Key・Private Note・ステータスは本文に出ない（Publish と同じ組み立て）', async () => {
+    const t = await published();
+    await t.services.songs.createSong({
+      title: 'Tagged',
+      artist: 'Y',
+      status: 'ready',
+      keyOffset: 4,
+      privateNote: 'ひみつ',
+      newTagNames: ['ballad', 'secret'],
+    });
+    const ballad = (await t.services.tags.listTags()).find((tag) => tag.name === 'ballad')!;
+    await t.service.setTagPublic(ballad.id, true);
+
+    await t.service.publishPendingChanges();
+
+    const text = JSON.stringify(t.server.published[0]);
+    assert.ok(text.includes('ballad'));
+    assert.ok(!text.includes('secret'));
+    assert.ok(!text.includes('ひみつ'));
+    assert.ok(!text.includes('keyOffset'));
+  });
+
+  it('Publish・Unpublish と重なっても、順に実行する（記録の途中を読まない）', async () => {
+    const t = await published();
+    await t.add('B', 'X');
+    const [manual, auto] = await Promise.all([
+      t.service.publish({ displayName: 'Karaoke Fan', bio: 'my bio' }),
+      t.service.publishPendingChanges(),
+    ]);
+    assert.equal(manual.version, 2);
+    // Publish Now が先に送ったので、自動の確認では、差が無い。
+    assert.deepEqual(auto, { kind: 'idle', reason: 'no-changes' });
+    assert.equal(t.server.published.length, 1);
   });
 });

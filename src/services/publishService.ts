@@ -5,6 +5,7 @@ import type { PublicTagRepository } from '../repositories/publicTagRepository.ts
 import { PublishError } from '../repositories/publishError.ts';
 import type { PublishRepository } from '../repositories/publishRepository.ts';
 import type { PublishState, PublishStateRepository } from '../repositories/publishStateRepository.ts';
+import type { SettingsRepository } from '../repositories/settingsRepository.ts';
 import type { TagRepository } from '../repositories/tagRepository.ts';
 import type { SessionAccess } from './accountService.ts';
 import { ServiceError } from './errors.ts';
@@ -13,8 +14,10 @@ import {
   buildPublishSongs,
   countSongChanges,
   songContentHash,
+  type PublishBody,
   type PublishSongSource,
 } from './publishSnapshot.ts';
+import { AUTO_PUBLISH_KEY } from './settingsService.ts';
 import type { ShowService } from './showService.ts';
 import { normalizeUsernameInput } from './username.ts';
 
@@ -29,7 +32,36 @@ export interface PublishServiceDeps {
   publicTags: PublicTagRepository;
   /** 公開に選べるタグ（端末のタグ）の読み取り */
   tags: TagRepository;
+  /**
+   * 端末の設定の保存先。端末の記録を別のアカウントのものと見て捨てるとき、Auto Publish の設定も OFF に戻す（7.4.9b。別のアカウントの
+   * 公開ページを、そのアカウントの利用者が選んでいないのに、自動で更新しない）。
+   */
+  settings: SettingsRepository;
 }
+
+/**
+ * `publishPendingChanges`（Auto Publish が使う）の結果。**送るのは `published` だけ**。`idle` は、送る必要も、送れる状態でも無い
+ * （異常ではない）。`stopped` は、利用者が Public Profile を開いて対応するまで、自動では送れない。
+ */
+export type PendingPublishResult =
+  | { kind: 'published'; profile: PublicProfile; changeCount: number }
+  | {
+      kind: 'idle';
+      /**
+       * `no-record`: この端末は公開していない（記録が無い・別のアカウントのもの・サーバーに `username` が無い）。`no-changes`: 変更が無い（通信しない）。
+       * `not-published`: サーバーが非公開（最初の公開・再公開は、確認つきの Publish Now だけ）。`not-signed-in`: サインインしていない・401。
+       */
+      reason: 'no-record' | 'no-changes' | 'not-published' | 'not-signed-in';
+    }
+  | {
+      kind: 'stopped';
+      /**
+       * `version-conflict`: サーバーの版が、この端末が最後に合意した版と違う（別の端末が Publish した、応答を受け取れなかった Publish が済んでいた）。
+       * 置き換えは確認つきの Publish Now だけ。`too-many-songs`・`display-name-required`: 通信の前に断った。`rejected`: サーバーが断った
+       * （`invalid-snapshot`・`too-large`。アプリの組み立ての不具合）。
+       */
+      reason: 'version-conflict' | 'too-many-songs' | 'display-name-required' | 'rejected';
+    };
 
 export interface PublishInput {
   /** Display Name（公開には要る。整えたあとで空なら `display-name-required`） */
@@ -55,7 +87,7 @@ export interface PublishInput {
  * `publish`・`unpublish`・`claimUsername`・`refreshProfile` は1本ずつ順に実行する（同じ端末の Publish が重なると、2つ目が1つ目の版を知らずに
  * 送って、自分自身と食い違う。`refreshProfile` は記録を捨てる処理を持つ）。
  */
-export function createPublishService({ db, access, publish, state, show, publicTags, tags }: PublishServiceDeps) {
+export function createPublishService({ db, access, publish, state, show, publicTags, tags, settings }: PublishServiceDeps) {
   let tail: Promise<unknown> = Promise.resolve();
   function serialize<T>(task: () => Promise<T>): Promise<T> {
     const result = tail.then(task);
@@ -90,8 +122,30 @@ export function createPublishService({ db, access, publish, state, show, publicT
   async function reconcile(profile: PublicProfile | null): Promise<void> {
     const current = await state.get(db);
     if (current !== null && (profile === null || current.username !== profile.username)) {
-      await db.transaction((tx) => state.clear(tx));
+      await db.transaction(async (tx) => {
+        await state.clear(tx);
+        await settings.set(tx, AUTO_PUBLISH_KEY, 'off');
+      });
     }
+  }
+
+  /**
+   * Publish に成功したときの、端末の記録（送った内容。整えたあと）。ここでの失敗は、Publish の失敗に見せない
+   * （`recordQuietly`。記録できなければ、次の Publish が版の食い違いの確認を通る）。
+   */
+  async function recordPublished(draft: PublishBody, profile: PublicProfile): Promise<void> {
+    const hashes = new Map(draft.songs.map((song) => [song.id, songContentHash(song)]));
+    await recordQuietly(() =>
+      db.transaction(async (tx) => {
+        await state.set(tx, {
+          username: profile.username,
+          baseVersion: profile.version,
+          displayName: draft.profile.displayName,
+          bio: draft.profile.bio,
+        });
+        await state.replaceHashes(tx, hashes);
+      }),
+    );
   }
 
   /**
@@ -218,6 +272,8 @@ export function createPublishService({ db, access, publish, state, show, publicT
           if (current === null || current.username !== profile.username) {
             await db.transaction(async (tx) => {
               await state.clear(tx);
+              // 別のアカウントの記録を捨てるときは、Auto Publish の設定も OFF に戻す（`reconcile` と同じ理由）。
+              if (current !== null) await settings.set(tx, AUTO_PUBLISH_KEY, 'off');
               await state.set(tx, { username: profile.username, baseVersion: 0, displayName: '', bio: '' });
             });
           }
@@ -263,20 +319,67 @@ export function createPublishService({ db, access, publish, state, show, publicT
             return publish.publish(session, { ...draft, baseVersion });
           });
 
-          // 送った内容（整えたあと）の記録。ここでの失敗は、Publish の失敗に見せない。
-          const hashes = new Map(draft.songs.map((song) => [song.id, songContentHash(song)]));
-          await recordQuietly(() =>
-            db.transaction(async (tx) => {
-              await state.set(tx, {
-                username: profile.username,
-                baseVersion: profile.version,
-                displayName: draft.profile.displayName,
-                bio: draft.profile.bio,
-              });
-              await state.replaceHashes(tx, hashes);
-            }),
-          );
+          await recordPublished(draft, profile);
           return profile;
+        }),
+      );
+    },
+
+    /**
+     * **Auto Publish が使う**（7.4.9b）。公開中のページへ、端末の曲の変更（最後に Publish したあとの差。`countUnpublishedChanges` と同じ数え方）を、
+     * **この端末が最後に Publish した Display Name・Bio**（`publish_state`）で送る。Display Name・Bio の編集は載せない
+     * （画面の下書きは保存しない。入力の途中を、公開しない）。
+     *
+     * **自動で送るのは、人に見える状態が、すでに利用者の確認を経ているときだけ**: サーバーが公開中で、端末の記録（`username`・`baseVersion`）が
+     * サーバーの今の状態と一致するとき。最初の公開・非公開にしたあとの公開・版の食い違いの置き換え（`replaceVersion`）は、ここでは行わない
+     * （`idle` / `stopped` を返す。確認つきの Publish Now だけ）。変更が無ければ、通信しない。サインインしていなければ、通信しない
+     * （`not-signed-in`）。**失敗のうち、利用者の対応が要るものは `stopped`、通信の失敗（`AuthError`）は投げる**（呼ぶ側が、再送するかを決める）。
+     * `publish` などと直列に実行する。送れていない変更は、端末の記録との差として残る（別に保持しない。再起動しても、次の呼び出しが同じ差を見つける）。
+     */
+    publishPendingChanges(): Promise<PendingPublishResult> {
+      return serialize(() =>
+        known(async () => {
+          if ((await state.get(db)) === null) return { kind: 'idle', reason: 'no-record' } as const;
+          const [hashes, sources] = await Promise.all([state.listHashes(db), loadSources()]);
+          const changeCount = countSongChanges(hashes, buildPublishSongs(sources)).total;
+          if (changeCount === 0) return { kind: 'idle', reason: 'no-changes' } as const;
+
+          let outcome: PendingPublishResult | { kind: 'sent'; draft: PublishBody; profile: PublicProfile };
+          try {
+            outcome = await access.withSession(async (session) => {
+              const server = await publish.getProfile(session);
+              await reconcile(server);
+              if (server === null) return { kind: 'idle', reason: 'no-record' } as const;
+              if (!server.published) return { kind: 'idle', reason: 'not-published' } as const;
+              const current = await state.get(db);
+              if (current === null) return { kind: 'idle', reason: 'no-record' } as const;
+              if (current.baseVersion !== server.version) return { kind: 'stopped', reason: 'version-conflict' } as const;
+              const built = buildPublishBody({
+                baseVersion: current.baseVersion,
+                displayName: current.displayName,
+                bio: current.bio,
+                songs: sources,
+              });
+              if (!built.ok) {
+                const reason = built.reason === 'too-many-songs' ? 'too-many-songs' : 'display-name-required';
+                return { kind: 'stopped', reason } as const;
+              }
+              return { kind: 'sent', draft: built.body, profile: await publish.publish(session, built.body) } as const;
+            });
+          } catch (error) {
+            if (error instanceof AuthError && (error.code === 'not-signed-in' || error.code === 'unauthorized')) {
+              return { kind: 'idle', reason: 'not-signed-in' } as const;
+            }
+            if (error instanceof PublishError) {
+              if (error.code === 'version-conflict') return { kind: 'stopped', reason: 'version-conflict' } as const;
+              if (error.code === 'username-required') return { kind: 'idle', reason: 'no-record' } as const;
+              return { kind: 'stopped', reason: 'rejected' } as const;
+            }
+            throw error;
+          }
+          if (outcome.kind !== 'sent') return outcome;
+          await recordPublished(outcome.draft, outcome.profile);
+          return { kind: 'published', profile: outcome.profile, changeCount } as const;
         }),
       );
     },

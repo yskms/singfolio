@@ -5,7 +5,7 @@ import { describe, it } from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
 
 import { createRawDatabase } from '../testing/testDatabase.ts';
-import { createDatabase } from './appDatabase.ts';
+import { createDatabase, observeCommits } from './appDatabase.ts';
 
 function open() {
   const sqlite = new DatabaseSync(':memory:');
@@ -106,5 +106,50 @@ describe('createDatabase', () => {
     assert.deepEqual(received, [[], [], []]);
     // 実際のDBでも、パラメータなしのクエリが通る。
     assert.deepEqual(await db.getAllAsync('SELECT * FROM log'), []);
+  });
+});
+
+describe('observeCommits（7.4.9b。Auto Publish のきっかけ）', () => {
+  it('書き込みがコミットされるたびに、そのあとで1回ずつ呼ぶ。読み取りでは呼ばない', async () => {
+    const { db, values } = open();
+    const seen: string[][] = [];
+    const observed = observeCommits(db, () => seen.push(values()));
+
+    await observed.getAllAsync('SELECT * FROM log');
+    assert.deepEqual(seen, []);
+
+    await observed.transaction((tx) => tx.runAsync('INSERT INTO log VALUES (?)', ['a']));
+    await observed.transaction((tx) => tx.runAsync('INSERT INTO log VALUES (?)', ['b']));
+    // 呼ばれた時点で、書き込みは見える（コミット済み）。
+    assert.deepEqual(seen, [['a'], ['a', 'b']]);
+  });
+
+  it('失敗した（ロールバックした）書き込みでは呼ばない。エラーはそのまま投げる', async () => {
+    const { db, values } = open();
+    let calls = 0;
+    const observed = observeCommits(db, () => calls++);
+    const failure = new Error('boom');
+    await assert.rejects(
+      observed.transaction(async (tx) => {
+        await tx.runAsync('INSERT INTO log VALUES (?)', ['a']);
+        throw failure;
+      }),
+      (error) => error === failure,
+    );
+    assert.equal(calls, 0);
+    assert.deepEqual(values(), []);
+  });
+
+  it('通知の失敗は、成功した書き込みの結果に影響しない', async () => {
+    const { db, values } = open();
+    const observed = observeCommits(db, () => {
+      throw new Error('listener failed');
+    });
+    const result = await observed.transaction(async (tx) => {
+      await tx.runAsync('INSERT INTO log VALUES (?)', ['a']);
+      return 7;
+    });
+    assert.equal(result, 7);
+    assert.deepEqual(values(), ['a']);
   });
 });

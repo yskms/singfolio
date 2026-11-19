@@ -15,6 +15,8 @@ const APPEARANCE_KEY = 'appearance';
 const LANGUAGE_KEY = 'language';
 const SUGGESTIONS_KEY = 'suggestions';
 const LOCAL_DATA_ID_KEY = 'local_data_id';
+/** Auto Publish（7.4.9b）の ON/OFF。`publishService` が、アカウントが変わったときに OFF に戻すため、同じキーを使う。 */
+export const AUTO_PUBLISH_KEY = 'auto_publish';
 
 // 書き込みは必ず `db.transaction` の中で行う（理由は db/appDatabase.ts）。
 export function createSettingsService({ db, settings, newId }: SettingsServiceDeps) {
@@ -66,6 +68,19 @@ export function createSettingsService({ db, settings, newId }: SettingsServiceDe
 
     async setSuggestionsEnabled(enabled: boolean): Promise<void> {
       await db.transaction((tx) => settings.set(tx, SUGGESTIONS_KEY, enabled ? 'on' : 'off'));
+    },
+
+    /**
+     * Auto Publish（公開中のページへ、曲の変更を自動で送る。7.4.9b）を使うか。**既定はオフ**。未設定や、`on` 以外の値
+     * （アプリの将来のバージョンが保存した値など）は、勝手に公開しないよう、オフにする（候補の設定とは逆の向き）。
+     * オンでも、公開していない・端末の記録が合わないときは何も送らない（`publishService.publishPendingChanges`）。
+     */
+    async getAutoPublishEnabled(): Promise<boolean> {
+      return (await settings.get(db, AUTO_PUBLISH_KEY)) === 'on';
+    },
+
+    async setAutoPublishEnabled(enabled: boolean): Promise<void> {
+      await db.transaction((tx) => settings.set(tx, AUTO_PUBLISH_KEY, enabled ? 'on' : 'off'));
     },
 
     /**
