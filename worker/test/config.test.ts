@@ -106,6 +106,17 @@ describe('wrangler.jsonc', () => {
     assert.equal(typeof worker.scheduled, 'function');
   });
 
+  it('公開スナップショットの R2 は1つだけ（binding 名とバケット名は、docs §8 と揃える）', () => {
+    // 公開スナップショットは1つのバケットに置く（キーは username から作る）。増やすときは docs の §8 と一緒に直す。
+    assert.deepEqual(
+      (config.r2_buckets ?? []).map((bucket: { binding: string; bucket_name?: string }) => [
+        bucket.binding,
+        bucket.bucket_name,
+      ]),
+      [['SNAPSHOTS', 'singfolio-snapshots']],
+    );
+  });
+
   it('HTTPS検査を迂回する設定を vars に置かない', () => {
     // 検査は、localhost のホスト名だけを通す。環境変数などで切る口は作らない（docs §8「HTTPS」）。
     for (const name of Object.keys(config.vars ?? {})) {

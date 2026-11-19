@@ -55,5 +55,11 @@
       "database_id": "32b6f13c-a7fe-43ef-826e-996b650a76af",
       "migrations_dir": "migrations"
     }
-  ]
+  ],
+
+  // 公開スナップショット（7.4）。キーは `public/{username}.json`（docs §8「バックエンドが担当すること」）。
+  // バケットは、利用者がダッシュボードで作る（デプロイの前に存在していないと `wrangler deploy` が失敗する）。
+  // **バケットの公開アクセス（r2.dev のURL・カスタムドメイン）は有効にしない。** 読むのは Worker だけ
+  // （公開ページ（7.5）も Worker が返す）。ローカルの開発・テストでは、バケットは作られず、メモリ上の代用が使われる。
+  "r2_buckets": [{ "binding": "SNAPSHOTS", "bucket_name": "singfolio-snapshots" }]
 }
