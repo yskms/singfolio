@@ -120,8 +120,9 @@ export async function deleteAccount(
     }
   }
 
-  // 6. アカウントを消す（R2のスナップショットなどは、7.4 以降で `deleteUserAccount` に足す）。
-  await deleteUserAccount(env.DB, session.userId);
+  // 6. アカウントを消す。順序は「`username` を読む → R2のスナップショットを消す → D1の行を消す」（`deleteUserAccount`）。
+  //    R2を消せなければ、何も消さず `unavailable`（503）。`T` は使用済みなので、やり直すときは、再認証からやり直す。
+  if (!(await deleteUserAccount(env, session.userId, now))) return failed('unavailable');
 
   // 7. Appleのトークンの失効（削除を止めない。ここで例外が出ても、アカウントはもう消えているので、失敗にしない）。
   if (input.provider !== 'apple') return { ok: true, appleRevoked: null };

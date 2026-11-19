@@ -59,6 +59,7 @@ describe('POST /auth/delete', () => {
       APPLE_PRIVATE_KEY,
       GOOGLE_WEB_CLIENT_ID: GOOGLE_CLIENT_ID,
       DB: db,
+      SNAPSHOTS: local.env.SNAPSHOTS,
     } as unknown as Env;
   });
   after(async () => {
@@ -291,6 +292,109 @@ describe('POST /auth/delete', () => {
       assert.equal((await call(session, body)).status, 200);
       for (const value of [session, other, googleSession]) assert.equal(await authenticateSession(db, value, NOW), null);
       assert.deepEqual(await counts(), { users: 0, identities: 0, sessions: 0, used_nonces: 1 });
+    });
+  });
+
+  describe('公開プロフィールの削除（7.4.5）', () => {
+    const KEY = 'public/del_user.json';
+    const retired = async () =>
+      (await db.prepare('SELECT username FROM retired_usernames').all<{ username: string }>()).results.map((row) => row.username);
+    const rowCount = async (table: string, where: string, value: string) =>
+      (await db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE ${where} = ?`).bind(value).first<{ n: number }>())!.n;
+    /** 公開中のアカウント（印が立ち、R2にスナップショットがある）。 */
+    async function published(username = 'del_user') {
+      const user = await signedIn('google', 'google-published');
+      await db
+        .prepare('INSERT INTO profiles (user_id, username, published_at, version, created_at) VALUES (?, ?, ?, 1, ?)')
+        .bind(user.userId, username, NOW - 5, NOW - 10)
+        .run();
+      await env.SNAPSHOTS.put(`public/${username}.json`, '{"schema":1}');
+      return user;
+    }
+    beforeEach(async () => {
+      await db.prepare('DELETE FROM retired_usernames').run();
+      await env.SNAPSHOTS.delete(KEY);
+    });
+
+    it('R2のスナップショットを消し、profiles を消し、username を再利用させない表へ移す（ユーザーIDとは結びつけない）', async () => {
+      const user = await published();
+      const { body } = await google({ sub: 'google-published' });
+      const response = await call(user.session, body);
+      assert.equal(response.status, 200);
+      assert.equal(await env.SNAPSHOTS.get(KEY), null);
+      assert.equal(await rowCount('profiles', 'user_id', user.userId), 0);
+      assert.equal(await rowCount('users', 'id', user.userId), 0);
+      assert.deepEqual(await retired(), ['del_user']);
+      assert.deepEqual(
+        await db.prepare('SELECT * FROM retired_usernames').first(),
+        { username: 'del_user', retired_at: NOW },
+      );
+    });
+
+    it('R2を消せなければ、何も消さず 503（D1の行を残す。使った T は戻らないので、再認証からやり直す）', async () => {
+      const user = await published();
+      const { body } = await google({ sub: 'google-published' });
+      const original = env;
+      env = {
+        ...original,
+        SNAPSHOTS: {
+          delete: () => Promise.reject(new Error('R2 is down: SECRET-DETAIL')),
+        } as unknown as R2Bucket,
+      } as Env;
+      const errors: unknown[] = [];
+      const log = console.error;
+      console.error = (message: unknown) => errors.push(message);
+      try {
+        const response = await call(user.session, body);
+        assert.equal(response.status, 503);
+        assert.equal((await response.text()).includes('SECRET'), false);
+      } finally {
+        env = original;
+        console.error = log;
+      }
+      // 何も消えていない。セッションも有効なまま（アプリは 503 のとき、端末のセッションを捨てない）。
+      assert.notEqual(await authenticateSession(db, user.session, NOW), null);
+      assert.equal(await rowCount('profiles', 'user_id', user.userId), 1);
+      assert.notEqual(await env.SNAPSHOTS.get(KEY), null);
+      assert.deepEqual(await retired(), []);
+      // 失敗の記録は固定の1行（値・例外の中身を出さない）。
+      assert.deepEqual(errors, ['account deletion: snapshot delete failed']);
+
+      // 再認証からやり直せば、消える。
+      const retry = await google({ sub: 'google-published' });
+      assert.equal((await call(user.session, retry.body)).status, 200);
+      assert.equal(await env.SNAPSHOTS.get(KEY), null);
+      assert.deepEqual(await retired(), ['del_user']);
+    });
+
+    it('username を確保していないアカウントは、R2に触れずに消える（R2が使えなくても消せる）', async () => {
+      const user = await signedIn('google', 'google-plain');
+      const { body } = await google({ sub: 'google-plain' });
+      const original = env;
+      env = { ...original, SNAPSHOTS: undefined } as unknown as Env;
+      try {
+        assert.equal((await call(user.session, body)).status, 200);
+      } finally {
+        env = original;
+      }
+      assert.equal(await rowCount('users', 'id', user.userId), 0);
+      assert.deepEqual(await retired(), []);
+    });
+
+    it('ほかの人の公開ページ・username は消さない', async () => {
+      const mine = await published('del_user');
+      const other = await signedIn('google', 'google-other');
+      await db
+        .prepare('INSERT INTO profiles (user_id, username, published_at, created_at) VALUES (?, ?, ?, ?)')
+        .bind(other.userId, 'other_user', NOW, NOW)
+        .run();
+      await env.SNAPSHOTS.put('public/other_user.json', '{"schema":1}');
+      const { body } = await google({ sub: 'google-published' });
+      assert.equal((await call(mine.session, body)).status, 200);
+      assert.notEqual(await env.SNAPSHOTS.get('public/other_user.json'), null);
+      assert.equal(await rowCount('profiles', 'user_id', other.userId), 1);
+      assert.deepEqual(await retired(), ['del_user']);
+      await env.SNAPSHOTS.delete('public/other_user.json');
     });
   });
 

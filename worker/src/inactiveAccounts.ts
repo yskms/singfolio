@@ -9,11 +9,19 @@
 //   ことがある。候補に選ばれたあとにログインしたアカウントは消えない。
 // - `last_active_at` が NULL のアカウントは、候補に入れない（`<` は NULL で偽）。`COALESCE(…, created_at)` に「簡略化」しない
 //   （埋め漏れた、使われているアカウントを消してしまう）。
+// - **公開ページのあるアカウントは、対象外**（`AUTO_DELETE_EXEMPT_SQL`。候補の SELECT と条件つきの DELETE が、同じ式を使う。のちに
+//   「課金していれば消えない」へ切り替えるときは、この式を変える。docs §8）。消すアカウントの `username` は、同じバッチで
+//   `retired_usernames` に移す（再利用させない）。R2に触れない（印が立っていない＝R2にスナップショットが無い、が前提。src/publish.ts）。
 // - **D1のクエリは2回だけ**（候補の SELECT と、条件つき DELETE の1バッチ）。Freeは、1回の実行で50回までで、バッチは1回と数える
 //   （資料: D1 Limits）。アカウントごとに別のクエリにしない。Cron の CPU 時間は Free で10ms（待ちは数えない）。
 // - 1回の実行で消す上限（`MAX_DELETIONS_PER_RUN`）。多ければ、翌日以降に続く（冪等）。Workers Logs は無効なので、失敗は
 //   `wrangler tail` でしか見えない。ログに出すのは件数だけ（ユーザーIDは出さない）。
-import { deleteInactiveUserStatement, INACTIVE_ACCOUNT_TTL_MS } from './account.ts';
+import {
+  AUTO_DELETE_EXEMPT_SQL,
+  deleteInactiveUserStatement,
+  INACTIVE_ACCOUNT_TTL_MS,
+  retireInactiveUsernameStatement,
+} from './account.ts';
 
 export const MAX_DELETIONS_PER_RUN = 100;
 
@@ -28,15 +36,21 @@ export interface InactiveDeletionResult {
 export async function deleteInactiveAccounts(db: D1Database, now: number): Promise<InactiveDeletionResult> {
   const cutoff = now - INACTIVE_ACCOUNT_TTL_MS;
   const { results } = await db
-    .prepare('SELECT id FROM users WHERE last_active_at < ?1 LIMIT ?2')
+    .prepare(`SELECT id FROM users WHERE last_active_at < ?1 AND NOT ${AUTO_DELETE_EXEMPT_SQL} LIMIT ?2`)
     .bind(cutoff, MAX_DELETIONS_PER_RUN)
     .all<{ id: string }>();
   if (results.length === 0) return { deleted: 0, skipped: 0 };
 
   // 1つのバッチ（1回のクエリ、1つのトランザクション）。各文は条件つきなので、選んだあとに使われたアカウントは消えない。
   // 消せたかは、文ごとの変更行数が 0 より大きいか（カスケードで消えた行も数えるので、合計は件数にならない）。
-  const outcomes = await db.batch(results.map((row) => deleteInactiveUserStatement(db, row.id, cutoff)));
-  const deleted = outcomes.filter((outcome) => outcome.meta.changes > 0).length;
+  // アカウントごとに、`username` を移す文、消す文の順に並べる（消す文の結果は、奇数番目）。
+  const outcomes = await db.batch(
+    results.flatMap((row) => [
+      retireInactiveUsernameStatement(db, row.id, cutoff, now),
+      deleteInactiveUserStatement(db, row.id, cutoff),
+    ]),
+  );
+  const deleted = outcomes.filter((outcome, index) => index % 2 === 1 && outcome.meta.changes > 0).length;
   return { deleted, skipped: results.length - deleted };
 }
 

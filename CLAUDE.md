@@ -141,8 +141,18 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     **D1のクエリは2回だけ**（候補の SELECT と、条件つき DELETE の1バッチ。アカウントごとのクエリに分けない。Freeは1回の実行で50回まで、バッチは1回と数える）。
     Cron Trigger を足さない（Freeは5つまで）。ポリシーに書いた「1年」「90日」「30日」を変えるときは、定数・docs・ポリシーを一緒に直す。
     **端末の中だけの利用は、最後に使った時刻を進めない**（アカウントを出した版から起きる。7.3 のアプリで認証つきの通信は `signOutOthers`・`deleteAccount` だけ）。
-    **7.4 で、公開ページのあるアカウントを自動削除の対象外にするか、利用の記録を足すか、決めてから公開機能を出す**（端末の中だけで使い続ける人は、1年後に公開ページごと消える）。
+    **公開ページのあるアカウント（`profiles.published_at` が立っている）は、自動削除の対象外**（端末の中だけで使い続ける人の公開ページが、1年後に消えないため）。
+    対象外の条件は `AUTO_DELETE_EXEMPT_SQL` の1か所で、候補の SELECT・条件つきの DELETE・`username` を移す文が同じ式を使う（のちに「課金していれば消えない」へ切り替えるときは、この式を変える。
+    先に利用の記録とポリシーの更新・告知が要る）。
     ログアウトは、有効なセッションのときだけ時刻を進める（`authenticateSession` と揃える）。詳細は `docs/singfolio-publishing-backend.md` §8「未使用のアカウントの自動削除」。
+-   公開（Publish / Unpublish。`worker/src/publish.ts`・`snapshot.ts`・`profile.ts`）。**順序は変えない**: Publish は「版の予約（D1。`baseVersion` の照合と `published_at` を1文で）→ R2に書く」、
+    Unpublish は「R2を消す → `published_at` を下ろし、版を+1」。**`published_at`（公開中の印）は、R2に書く前に立て、R2を消したあとに下ろす**（R2にスナップショットが存在しうる間は、必ず立っている。
+    自動削除はD1の行だけを消すので、印が遅れると公開ページだけが残る）。失敗のときは印を立てたままにする（安全側）。Unpublish も版を上げる（別の端末の古い版の Publish が、公開を勝手に戻さない）。
+    「R2を先に書き、成功したらD1の版を更新」に「簡略化」しない（同じ版からの同時の Publish が、負けた側もR2を上書きする）。
+-   公開スナップショット（`snapshot.ts`）は**許可リストで新しく作る**。入力をそのまま（`{ ...song }` で）保存しない。My Key・Private Note・status は型にも入れない。
+    上限（曲 **1000**・本文512KiB）は、Free の CPU 10ms に初回でも収まるよう**実測して決めた値**。上げるときは `npm run bench:snapshot` と workerd で実測し直す（3000曲は初回に10msを超えた）。
+    Display Name・Bio は Publish のリクエストに載せる（単独で更新するエンドポイントを作らない。D1の `profiles` は最後にPublishした値の控え）。`username` は変更しない（R2のキーに使う）。
+    予約語（`username.ts`）を外す・変えるときは、確保済みの名前を確かめる。R2の公開アクセス（r2.dev・カスタムドメイン）は有効にしない（読み書きはWorkerだけ）。
 -   Appleのサーバー間通知（`worker/src/appleNotification.ts`）とセッション発行の競合: **`createSession` の INSERT にある `consent_revoked_at` の条件
     （`migrations/0002`）は外さない。** 通知の処理の最中に進んでいたログインが、取り消し後のセッションを作るのを防ぐ唯一の手段で、`last_sign_in_at` と
     `event_time` の比較だけでは吸収できない（確かめた）。通知の `aud` は、バンドルIDとServices IDの**どちらも**受け入れる（ログインの `aud` を1つに決める規則とは
@@ -154,7 +164,8 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     再認証の失敗は 403 にして、401 にしない（アプリは 401 のときだけ端末のセッションを捨てる）。**Appleのトークンの失効は、D1の行を消したあとに行い、失敗しても削除を
     止めない**（失効を先にすると、D1の失敗で、Apple側だけ失効した中途半端な状態になる）。iOSの認可コードの交換は、D1を消す**前**に行う（消したあとに待つのを失効の1回にする。
     アプリが先に打ち切る・切断すると、Workerは消したあとの処理を打ち切りうる）。`refresh_token`・`access_token` を読むのは、削除（`exchangeWithToken`）だけ。
-    ログインの交換（`exchange`）は読まない。R2・`profiles`・Requestの削除は、7.4 で `deleteUserAccount`（`worker/src/account.ts`）に足す。
+    ログインの交換（`exchange`）は読まない。`deleteUserAccount`（`worker/src/account.ts`）の順序は「`username` を読む → R2を消す → D1の行を消す」（R2の失敗なら D1 を残して失敗にする。
+    行を先に消すと、消し残したスナップショットのキーが分からなくなる）。D1のバッチで `username` を `retired_usernames` に移す（再利用させない。ユーザーIDと結びつけない）。Requestの削除は 7.6。
 
 ### アカウント（アプリ側）
 

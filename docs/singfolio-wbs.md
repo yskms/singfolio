@@ -354,10 +354,10 @@ v1.0より後（公開機能・Requests）の実装順序は、
         R2 に書く。印は R2 に書く前に立てる。Unpublish は R2 を消してから印を下ろし、版を +1 する（`username` と控えは残す）。失敗のときは印を立てたまま（安全側）。
         公開の状態は `GET /me/profile`（7.4.3）。D1 の書き込みは Publish・Unpublish とも1回。Node のテストと、`wrangler dev`（workerd。1000曲の Publish）で確かめた
         （§8「Publish と Unpublish のエンドポイント」）
-    -   [ ] 7.4.5 アカウントの削除と自動削除の見直し。`deleteUserAccount` に「`username` を読む → R2 を消す → D1 を消す」を足す（R2 の失敗なら D1 の行を残して失敗にする）。
-        自己削除と Apple の `account-deleted` の両方が使う。自動削除の対象外（Publish済み）を、1か所の式として実装する（候補の SELECT と条件つきの DELETE で共有。
-        「対象外は、消す瞬間にも見る」をテストで固定する）。ポリシーの「1年」の説明を直す準備をする。
-        ここまでで Worker は完成（Node のテストと workerd）
+    -   [x] 7.4.5 アカウントの削除と自動削除の見直し。`deleteUserAccount` に「`username` を読む → R2 を消す → D1 を消す」を足した（R2 の失敗なら D1 の行を残して失敗にする。
+        自己削除は 503、`account-deleted` も 503。D1 のバッチで `username` を `retired_usernames` に移す）。自己削除と Apple の `account-deleted` の両方が使う。
+        自動削除の対象外（Publish済み）を、1か所の式（`AUTO_DELETE_EXEMPT_SQL`）として実装した（候補の SELECT・条件つきの DELETE・`username` を移す文が共有。「消す瞬間にも見る」をテストで固定）。
+        公開ページの無いアカウントは、これまでどおり1年で消え、`username` は再利用されない。ポリシーの「1年」の説明を直すのは 7.4.10。ここまでで Worker は完成（Node のテストと workerd）
     -   [ ] 7.4.6 アプリ: スナップショットの組み立てと Repository / Service。Ready の曲から作る純粋な関数（`src/` に置き、Node でテスト。`ShowSong` と同じ発想で、
         My Key・Private Note を型の上でも持たない）。`publishRepository`（HTTP は Repository に閉じ込める。認証が要る呼び出しは `account` の `authorized` を通す）。
         Publish の状態を持つローカルのテーブル（アプリのDBの migration 4）

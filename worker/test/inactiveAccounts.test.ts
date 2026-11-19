@@ -4,9 +4,11 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import {
+  AUTO_DELETE_EXEMPT_SQL,
   deleteInactiveUserStatement,
   INACTIVE_ACCOUNT_TTL_MS,
   markUserActiveStatement,
+  retireInactiveUsernameStatement,
 } from '../src/account.ts';
 import { resolveIdentity } from '../src/identity.ts';
 import { deleteInactiveAccounts, MAX_DELETIONS_PER_RUN } from '../src/inactiveAccounts.ts';
@@ -99,6 +101,90 @@ describe('未使用のアカウントの自動削除', () => {
       assert.equal(await count('users'), extra);
       assert.deepEqual(await deleteInactiveAccounts(db, NOW), { deleted: extra, skipped: 0 });
       assert.deepEqual(await deleteInactiveAccounts(db, NOW), { deleted: 0, skipped: 0 });
+    });
+  });
+
+  describe('公開ページのあるアカウントは対象外（7.4.5）', () => {
+    // `profiles` の行。`publishedAt` が null なら非公開（印が下りている）。
+    const addProfile = (userId: string, username: string, publishedAt: number | null) =>
+      db
+        .prepare('INSERT INTO profiles (user_id, username, published_at, created_at) VALUES (?, ?, ?, ?)')
+        .bind(userId, username, publishedAt, 1)
+        .run();
+    const retired = async () =>
+      (await db.prepare('SELECT username FROM retired_usernames ORDER BY username').all<{ username: string }>()).results.map(
+        (row) => row.username,
+      );
+    beforeEach(async () => {
+      await db.prepare('DELETE FROM retired_usernames').run();
+    });
+
+    it('Publish済み（印が立っている）は、1年たっても消さない。ほかの古いアカウントは消える', async () => {
+      const published = await addUser(NOW - YEAR - DAY);
+      await addProfile(published.userId, 'pub_account', NOW - 2 * YEAR);
+      const plain = await addUser(NOW - YEAR - DAY);
+      assert.deepEqual(await deleteInactiveAccounts(db, NOW), { deleted: 1, skipped: 0 });
+      assert.equal(await exists(published.userId), true);
+      assert.equal(await exists(plain.userId), false);
+      assert.deepEqual(await retired(), []);
+      // 何度走らせても、対象外のまま。
+      assert.deepEqual(await deleteInactiveAccounts(db, NOW + 10 * YEAR), { deleted: 0, skipped: 0 });
+      assert.equal(await exists(published.userId), true);
+    });
+
+    it('Unpublish（印が下りた）か、username だけ確保して Publish していないアカウントは、対象に戻る。username は再利用できなくなる', async () => {
+      const unpublished = await addUser(NOW - YEAR - DAY);
+      await addProfile(unpublished.userId, 'was_published', null);
+      const claimedOnly = await addUser(NOW - YEAR - DAY);
+      await addProfile(claimedOnly.userId, 'claimed_only', null);
+      assert.deepEqual(await deleteInactiveAccounts(db, NOW), { deleted: 2, skipped: 0 });
+      assert.equal(await exists(unpublished.userId), false);
+      assert.equal(await exists(claimedOnly.userId), false);
+      assert.equal(await count('profiles'), 0);
+      assert.deepEqual(await retired(), ['claimed_only', 'was_published']);
+    });
+
+    it('消す文も同じ条件: 候補に選んだあとに Publish したアカウントは、消えず、username も移らない（消す瞬間にも見る）', async () => {
+      const user = await addUser(NOW - YEAR - DAY);
+      await addProfile(user.userId, 'late_publisher', null);
+      const cutoff = NOW - YEAR;
+      // 候補に選ばれたあとに、Publish で印が立つ。
+      await db.prepare('UPDATE profiles SET published_at = ? WHERE user_id = ?').bind(NOW, user.userId).run();
+      const [retire, remove] = await db.batch([
+        retireInactiveUsernameStatement(db, user.userId, cutoff, NOW),
+        deleteInactiveUserStatement(db, user.userId, cutoff),
+      ]);
+      assert.equal(retire!.meta.changes, 0);
+      assert.equal(remove!.meta.changes, 0);
+      assert.equal(await exists(user.userId), true);
+      assert.equal(await count('profiles'), 1);
+      assert.deepEqual(await retired(), []);
+    });
+
+    it('username を移す文は、消さないアカウント（まだ使われている）では何も移さない', async () => {
+      const active = await addUser(NOW - DAY);
+      await addProfile(active.userId, 'still_active', null);
+      const result = await retireInactiveUsernameStatement(db, active.userId, NOW - YEAR, NOW).run();
+      assert.equal(result.meta.changes, 0);
+      assert.deepEqual(await retired(), []);
+    });
+
+    it('移した username は、ユーザーIDと結びつかない（retired_usernames は username と時刻だけ）', async () => {
+      const user = await addUser(NOW - YEAR - DAY);
+      await addProfile(user.userId, 'no_link_name', null);
+      await deleteInactiveAccounts(db, NOW);
+      const row = await db.prepare('SELECT * FROM retired_usernames WHERE username = ?').bind('no_link_name').first();
+      assert.deepEqual(row, { username: 'no_link_name', retired_at: NOW });
+    });
+
+    it('対象外の条件は、候補の SELECT と消す文が同じ式（AUTO_DELETE_EXEMPT_SQL）を使う', () => {
+      const source = readFileSync(path.join(workerDir, 'src', 'inactiveAccounts.ts'), 'utf8');
+      const account = readFileSync(path.join(workerDir, 'src', 'account.ts'), 'utf8');
+      assert.match(source, /NOT \$\{AUTO_DELETE_EXEMPT_SQL\}/);
+      assert.equal((account.match(/NOT \$\{AUTO_DELETE_EXEMPT_SQL\}/g) ?? []).length, 2);
+      // 式そのものは1か所にだけ書く。
+      assert.equal((account.match(/p\.published_at IS NOT NULL/g) ?? []).length, 1);
+      assert.match(AUTO_DELETE_EXEMPT_SQL, /published_at IS NOT NULL/);
     });
   });
 

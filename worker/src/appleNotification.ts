@@ -21,7 +21,14 @@ import { getIdTokenVerifier, type AppleNotificationEvent, type IdTokenVerifier }
 const MAX_BODY_BYTES = 16 * 1024;
 
 /** 処理した結果。呼び出し側（テスト）が、何が起きたか見分けるためのもの。応答には出さない。 */
-export type AppleEventOutcome = 'ignored' | 'sessions-revoked' | 'identity-deleted' | 'user-deleted' | 'nothing';
+export type AppleEventOutcome =
+  | 'ignored'
+  | 'sessions-revoked'
+  | 'identity-deleted'
+  | 'user-deleted'
+  | 'nothing'
+  // アカウントごと消すとき、R2のスナップショットを消せなかった（D1の行は残した。やり直せる）。
+  | 'storage-unavailable';
 
 /**
  * POST /auth/apple/notifications。検証に通ったら、通知を処理して 200（本文 `{}`）を返す（知らない種類・対象が
@@ -52,7 +59,8 @@ export async function handleAppleNotification(
     return verified.reason === 'unavailable' ? serviceUnavailable() : unauthorized();
   }
 
-  await applyAppleEvent(env.DB, verified.event);
+  // R2を消せなかったら 503（Appleが再送するかは分からない。再送されなければ、公開ページのあるアカウントは、自動削除の対象外のまま残る）。
+  if ((await applyAppleEvent(env, verified.event, now)) === 'storage-unavailable') return serviceUnavailable();
   return json({});
 }
 
@@ -63,9 +71,13 @@ export async function handleAppleNotification(
  *   無ければ、アカウントごと消す。
  * - それ以外: 何もしない。
  */
-export async function applyAppleEvent(db: D1Database, event: AppleNotificationEvent): Promise<AppleEventOutcome> {
-  if (event.type === 'consent-revoked') return revokeConsent(db, event);
-  if (event.type === 'account-deleted' || event.type === 'account-delete') return deleteAppleIdentity(db, event.sub);
+export async function applyAppleEvent(
+  env: Pick<Env, 'DB' | 'SNAPSHOTS'>,
+  event: AppleNotificationEvent,
+  now: number,
+): Promise<AppleEventOutcome> {
+  if (event.type === 'consent-revoked') return revokeConsent(env.DB, event);
+  if (event.type === 'account-deleted' || event.type === 'account-delete') return deleteAppleIdentity(env, event.sub, now);
   return 'ignored';
 }
 
@@ -101,10 +113,15 @@ async function revokeConsent(db: D1Database, event: AppleNotificationEvent): Pro
  * **件数の確認（SELECT）と削除は、1つのトランザクションに入っていない。** 今は、`identities` の行を足すのは、ログインでの
  * `resolveIdentity`（ユーザーと行を同時に作る）だけで、既存のユーザーにログイン手段を足す処理が無いので、確認と削除の間に件数が増えない。
  * 「アカウントのつなぎ方」（既存のユーザーにログイン手段をつなぐ処理）を作るときは、ここを見直す: 確認のあとにつながった手段ごと
- * アカウントが消える、または、最後の手段だけが消えて `users` の行が残る。7.4 で `deleteUserAccount` に足す、R2を消す順序
- * （`username` を読む → R2 → D1）とも合わせて、確認と削除を1文（条件つきの DELETE）か1バッチにできるかを決める。
+ * アカウントが消える、または、最後の手段だけが消えて `users` の行が残る。`deleteUserAccount` の、R2を消す順序
+ * （`username` を読む → R2 → D1。7.4.5）とも合わせて、確認と削除を1文（条件つきの DELETE）か1バッチにできるかを決める。
  */
-async function deleteAppleIdentity(db: D1Database, sub: string): Promise<AppleEventOutcome> {
+async function deleteAppleIdentity(
+  env: Pick<Env, 'DB' | 'SNAPSHOTS'>,
+  sub: string,
+  now: number,
+): Promise<AppleEventOutcome> {
+  const { DB: db } = env;
   const row = await db
     .prepare(
       `SELECT i.id AS id, i.user_id AS user_id,
@@ -115,8 +132,7 @@ async function deleteAppleIdentity(db: D1Database, sub: string): Promise<AppleEv
     .first<{ id: string; user_id: string; total: number }>();
   if (row === null) return 'nothing';
   if (row.total <= 1) {
-    await deleteUserAccount(db, row.user_id);
-    return 'user-deleted';
+    return (await deleteUserAccount(env, row.user_id, now)) ? 'user-deleted' : 'storage-unavailable';
   }
   await db.prepare('DELETE FROM identities WHERE id = ?1').bind(row.id).run();
   return 'identity-deleted';

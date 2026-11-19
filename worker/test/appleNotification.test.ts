@@ -49,6 +49,7 @@ describe('POST /auth/apple/notifications', () => {
       APPLE_SERVICES_ID: 'com.example.web',
       GOOGLE_WEB_CLIENT_ID: '1234-web.apps.googleusercontent.com',
       DB: db,
+      SNAPSHOTS: local.env.SNAPSHOTS,
     } as unknown as Env;
   });
   after(async () => {
@@ -376,6 +377,77 @@ describe('POST /auth/apple/notifications', () => {
       const { userId } = await resolveIdentity(db, 'apple', SUB, NOW + 1);
       assert.equal((await counts()).users, 1);
       assert.ok(userId);
+    });
+  });
+
+  describe('account-deleted: 公開プロフィール（7.4.5）', () => {
+    const KEY = 'public/notified_user.json';
+    const retired = async () =>
+      (await db.prepare('SELECT username FROM retired_usernames').all<{ username: string }>()).results.map((row) => row.username);
+    const profileCount = async () =>
+      (await db.prepare('SELECT COUNT(*) AS n FROM profiles').first<{ n: number }>())!.n;
+    async function publishedUser() {
+      const user = await newSignedIn();
+      await db
+        .prepare('INSERT INTO profiles (user_id, username, published_at, version, created_at) VALUES (?, ?, ?, 1, ?)')
+        .bind(user.userId, 'notified_user', NOW - 5, NOW - 10)
+        .run();
+      await env.SNAPSHOTS.put(KEY, '{"schema":1}');
+      return user;
+    }
+    beforeEach(async () => {
+      await db.prepare('DELETE FROM retired_usernames').run();
+      await env.SNAPSHOTS.delete(KEY);
+    });
+
+    it('唯一のログイン手段なら、R2のスナップショットも消し、username を再利用させない表へ移す', async () => {
+      await publishedUser();
+      assert.equal((await notify({ type: 'account-deleted' })).status, 200);
+      assert.equal(await env.SNAPSHOTS.get(KEY), null);
+      assert.deepEqual(await counts(), { users: 0, identities: 0, sessions: 0 });
+      assert.equal(await profileCount(), 0);
+      assert.deepEqual(await retired(), ['notified_user']);
+    });
+
+    it('ほかのログイン手段が残るなら、公開ページ・username には触れない', async () => {
+      const { userId } = await publishedUser();
+      await db
+        .prepare(`INSERT INTO identities (id, user_id, provider, sub, created_at, last_sign_in_at) VALUES (?1, ?2, 'google', 'g-1', ?3, ?3)`)
+        .bind(crypto.randomUUID(), userId, NOW)
+        .run();
+      assert.equal((await notify({ type: 'account-deleted' })).status, 200);
+      assert.notEqual(await env.SNAPSHOTS.get(KEY), null);
+      assert.equal(await profileCount(), 1);
+      assert.deepEqual(await retired(), []);
+    });
+
+    it('R2を消せなければ 503。D1の行は残す（Appleが再送すれば、やり直せる）。固定の1行だけ記録する', async () => {
+      await publishedUser();
+      const original = env;
+      env = {
+        ...original,
+        SNAPSHOTS: { delete: () => Promise.reject(new Error('R2 is down: SECRET-DETAIL')) } as unknown as R2Bucket,
+      } as Env;
+      const errors: unknown[] = [];
+      const log = console.error;
+      console.error = (message: unknown) => errors.push(message);
+      try {
+        const response = await notify({ type: 'account-deleted' });
+        assert.equal(response.status, 503);
+        assert.equal((await response.text()).includes('SECRET'), false);
+      } finally {
+        env = original;
+        console.error = log;
+      }
+      assert.deepEqual(await counts(), { users: 1, identities: 1, sessions: 1 });
+      assert.equal(await profileCount(), 1);
+      assert.notEqual(await env.SNAPSHOTS.get(KEY), null);
+      assert.deepEqual(errors, ['account deletion: snapshot delete failed']);
+
+      // 再送されれば、消える。
+      assert.equal((await notify({ type: 'account-deleted' })).status, 200);
+      assert.equal(await env.SNAPSHOTS.get(KEY), null);
+      assert.deepEqual(await retired(), ['notified_user']);
     });
   });
 
