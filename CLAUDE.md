@@ -244,8 +244,8 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     版の食い違いの置き換えの確認は外さない（人に見える状態になる・変更できない）。公開中と見て確認なしで送ったのにサーバーが非公開だったときは、置き換えの文言にせず、公開の確認の文言にする。`username` の形の規則は `src/services/username.ts` に、Workerと同じ値を別に持つ。日時は `Intl` を使わない
     （`src/i18n/dateTime.ts`）。失敗の文言は `src/i18n/publishErrors.ts`（Publish の `network` だけ「公開できたか分からない」）。
     **「N unpublished changes」（`publishService.countUnpublishedChanges(profile)`。7.4.9a）は、数えるのを曲だけにする**（Display Name・Bio の下書きを混ぜない）。**端末の記録が、渡された
-    サーバーの `profile`（公開中・`username` と `baseVersion` が一致）と合うときだけ数え、合わなければ `null`**（再インストール後の空の記録と比べると、全部が「追加」と数えられる。
-    別の端末が Publish したあとの記録は、今の公開内容の基準にならない）。Service からサーバーへ聞きに行かない（通信しない）。曲の整え方は Publish と同じ `buildPublishSongs` を使い、
+    サーバーの `profile`（呼ぶ側が最後に読んだもの。公開中・`username` と `baseVersion` が一致）と合うときだけ数え、合わなければ `null`**（再インストール後の空の記録と比べると、全部が「追加」と数えられる。
+    別の端末が Publish したあとの記録は、公開内容の基準にならない。ただし画面が読み直すまでは気づかず、表示が古くなるだけ）。Service からサーバーへ聞きに行かない（通信しない）。曲の整え方は Publish と同じ `buildPublishSongs` を使い、
     数え方だけ別に整えない（整えた値のずれが、Publish しても消えない「変更あり」になる）。詳細は同じ docs §8「未公開の変更の数え方」。
 -   `expo-secure-store` の config plugin を `app.json` に足さない。Androidのバックアップ規則が `<include>` で、v1.0で今
     バックアップされているSQLiteを外す。

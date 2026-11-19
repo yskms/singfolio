@@ -197,6 +197,9 @@ export function PublicProfileSection() {
         },
         () => {},
       );
+    // 数える相手の `profile` は、この画面が最後にサーバーから読んだもの（`load`・Publish の応答・版の食い違い）。ここでは読み直さない（Public Tags から
+    // 戻るたびに通信しない）。画面を開いたまま別の端末が Publish しても、次に読み込むまでは気づかない。数は「最後にサーバーを読んだ時点で合っていた記録」
+    // との比較で、Publish は版の食い違いの確認を通るので、上書きの事故にはならない（表示が古くなるだけ）。
     refreshChanges(profileRef.current);
     return () => {
       cancelled = true;

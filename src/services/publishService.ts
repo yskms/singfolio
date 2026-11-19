@@ -44,7 +44,9 @@ export interface PublishInput {
 
 /**
  * 公開（Public Profile・Publish・Unpublish）。**ログインを要求しない**（サインインしていなければ、どの操作も `not-signed-in`
- * で、端末の機能は何も変わらない）。失敗はすべて `AuthError`（通信・認証）か `PublishError`（サーバーが断った、アプリ側の前提の不備）。
+ * で、端末の機能は何も変わらない）。サーバーとやりとりする操作の失敗は、すべて `AuthError`（通信・認証）か `PublishError`（サーバーが断った、
+ * アプリ側の前提の不備）。**端末の中だけの操作は例外**: 公開タグの選択（`listPublicTagChoices`・`countPublicTags`・`setTagPublic`）と、未公開の変更の数え方
+ * （`countUnpublishedChanges`）は、通信もサインインも要らず、失敗は `ServiceError`・DBのエラーのまま（画面は、補助の情報として受ける）。
  *
  * 公開する曲は、`show`（Show Mode の Service）から取る: Ready の曲だけが、My Key・Private Note・ステータスを持たない形で来る。
  * 順序は Show Mode のアーティスト順で、これが公開ページの既定の並び（`sortOrder`）になる。
@@ -165,10 +167,11 @@ export function createPublishService({ db, access, publish, state, show, publicT
      * 最後に Publish したあとの、公開する曲の変更の数（「N unpublished changes」。7.4.9a）。**通信しない**。曲ごとに1つと数える
      * （曲名・アーティスト・公開タグのどれが変わっても1つ。Ready になった・Ready でなくなった・削除も）。並びと、Display Name・Bio の下書きは数えない。
      *
-     * `profile` は、`refreshProfile`（または Publish の応答）が返した、サーバーの今の状態。**数えられるのは、端末の記録が、サーバーに今ある
-     * 公開内容そのもののとき**だけ: 公開中で、記録の `username` と `baseVersion` が一致する。そうでなければ `null`（数えない）。
-     * 記録が無い（再インストール後）、前のアカウントのもの、別の端末が Publish した（記録より新しい版がある）ときは、端末の記録は、
-     * 今の公開内容と比べる基準にならない。次の Publish は、版の食い違いの確認を通る。
+     * `profile` は、呼ぶ側が最後に読んだ、サーバーの状態（`refreshProfile`・Publish の応答・版の食い違いの `profile`）。この関数は、サーバーに聞き直さない
+     * （渡された `profile` が古ければ、数も、その時点に対する値になる）。**数えられるのは、端末の記録が、その `profile` の公開内容そのもののとき**だけ:
+     * 公開中で、記録の `username` と `baseVersion` が一致する。そうでなければ `null`（数えない）。
+     * 記録が無い（再インストール後）、前のアカウントのもの、別の端末が Publish した（記録より新しい版がある。`profile` がそれを読んだあと）ときは、
+     * 端末の記録は、公開内容と比べる基準にならない。次の Publish は、版の食い違いの確認を通る。
      * 失敗（DBの読み取り）は、そのまま投げる。
      * `publish`・`unpublish` などと直列に実行する（待つのは、実行中の操作が終わるまで）。
      */
