@@ -350,8 +350,10 @@ v1.0より後（公開機能・Requests）の実装順序は、
         Display Name・Bio は、Publish のリクエストに載せる（Publishしたときに公開内容になる。単独で更新するエンドポイントは作らない。§8「公開スナップショットの形と上限」）。
         削除後に再利用させない `username` を残す表（`retired_usernames`）も、ここで作った（書き込みは 7.4.5）。`GET /me/profile`・`PUT /me/username`（競合は一意制約に任せる。同時の確保でも勝つのは1つ）。
         Node のテストと、`wrangler dev`（workerd）で確かめた（§8「公開プロフィールのエンドポイント」）
-    -   [ ] 7.4.4 Publish と Unpublish（Worker）。R2 を先に書き、成功したら D1 の版を更新する。`baseVersion` の照合（食い違いは 409）。Unpublish は R2 を消す
-        （`username` と D1 のプロフィールは残す）。公開の状態（公開中か、版、最終 Publish）の取得。D1 の書き込みは最小にする
+    -   [x] 7.4.4 Publish と Unpublish（Worker。`POST /me/publish`・`POST /me/unpublish`。`worker/src/publish.ts`）。版の予約（`baseVersion` の照合と「公開中」の印を1文で。食い違いは 409 と今の `profile`）→
+        R2 に書く。印は R2 に書く前に立てる。Unpublish は R2 を消してから印を下ろし、版を +1 する（`username` と控えは残す）。失敗のときは印を立てたまま（安全側）。
+        公開の状態は `GET /me/profile`（7.4.3）。D1 の書き込みは Publish・Unpublish とも1回。Node のテストと、`wrangler dev`（workerd。1000曲の Publish）で確かめた
+        （§8「Publish と Unpublish のエンドポイント」）
     -   [ ] 7.4.5 アカウントの削除と自動削除の見直し。`deleteUserAccount` に「`username` を読む → R2 を消す → D1 を消す」を足す（R2 の失敗なら D1 の行を残して失敗にする）。
         自己削除と Apple の `account-deleted` の両方が使う。自動削除の対象外（Publish済み）を、1か所の式として実装する（候補の SELECT と条件つきの DELETE で共有。
         「対象外は、消す瞬間にも見る」をテストで固定する）。ポリシーの「1年」の説明を直す準備をする。

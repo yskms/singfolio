@@ -12,6 +12,8 @@ export const workerDir = path.resolve(path.dirname(fileURLToPath(import.meta.url
 
 export interface LocalDatabase {
   db: D1Database;
+  /** DB のほか、wrangler.jsonc の binding（R2 の SNAPSHOTS など）を持つ。R2 は、ローカルの代用（バケットは作らない）。 */
+  env: Env;
   dispose(): Promise<void>;
 }
 
@@ -32,6 +34,7 @@ export async function openLocalDatabase(): Promise<LocalDatabase> {
   });
   return {
     db: proxy.env.DB,
+    env: proxy.env,
     async dispose() {
       await proxy.dispose();
       rmSync(stateDir, { recursive: true, force: true });

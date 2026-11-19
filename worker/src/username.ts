@@ -91,3 +91,13 @@ export function checkUsername(value: unknown): UsernameCheck {
   if (typeof value !== 'string' || !USERNAME_PATTERN.test(value)) return 'invalid';
   return RESERVED_USERNAMES.has(value) ? 'reserved' : 'ok';
 }
+
+/**
+ * 公開スナップショットの R2 のキー（docs §8「バックエンドが担当すること」）。**`username` から作る**（ユーザーIDにしない。
+ * 公開ページは `username` から直接引き、D1に触れない）。規則に合わない値からは作らない（キーを組み立てるパスに、
+ * `../` や `/` が入らないようにする。D1の値は規則の CHECK を通っているが、ここでも確かめる）。
+ */
+export function snapshotKey(username: string): string {
+  if (!USERNAME_PATTERN.test(username)) throw new Error('invalid username for snapshot key');
+  return `public/${username}.json`;
+}

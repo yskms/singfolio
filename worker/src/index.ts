@@ -6,6 +6,7 @@ import { handleLogin, handleLogout, handleLogoutOthers, handleNonce } from './au
 import { httpsRequiredResponse, isInsecureRequest } from './https.ts';
 import { runInactiveAccountDeletion } from './inactiveAccounts.ts';
 import { handleClaimUsername, handleGetProfile } from './profile.ts';
+import { handlePublish, handleUnpublish } from './publish.ts';
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -24,6 +25,8 @@ export default {
     // 公開プロフィール（7.4）。認証が要る。パスの最上位（`me`）は、確保させない名前（src/username.ts）。
     if (pathname === '/me/profile') return handleGetProfile(request, env, Date.now());
     if (pathname === '/me/username') return handleClaimUsername(request, env, Date.now());
+    if (pathname === '/me/publish') return handlePublish(request, env, Date.now());
+    if (pathname === '/me/unpublish') return handleUnpublish(request, env, Date.now());
 
     return new Response('Not Found', {
       status: 404,

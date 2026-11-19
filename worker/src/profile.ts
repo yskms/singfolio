@@ -23,7 +23,7 @@ export interface Profile {
   bio: string;
 }
 
-interface ProfileRow {
+export interface ProfileRow {
   username: string;
   version: number;
   published_at: number | null;
@@ -31,9 +31,9 @@ interface ProfileRow {
   bio: string;
 }
 
-const PROFILE_COLUMNS = 'username, version, published_at, display_name, bio';
+export const PROFILE_COLUMNS = 'username, version, published_at, display_name, bio';
 
-const toProfile = (row: ProfileRow): Profile => ({
+export const toProfile = (row: ProfileRow): Profile => ({
   username: row.username,
   version: row.version,
   published: row.published_at !== null,
