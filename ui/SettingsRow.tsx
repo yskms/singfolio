@@ -9,19 +9,21 @@ import { useTheme } from './theme';
  * 設定の項目（Settings の Appearance・Language・Tags・Artists・About）。押すと、選択肢のシートや別の画面を
  * 開く。`value` は、今の設定（右端に控えめに出す）。読み上げは、名前と値が続けて読まれる。
  * `external` は、アプリの外（ブラウザ）が開く項目。右端を、画面へ進む矢印ではなく、外へ出る印にする
- * （読み上げには、`accessibilityHint` で伝える）。
+ * （読み上げには、`accessibilityHint` で伝える）。`disabled` は、押せない状態（薄くして、読み上げにも伝える）。
  */
 export function SettingsRow({
   label,
   value,
   accessibilityHint,
   external = false,
+  disabled = false,
   onPress,
 }: {
   label: string;
   value?: string;
   accessibilityHint?: string;
   external?: boolean;
+  disabled?: boolean;
   onPress: () => void;
 }) {
   const { colors } = useTheme();
@@ -29,8 +31,10 @@ export function SettingsRow({
     <Pressable
       accessibilityRole="button"
       accessibilityHint={accessibilityHint}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [styles.row, { opacity: pressed ? 0.6 : 1 }]}
+      style={({ pressed }) => [styles.row, { opacity: disabled ? 0.5 : pressed ? 0.6 : 1 }]}
     >
       <Text style={[styles.label, { color: colors.textPrimary }]}>{label}</Text>
       <View style={styles.trailing}>

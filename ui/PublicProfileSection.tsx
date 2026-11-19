@@ -32,8 +32,8 @@ type ScreenState =
   | { kind: 'failed' }
   | { kind: 'signedOut' }
   // `profile` が `null` なら、まだ `username` を確保していない。`readyCount` は、公開する曲（Ready）の数、`publicTagCount` は、
-  // 公開に選んだタグの数（Public Tags 画面から戻ったときに読み直す）。
-  | { kind: 'ready'; profile: PublicProfile | null; readyCount: number; publicTagCount: number };
+  // 公開に選んだタグの数（Public Tags 画面から戻ったときに読み直す。行の値だけの補助の情報なので、読めなければ `null` で、値を出さない）。
+  | { kind: 'ready'; profile: PublicProfile | null; readyCount: number; publicTagCount: number | null };
 
 type NoticeKey = PublicProfileErrorMessageKey | 'publicProfile.published' | 'publicProfile.unpublished';
 
@@ -116,13 +116,10 @@ export function PublicProfileSection() {
       } else {
         profile = await publish.refreshProfile();
         const counts = await songs.countSongsByStatus();
-        const choices = await publish.listPublicTagChoices();
-        next = {
-          kind: 'ready',
-          profile,
-          readyCount: counts.ready,
-          publicTagCount: choices.filter((choice) => choice.isPublic).length,
-        };
+        // 行の値という補助の情報のために、Display Name・Bio・Publish まで使えなくしない（読めなければ、値を出さないだけ。
+        // `catch` の「サーバーの状態を読めなかった」にも混ぜない）。
+        const publicTagCount = await publish.countPublicTags().catch(() => null);
+        next = { kind: 'ready', profile, readyCount: counts.ready, publicTagCount };
       }
     } catch (error) {
       if (needsProfileReload(error)) {
@@ -158,11 +155,10 @@ export function PublicProfileSection() {
     if (focusKey === 0 || viewKindRef.current !== 'ready') return;
     let cancelled = false;
     getServices()
-      .then(({ publish }) => publish.listPublicTagChoices())
+      .then(({ publish }) => publish.countPublicTags())
       .then(
-        (choices) => {
+        (publicTagCount) => {
           if (cancelled) return;
-          const publicTagCount = choices.filter((choice) => choice.isPublic).length;
           setView((current) => (current.kind === 'ready' ? { ...current, publicTagCount } : current));
         },
         () => {},
@@ -343,7 +339,7 @@ export function PublicProfileSection() {
   // `ready` のときだけ値がある（`profile` が `null` なら、まだ `username` を確保していない）。
   const profile = view.kind === 'ready' ? view.profile : null;
   const readyCount = view.kind === 'ready' ? view.readyCount : 0;
-  const publicTagCount = view.kind === 'ready' ? view.publicTagCount : 0;
+  const publicTagCount = view.kind === 'ready' ? view.publicTagCount : null;
   const tooManySongs = readyCount > PUBLISH_LIMITS.songs;
 
   return (
@@ -441,10 +437,19 @@ export function PublicProfileSection() {
 
           <SettingsRow
             label={t('publicProfile.tags')}
-            value={publicTagCount === 0 ? t('publicProfile.tagsNone') : t('publicProfile.tagsCount', { count: publicTagCount })}
+            // 読めなかったときは、値を出さない（「なし」と取り違えない）。
+            value={
+              publicTagCount === null
+                ? undefined
+                : publicTagCount === 0
+                  ? t('publicProfile.tagsNone')
+                  : t('publicProfile.tagsCount', { count: publicTagCount })
+            }
             accessibilityHint={t('publicProfile.tagsHint')}
+            // 実行中は開かない（Publish が読んだあとに選択が変わると、公開される内容が画面の印象とずれる）。押せない状態は見た目と読み上げにも出す
+            // （`busy` の state は再描画まで古いので、`busyRef` でも見る）。
+            disabled={disabled}
             onPress={() => {
-              // 実行中は開かない（Publish が読んだあとに選択が変わると、公開される内容が画面の印象とずれる）。
               if (!busyRef.current) router.push('/public-tags');
             }}
           />

@@ -13,6 +13,12 @@ export function createPublicTagRepository() {
       return new Set(rows.map((row) => row.tag_id));
     },
 
+    /** 公開に選んだタグの数（`listIds` の件数と同じ。全件を読まない）。 */
+    async count(db: ReadExecutor): Promise<number> {
+      const row = await db.getFirstAsync<{ n: number }>('SELECT COUNT(*) AS n FROM public_tags');
+      return row?.n ?? 0;
+    },
+
     /** 公開に選ぶ。すでに選んでいれば何もしない。存在しないタグのIDは外部キーが断る（呼ぶ側が先に確かめる）。 */
     async add(tx: WriteExecutor, tagId: string): Promise<void> {
       await tx.runAsync('INSERT OR IGNORE INTO public_tags (tag_id) VALUES (?)', [tagId]);

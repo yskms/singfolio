@@ -132,6 +132,14 @@ export function createPublishService({ db, access, publish, state, show, publicT
     },
 
     /**
+     * 公開に選んだタグの数（Public Profile の行の値）。`public_tags` の件数だけを読む（`listPublicTagChoices` のように、Ready の曲を全件は読まない）。
+     * **数えるのは、オンにしたタグ**（Public Tags 画面のスイッチと同じ数）で、公開ページに実際に出るタグの数ではない（Ready の曲に付いていないタグも数える）。
+     */
+    countPublicTags(): Promise<number> {
+      return publicTags.count(db);
+    },
+
+    /**
      * タグを公開ページに出すか（`isPublic`）を決める。既定は、どのタグも出さない。次の Publish から反映される（公開中の内容はすぐには変わらない）。
      * 同じ値をもう一度設定しても成功する。存在しないタグを公開に選ぶと `tag-not-found`（外すときは何もしない）。タグを消すと選択も消える
      * （作り直した同じ名前のタグが、黙って公開されない）。名前を変えると、公開されるタグの名前も、次の Publish で変わる。

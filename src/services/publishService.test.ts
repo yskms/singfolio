@@ -305,6 +305,23 @@ describe('publish: 公開するタグ（7.4.8）', () => {
       );
     });
 
+    it('countPublicTags は、オンにしたタグの数だけを返す（Ready の曲に付いていないタグも数える。消したタグは数えない）', async () => {
+      const t = await setup();
+      assert.equal(await t.service.countPublicTags(), 0);
+      await t.services.songs.createSong({ title: 'A', artist: 'X', status: 'ready', newTagNames: ['ballad'] });
+      await t.services.songs.createSong({ title: 'B', artist: 'X', status: 'practice', newTagNames: ['only practice'] });
+      await t.service.setTagPublic(await tagId(t, 'ballad'), true);
+      await t.service.setTagPublic(await tagId(t, 'only practice'), true);
+      assert.equal(await t.service.countPublicTags(), 2);
+      // 数は、Public Tags 画面でオンのスイッチの数と同じ。
+      assert.equal((await t.service.listPublicTagChoices()).filter((c) => c.isPublic).length, 2);
+
+      await t.service.setTagPublic(await tagId(t, 'ballad'), false);
+      assert.equal(await t.service.countPublicTags(), 1);
+      await t.services.tags.deleteTag(await tagId(t, 'only practice'));
+      assert.equal(await t.service.countPublicTags(), 0);
+    });
+
     it('通信しない・サインインも要らない（端末内だけの設定）', async () => {
       const t = await setup({ access: signedOut });
       await t.services.songs.createSong({ title: 'A', artist: 'X', status: 'ready', newTagNames: ['ballad'] });
