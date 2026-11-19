@@ -309,9 +309,10 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
 
 -   UI → Service → Repository → SQLite の一方向。画面はRepository・DBに触れず、
     `getServices()` のServiceだけを使う。例外は、`src/services/` の、DBに触れない純粋な関数
-    （`text.ts` の正規化・`tagInput.ts`・`suggestionRules.ts`）、`ServiceError`、入力の型で、
+    （`text.ts` の正規化・`tagInput.ts`・`suggestionRules.ts`・`readingRules.ts`・`artistReadingDictionary.ts`・
+    `username.ts`・`publishSnapshot.ts` の `PUBLISH_LIMITS`）、`ServiceError`・`PublishError`、入力の型で、
     保存前の入力の確認を、Serviceと同じ判定にそろえるために画面から直接importしてよい
-    （Add / Edit Songの、空の曲名の判定・新規タグの重複の判定・アーティストの候補の結合）。それ以外（`createServices`・Serviceの実装・
+    （Add / Edit Songの、空の曲名の判定・新規タグの重複の判定・アーティストの候補の結合、Public Profile の入力欄の長さ）。それ以外（`createServices`・Serviceの実装・
     `repositories/`・`db/`）は、画面から使わない。
 -   DBへの書き込みは、必ず `Database.transaction` の中で行う（expo-sqliteの
     `withTransactionAsync` は排他ではないため）。`Database` を読み取り専用の型に
