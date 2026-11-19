@@ -10,6 +10,12 @@ export {
   type AccountErrorMessageKey,
 } from './authErrors.ts';
 export {
+  needsProfileReload,
+  publicProfileErrorMessageKey,
+  type PublicProfileAction,
+  type PublicProfileErrorMessageKey,
+} from './publishErrors.ts';
+export {
   errorMessageKey,
   errorScreenContent,
   type ErrorMessageKey,

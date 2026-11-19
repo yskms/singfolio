@@ -72,6 +72,8 @@ export const en = {
   'profile.showMySongs': 'Show My Songs',
   // 読み上げ用。ボタンの名前と、開く画面（Show Mode）の名前が違うので、行き先を添える。
   'profile.showMySongsHint': 'Opens Show Mode',
+  // Public Profile（公開機能。アカウントが使えるビルドだけ出す入口）。画面の名前と同じ。
+  'profile.publicProfile': 'Public Profile',
 
   // Settings の項目（ui/SettingsSection.tsx）。Language の English / 日本語 は、その言語自身の
   // 名前で出すので、文言ではなく `languageNames`（src/i18n）。System だけは、表示中の言語の文言。
@@ -264,6 +266,73 @@ export const en = {
   // 削除の 401。削除の再試行とは限らない（別の端末のサインアウトや、使わないままの失効でも起きる）ので、両方の場合を伝える。
   'account.error.deleteSignedOut':
     'You were signed out. Your account may already be deleted. If it still exists, sign in again to delete it.',
+
+  // Public Profile（app/public-profile.tsx。Profile の Public Profile から開く）。公開は、アカウントを作った人が自分で選んだときだけ。
+  // 失敗の文言は publicProfile.error.* と account.error.*（対応は src/i18n/publishErrors.ts）。
+  'publicProfile.title': 'Public Profile',
+  'publicProfile.signedOutNote':
+    'Sign in to share your Ready songs on a public page. You don’t need an account to use Singfolio.',
+  'publicProfile.goToAccount': 'Go to Account',
+  'publicProfile.loadFailed': 'Couldn’t load your public profile.',
+  'publicProfile.retry': 'Try again',
+  'publicProfile.username.title': 'Choose your username',
+  'publicProfile.username.label': 'Username',
+  'publicProfile.username.note': 'Use 3 to 20 letters, numbers, or underscores. You can’t change it later.',
+  'publicProfile.username.preview': 'Your page will be at {address}',
+  'publicProfile.username.claim': 'Use this username',
+  'publicProfile.username.confirmTitle': 'Use “{username}”?',
+  'publicProfile.username.confirmMessage': 'Your public page will be at {address}. You can’t change this later.',
+  'publicProfile.username.confirmAction': 'Use username',
+  'publicProfile.claiming': 'Saving your username…',
+  'publicProfile.status.published': 'Published',
+  'publicProfile.status.notPublished': 'Not published',
+  'publicProfile.lastPublished': 'Last published {time}',
+  'publicProfile.displayName': 'Display Name',
+  'publicProfile.bio': 'Bio',
+  'publicProfile.sharedNote':
+    'Your page shows your Display Name, Bio, and the title and artist of your Ready songs. My Key, Private Note, and status are never shared.',
+  'publicProfile.readyCount': {
+    one: '{count} Ready song will be published.',
+    other: '{count} Ready songs will be published.',
+  },
+  'publicProfile.tooManySongs':
+    'You have {count} Ready songs, but a public profile can show up to {limit}. Move some to Practice or Want to publish.',
+  'publicProfile.publish': 'Publish Now',
+  'publicProfile.publishing': 'Publishing…',
+  'publicProfile.published': 'Your profile is published.',
+  'publicProfile.publishConfirmTitle': 'Publish your profile?',
+  'publicProfile.publishConfirmMessage':
+    'Anyone can see your Display Name, Bio, and Ready songs at {address}. My Key, Private Note, and status are never shared.',
+  'publicProfile.publishConfirmAction': 'Publish',
+  // 版が食い違うとき（別の端末から Publish した、再インストール後、応答を受け取れなかった Publish のあと）。
+  'publicProfile.replaceTitle': 'Replace the profile?',
+  'publicProfile.replaceMessage':
+    'This profile was changed somewhere else, or your last publish didn’t finish. Continue to replace it with this device’s Display Name, Bio, and Ready songs.',
+  'publicProfile.replaceAction': 'Replace',
+  'publicProfile.unpublish': 'Unpublish Profile',
+  'publicProfile.unpublishNote': 'Hides your public page. Songs on this device are not deleted.',
+  'publicProfile.unpublishConfirmTitle': 'Unpublish your profile?',
+  'publicProfile.unpublishConfirmMessage':
+    'Your public page will no longer be visible. Songs on this device are not deleted, and the username stays yours.',
+  'publicProfile.unpublishConfirmAction': 'Unpublish',
+  'publicProfile.unpublishing': 'Unpublishing…',
+  'publicProfile.unpublished': 'Your profile is no longer published.',
+  'publicProfile.discardTitle': 'Discard changes?',
+  'publicProfile.discardMessage': 'Your changes haven’t been published.',
+  'publicProfile.keepEditing': 'Keep editing',
+  'publicProfile.discard': 'Discard',
+  'publicProfile.error.usernameInvalid': 'Use 3 to 20 letters, numbers, or underscores.',
+  'publicProfile.error.usernameUnavailable': 'That username isn’t available. Try another one.',
+  'publicProfile.error.usernameAlreadySet': 'This account already has a username.',
+  'publicProfile.error.usernameRequired': 'Choose a username first.',
+  'publicProfile.error.displayNameRequired': 'Enter a Display Name.',
+  'publicProfile.error.tooManySongs':
+    'You have too many Ready songs to publish. Move some to Practice or Want and try again.',
+  'publicProfile.error.tooLarge':
+    'Your profile is too large to publish. Shorten long titles or move some songs out of Ready.',
+  // Publish の応答を受け取れなかったとき。サーバーでは済んでいることがある（送り直すと、置き換えの確認になる）。
+  'publicProfile.error.publishNetwork':
+    'The connection was lost, so we can’t tell whether your profile was published. Please try again.',
 
   // ServiceErrorCode → 文言の対応は errors.ts。
   'error.titleRequired': 'Enter a title.',

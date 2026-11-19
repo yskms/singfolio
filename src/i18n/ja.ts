@@ -54,6 +54,7 @@ export const ja: Record<MessageKey, Message> = {
   'profile.count': { other: '歌える曲は{count}曲' },
   'profile.showMySongs': '歌える曲を見せる',
   'profile.showMySongsHint': 'Show Modeを開きます',
+  'profile.publicProfile': '公開プロフィール',
 
   'settings.appearance': '外観',
   'settings.appearance.system': 'システム',
@@ -218,6 +219,66 @@ export const ja: Record<MessageKey, Message> = {
     'サーバーに接続できず、アカウントが削除されたかどうか分かりません。もう一度お試しください。サインアウトされた場合は、すでに削除されている可能性があります。',
   'account.error.deleteSignedOut':
     'サインアウトされました。アカウントはすでに削除されている可能性があります。残っている場合は、サインインし直して削除してください。',
+
+  'publicProfile.title': '公開プロフィール',
+  'publicProfile.signedOutNote':
+    'サインインすると、歌える曲を公開ページで見せられます。Singfolio はアカウントなしで使えます。',
+  'publicProfile.goToAccount': 'アカウントを開く',
+  'publicProfile.loadFailed': '公開プロフィールを読み込めませんでした。',
+  'publicProfile.retry': 'もう一度試す',
+  'publicProfile.username.title': 'ユーザー名を決める',
+  'publicProfile.username.label': 'ユーザー名',
+  'publicProfile.username.note': '英字・数字・アンダースコアの3〜20字。あとから変更できません。',
+  'publicProfile.username.preview': '公開ページ: {address}',
+  'publicProfile.username.claim': 'このユーザー名にする',
+  'publicProfile.username.confirmTitle': '「{username}」にしますか？',
+  'publicProfile.username.confirmMessage': '公開ページのアドレスは {address} になります。あとから変更できません。',
+  'publicProfile.username.confirmAction': 'この名前にする',
+  'publicProfile.claiming': 'ユーザー名を保存しています…',
+  'publicProfile.status.published': '公開中',
+  'publicProfile.status.notPublished': '未公開',
+  'publicProfile.lastPublished': '最終公開 {time}',
+  'publicProfile.displayName': '表示名',
+  'publicProfile.bio': '自己紹介',
+  'publicProfile.sharedNote':
+    '公開ページには、表示名・自己紹介と、歌える曲の曲名・アーティスト名が載ります。キー・プライベートメモ・ステータスは公開されません。',
+  'publicProfile.readyCount': { other: '歌える曲{count}曲を公開します。' },
+  'publicProfile.tooManySongs':
+    '歌える曲が{count}曲あります。公開プロフィールに載せられるのは{limit}曲までです。一部を練習中か歌いたいに移すと公開できます。',
+  'publicProfile.publish': '今すぐ公開',
+  'publicProfile.publishing': '公開しています…',
+  'publicProfile.published': 'プロフィールを公開しました。',
+  'publicProfile.publishConfirmTitle': 'プロフィールを公開しますか？',
+  'publicProfile.publishConfirmMessage':
+    '{address} で、誰でも表示名・自己紹介・歌える曲を見られるようになります。キー・プライベートメモ・ステータスは公開されません。',
+  'publicProfile.publishConfirmAction': '公開',
+  'publicProfile.replaceTitle': 'プロフィールを置き換えますか？',
+  'publicProfile.replaceMessage':
+    'このプロフィールは、ほかの場所で変更されたか、前回の公開が完了していません。続けると、この端末の表示名・自己紹介・歌える曲に置き換わります。',
+  'publicProfile.replaceAction': '置き換える',
+  'publicProfile.unpublish': '公開をやめる',
+  'publicProfile.unpublishNote': '公開ページを見えなくします。この端末の曲は削除されません。',
+  'publicProfile.unpublishConfirmTitle': '公開をやめますか？',
+  'publicProfile.unpublishConfirmMessage':
+    '公開ページが見えなくなります。この端末の曲は削除されません。ユーザー名はあなたのものとして残ります。',
+  'publicProfile.unpublishConfirmAction': '公開をやめる',
+  'publicProfile.unpublishing': '公開をやめています…',
+  'publicProfile.unpublished': '公開をやめました。',
+  'publicProfile.discardTitle': '変更を破棄しますか？',
+  'publicProfile.discardMessage': '変更はまだ公開されていません。',
+  'publicProfile.keepEditing': '編集を続ける',
+  'publicProfile.discard': '破棄',
+  'publicProfile.error.usernameInvalid': '英字・数字・アンダースコアの3〜20字で入力してください。',
+  'publicProfile.error.usernameUnavailable': 'このユーザー名は使えません。別の名前をお試しください。',
+  'publicProfile.error.usernameAlreadySet': 'このアカウントにはすでにユーザー名があります。',
+  'publicProfile.error.usernameRequired': '先にユーザー名を決めてください。',
+  'publicProfile.error.displayNameRequired': '表示名を入力してください。',
+  'publicProfile.error.tooManySongs':
+    '歌える曲が多すぎて公開できません。一部を練習中か歌いたいに移して、もう一度お試しください。',
+  'publicProfile.error.tooLarge':
+    'プロフィールが大きすぎて公開できません。長い曲名を短くするか、歌える曲を減らしてください。',
+  'publicProfile.error.publishNetwork':
+    '接続が切れたため、公開できたか分かりません。もう一度お試しください。',
 
   'error.titleRequired': '曲名を入力してください。',
   'error.artistRequired': 'アーティスト名を入力してください。',

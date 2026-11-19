@@ -14,6 +14,7 @@ import {
 import type { AuthProvider } from '../src/domain/types';
 import { accountErrorMessageKey, type AccountAction } from '../src/i18n';
 import { getServices } from '../src/services';
+import { ActionButton, BUTTON_RADIUS } from './ActionButton';
 import { useI18n } from './i18n';
 import { Text } from './Text';
 import { useTheme } from './theme';
@@ -191,6 +192,7 @@ export function AccountSection() {
       {view.kind === 'signedOut' && (
         <View style={styles.block}>
           <Text style={[styles.note, { color: colors.textSecondary }]}>{t('account.signedOutNote')}</Text>
+          {/* Googleと、iOS以外のAppleのボタン。ロゴは使わない（各社のロゴの規約に踏み込まないため）。 */}
           <View style={styles.buttons}>
             {Platform.OS === 'ios' ? (
               // Appleの規約に沿った見た目と文言（OSが、端末の言語で出す）。背景色・角丸は、`style` ではなく専用の
@@ -257,8 +259,6 @@ export function AccountSection() {
   );
 }
 
-const BUTTON_RADIUS = 12;
-
 const busyKeys = {
   signIn: 'account.signingIn',
   signOut: 'account.signingOut',
@@ -268,37 +268,6 @@ const busyKeys = {
 
 function providerName(t: ReturnType<typeof useI18n>['t'], provider: AuthProvider): string {
   return provider === 'apple' ? t('account.providerApple') : t('account.providerGoogle');
-}
-
-/** サインインのボタン（Googleと、iOS以外のApple）。ロゴは使わない（各社のロゴの規約に踏み込まないため）。 */
-function ActionButton({
-  label,
-  disabled,
-  onPress,
-}: {
-  label: string;
-  disabled: boolean;
-  onPress: () => void;
-}) {
-  const { colors } = useTheme();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ disabled }}
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.button,
-        {
-          backgroundColor: colors.surface,
-          borderColor: colors.border,
-          opacity: disabled ? 0.5 : pressed ? 0.7 : 1,
-        },
-      ]}
-    >
-      <Text style={[styles.buttonLabel, { color: colors.textPrimary }]}>{label}</Text>
-    </Pressable>
-  );
 }
 
 /** サインイン中の操作の行（ログアウト・ほかの端末のログアウト・削除）。`note` は、行の下の補足。 */
@@ -340,15 +309,6 @@ const styles = StyleSheet.create({
   buttons: { gap: 12 },
   // 高さと幅が無いと、Appleのボタンは画面に出ない。
   appleButton: { width: '100%', height: 48 },
-  button: {
-    minHeight: 48,
-    paddingHorizontal: 20,
-    borderRadius: BUTTON_RADIUS,
-    borderWidth: StyleSheet.hairlineWidth,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buttonLabel: { fontSize: 16, lineHeight: 22, fontWeight: '700' },
   signedIn: { fontSize: 16, lineHeight: 22, fontWeight: '700' },
   rowWrap: { gap: 0 },
   row: { minHeight: 48, justifyContent: 'center' },

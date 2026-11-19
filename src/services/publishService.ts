@@ -7,6 +7,7 @@ import type { PublishState, PublishStateRepository } from '../repositories/publi
 import type { SessionAccess } from './accountService.ts';
 import { buildPublishBody, songContentHash, type PublishSongSource } from './publishSnapshot.ts';
 import type { ShowService } from './showService.ts';
+import { normalizeUsernameInput } from './username.ts';
 
 export interface PublishServiceDeps {
   db: Database;
@@ -116,7 +117,7 @@ export function createPublishService({ db, access, publish, state, show }: Publi
       return serialize(() =>
         known(async () => {
           const profile = await access.withSession((session) =>
-            publish.claimUsername(session, username.trim().toLowerCase()),
+            publish.claimUsername(session, normalizeUsernameInput(username)),
           );
           const current = await state.get(db);
           // すでにこの `username` の記録があれば、触れない（確保のやり直しで、`baseVersion` を進めない）。別のアカウントの記録は捨てる。

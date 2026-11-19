@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet } from 'react-native';
 
 import { getServices } from '../../src/services';
+import { ActionButton } from '../../ui/ActionButton';
 import { useI18n } from '../../ui/i18n';
 import { Text } from '../../ui/Text';
 import { useTheme } from '../../ui/theme';
@@ -18,6 +19,8 @@ export default function ProfileScreen() {
   // 歌える（Ready）曲の数。読み込み前は undefined。再読み込みのあいだは前の値を出し続ける
   // （タブを切り替えるたびに、件数が一瞬消えないように）。
   const [readyCount, setReadyCount] = useState<number | undefined>(undefined);
+  // Public Profile（公開機能）の入口を出すか。アカウントが使えないビルド（`account.available` が偽）では出さない。
+  const [publicProfileAvailable, setPublicProfileAvailable] = useState(false);
   // 他の画面で曲が変わったあと（Songs の行のボタン、Song Detail など）にこのタブへ
   // 戻ってきたら、読み直す。
   const refreshKey = useFocusRefreshKey();
@@ -28,9 +31,11 @@ export default function ProfileScreen() {
     // 読み込み中に再び読み込みが始まったとき、先の結果で上書きしない。
     let cancelled = false;
     (async () => {
-      const { songs } = await getServices();
+      const { songs, account } = await getServices();
       const counts = await songs.countSongsByStatus();
-      if (!cancelled) setReadyCount(counts.ready);
+      if (cancelled) return;
+      setReadyCount(counts.ready);
+      setPublicProfileAvailable(account.available);
     })().catch((error) => {
       if (!cancelled) setFailure({ error });
     });
@@ -65,6 +70,11 @@ export default function ProfileScreen() {
       >
         <Text style={[styles.buttonLabel, { color: colors.onPrimary }]}>{t('profile.showMySongs')}</Text>
       </Pressable>
+
+      {publicProfileAvailable && (
+        // 公開プロフィールの設定。連打で重ねて開かない（`app/_layout.tsx` の `dangerouslySingular`）。
+        <ActionButton label={t('profile.publicProfile')} onPress={() => router.push('/public-profile')} />
+      )}
     </ScrollView>
   );
 }

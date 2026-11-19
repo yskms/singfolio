@@ -6,14 +6,24 @@ import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
 import { LANGUAGES } from '../domain/types.ts';
-import { AuthError, DatabaseTooNewError, ServiceError, type AuthErrorCode } from '../services/errors.ts';
+import {
+  AuthError,
+  DatabaseTooNewError,
+  PublishError,
+  ServiceError,
+  type AuthErrorCode,
+  type PublishErrorCode,
+} from '../services/errors.ts';
 import {
   accountErrorMessageKey,
   catalogs,
   createAppTranslator,
   errorMessageKey,
   errorScreenContent,
+  needsProfileReload,
+  publicProfileErrorMessageKey,
   type AccountAction,
+  type PublicProfileAction,
   type MessageKey,
 } from './index.ts';
 import { en } from './en.ts';
@@ -242,5 +252,98 @@ describe('accountErrorMessageKey', () => {
     assert.equal(accountErrorMessageKey(new AuthError('unexpected'), 'deleteAccount'), 'error.unexpected');
     assert.equal(accountErrorMessageKey(new Error('boom'), 'signIn'), 'error.unexpected');
     assert.equal(accountErrorMessageKey(undefined, 'signOut'), 'error.unexpected');
+  });
+});
+
+describe('publicProfileErrorMessageKey', () => {
+  // 全コードを挙げる（足し忘れは型エラー）。
+  const authCodes: Record<AuthErrorCode, true> = {
+    cancelled: true,
+    network: true,
+    unavailable: true,
+    unauthorized: true,
+    'invalid-request': true,
+    'invalid-response': true,
+    'provider-unavailable': true,
+    'provider-failed': true,
+    timeout: true,
+    'already-signed-in': true,
+    'not-signed-in': true,
+    'reauth-failed': true,
+    'account-mismatch': true,
+    'storage-failed': true,
+    'delete-unconfirmed': true,
+    unexpected: true,
+  };
+  const publishCodes: Record<PublishErrorCode, true> = {
+    'username-required': true,
+    'username-invalid': true,
+    'username-unavailable': true,
+    'username-already-set': true,
+    'version-conflict': true,
+    'display-name-required': true,
+    'too-many-songs': true,
+    'invalid-snapshot': true,
+    'too-large': true,
+  };
+  const actions: PublicProfileAction[] = ['load', 'claimUsername', 'publish', 'unpublish'];
+
+  it('すべての操作・失敗の種類で、英語・日本語の文言があるキーに決まる', () => {
+    for (const action of actions) {
+      const errors = [
+        ...(Object.keys(authCodes) as AuthErrorCode[]).map((code) => new AuthError(code)),
+        ...(Object.keys(publishCodes) as PublishErrorCode[]).map((code) => new PublishError(code)),
+        new Error('boom'),
+        undefined,
+      ];
+      for (const error of errors) {
+        const key = publicProfileErrorMessageKey(error, action);
+        for (const language of LANGUAGES) assert.ok(key in catalogs[language], `${action}: ${key}`);
+      }
+    }
+  });
+
+  it('サーバーが理由を返して断ったものは、それぞれの文言', () => {
+    assert.equal(publicProfileErrorMessageKey(new PublishError('username-invalid'), 'claimUsername'), 'publicProfile.error.usernameInvalid');
+    assert.equal(
+      publicProfileErrorMessageKey(new PublishError('username-unavailable'), 'claimUsername'),
+      'publicProfile.error.usernameUnavailable',
+    );
+    assert.equal(publicProfileErrorMessageKey(new PublishError('display-name-required'), 'publish'), 'publicProfile.error.displayNameRequired');
+    assert.equal(publicProfileErrorMessageKey(new PublishError('too-large'), 'publish'), 'publicProfile.error.tooLarge');
+  });
+
+  it('Publish の network だけは「公開できたか分からない」。ほかの操作の network は、ふつうの文言', () => {
+    assert.equal(publicProfileErrorMessageKey(new AuthError('network'), 'publish'), 'publicProfile.error.publishNetwork');
+    assert.equal(publicProfileErrorMessageKey(new AuthError('network'), 'unpublish'), 'account.error.network');
+    assert.equal(publicProfileErrorMessageKey(new AuthError('network'), 'load'), 'account.error.network');
+  });
+
+  it('401 とサインインしていない状態は、サインアウトされたと伝える', () => {
+    for (const code of ['unauthorized', 'not-signed-in'] as const) {
+      assert.equal(publicProfileErrorMessageKey(new AuthError(code), 'publish'), 'account.error.signedOut');
+    }
+  });
+
+  it('アプリの不具合・読めない応答・想定外は、汎用の文言（snapshot の検証の失敗を含む）', () => {
+    assert.equal(publicProfileErrorMessageKey(new AuthError('invalid-response'), 'publish'), 'error.unexpected');
+    assert.equal(publicProfileErrorMessageKey(new AuthError('unexpected'), 'load'), 'error.unexpected');
+    assert.equal(publicProfileErrorMessageKey(new PublishError('invalid-snapshot'), 'publish'), 'error.unexpected');
+    assert.equal(publicProfileErrorMessageKey(new Error('boom'), 'publish'), 'error.unexpected');
+  });
+
+  it('読み直すべき失敗: サインインが外れた、username の有無が食い違った', () => {
+    assert.equal(needsProfileReload(new AuthError('unauthorized')), true);
+    assert.equal(needsProfileReload(new AuthError('not-signed-in')), true);
+    assert.equal(needsProfileReload(new PublishError('username-required')), true);
+    assert.equal(needsProfileReload(new PublishError('username-already-set')), true);
+    assert.equal(needsProfileReload(new AuthError('network')), false);
+    assert.equal(needsProfileReload(new PublishError('username-invalid')), false);
+    assert.equal(needsProfileReload(new Error('boom')), false);
+  });
+
+  it('公開の確認の文言は、秘密の項目は公開しないと明示する', () => {
+    assert.match(en['publicProfile.sharedNote'], /My Key, Private Note, and status are never shared/);
+    assert.match(en['publicProfile.publishConfirmMessage'], /never shared/);
   });
 });
