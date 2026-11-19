@@ -20,6 +20,7 @@ import { ActionButton } from './ActionButton';
 import { FormField } from './FormField';
 import { FormInput } from './FormInput';
 import { useI18n } from './i18n';
+import { SettingsRow } from './SettingsRow';
 import { Text } from './Text';
 import { useTheme } from './theme';
 import { useFocusRefreshKey } from './useFocusRefreshKey';
@@ -30,8 +31,9 @@ type ScreenState =
   // サーバーの状態を読めなかった（通信・サーバー）。「公開していない」とは取り違えない。
   | { kind: 'failed' }
   | { kind: 'signedOut' }
-  // `profile` が `null` なら、まだ `username` を確保していない。`readyCount` は、公開する曲（Ready）の数。
-  | { kind: 'ready'; profile: PublicProfile | null; readyCount: number };
+  // `profile` が `null` なら、まだ `username` を確保していない。`readyCount` は、公開する曲（Ready）の数、`publicTagCount` は、
+  // 公開に選んだタグの数（Public Tags 画面から戻ったときに読み直す）。
+  | { kind: 'ready'; profile: PublicProfile | null; readyCount: number; publicTagCount: number };
 
 type NoticeKey = PublicProfileErrorMessageKey | 'publicProfile.published' | 'publicProfile.unpublished';
 
@@ -114,7 +116,13 @@ export function PublicProfileSection() {
       } else {
         profile = await publish.refreshProfile();
         const counts = await songs.countSongsByStatus();
-        next = { kind: 'ready', profile, readyCount: counts.ready };
+        const choices = await publish.listPublicTagChoices();
+        next = {
+          kind: 'ready',
+          profile,
+          readyCount: counts.ready,
+          publicTagCount: choices.filter((choice) => choice.isPublic).length,
+        };
       }
     } catch (error) {
       if (needsProfileReload(error)) {
@@ -143,6 +151,26 @@ export function PublicProfileSection() {
   useEffect(() => {
     if (focusKey > 0 && (viewKindRef.current === 'signedOut' || viewKindRef.current === 'failed')) void load();
   }, [focusKey, load]);
+
+  // Public Tags から戻ったとき（選んだタグの数が変わったかもしれない）、数だけを読み直す。入力中の下書きには触れない。
+  // 読めなくても、前の数のまま（行の値が古くなるだけ。選択そのものは Public Tags 画面が持つ）。
+  useEffect(() => {
+    if (focusKey === 0 || viewKindRef.current !== 'ready') return;
+    let cancelled = false;
+    getServices()
+      .then(({ publish }) => publish.listPublicTagChoices())
+      .then(
+        (choices) => {
+          if (cancelled) return;
+          const publicTagCount = choices.filter((choice) => choice.isPublic).length;
+          setView((current) => (current.kind === 'ready' ? { ...current, publicTagCount } : current));
+        },
+        () => {},
+      );
+    return () => {
+      cancelled = true;
+    };
+  }, [focusKey]);
 
   const isDirty = displayName !== base.displayName || bio !== base.bio;
 
@@ -315,6 +343,7 @@ export function PublicProfileSection() {
   // `ready` のときだけ値がある（`profile` が `null` なら、まだ `username` を確保していない）。
   const profile = view.kind === 'ready' ? view.profile : null;
   const readyCount = view.kind === 'ready' ? view.readyCount : 0;
+  const publicTagCount = view.kind === 'ready' ? view.publicTagCount : 0;
   const tooManySongs = readyCount > PUBLISH_LIMITS.songs;
 
   return (
@@ -409,6 +438,16 @@ export function PublicProfileSection() {
               {bio.length} / {PUBLISH_LIMITS.bioChars}
             </Text>
           </FormField>
+
+          <SettingsRow
+            label={t('publicProfile.tags')}
+            value={publicTagCount === 0 ? t('publicProfile.tagsNone') : t('publicProfile.tagsCount', { count: publicTagCount })}
+            accessibilityHint={t('publicProfile.tagsHint')}
+            onPress={() => {
+              // 実行中は開かない（Publish が読んだあとに選択が変わると、公開される内容が画面の印象とずれる）。
+              if (!busyRef.current) router.push('/public-tags');
+            }}
+          />
 
           <Text style={[styles.note, { color: colors.textSecondary }]}>{t('publicProfile.sharedNote')}</Text>
           <Text

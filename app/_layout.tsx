@@ -17,7 +17,7 @@ export { ErrorScreen as ErrorBoundary } from '../ui/ErrorScreen';
 // （app/song/）は、このStackに載せ、タブバーを隠して全画面で出す（ヘッダーは各画面が指定する）。
 // Show Mode（app/show.tsx）も、このStackに載せ、タブバーを隠して全画面で出す。Settingsの、Tags・Account・About
 // （app/tags.tsx・app/account.tsx・app/about.tsx）と、Aboutから開く Open source licenses（app/licenses.tsx）と、
-// Profileから開く Public Profile（app/public-profile.tsx）も同じ。
+// Profileから開く Public Profile（app/public-profile.tsx）と、そこから開く Public Tags（app/public-tags.tsx）も同じ。
 // 下の `initialRouteName` は、ディープリンクで詳細画面だけが開かれたとき、下にタブが無く、
 // 戻る操作でアプリが終了するのを防ぐ。
 export const unstable_settings = { initialRouteName: '(tabs)' };
@@ -89,6 +89,7 @@ export default function RootLayout() {
           <Stack.Screen name="about" dangerouslySingular />
           <Stack.Screen name="account" dangerouslySingular />
           <Stack.Screen name="public-profile" dangerouslySingular />
+          <Stack.Screen name="public-tags" dangerouslySingular />
           <Stack.Screen name="licenses" dangerouslySingular />
         </Stack>
       </ThemeProvider>

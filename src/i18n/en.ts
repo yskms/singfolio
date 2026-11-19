@@ -290,7 +290,7 @@ export const en = {
   'publicProfile.displayName': 'Display Name',
   'publicProfile.bio': 'Bio',
   'publicProfile.sharedNote':
-    'Your page shows your Display Name, Bio, and the title and artist of your Ready songs. My Key, Private Note, and status are never shared.',
+    'Your page shows your Display Name, Bio, and the title, artist, and public tags of your Ready songs. My Key, Private Note, and status are never shared.',
   'publicProfile.readyCount': {
     one: '{count} Ready song will be published.',
     other: '{count} Ready songs will be published.',
@@ -302,17 +302,17 @@ export const en = {
   'publicProfile.published': 'Your profile is published.',
   'publicProfile.publishConfirmTitle': 'Publish your profile?',
   'publicProfile.publishConfirmMessage':
-    'Anyone can see your Display Name, Bio, and Ready songs at {address}. My Key, Private Note, and status are never shared.',
+    'Anyone can see your Display Name, Bio, Ready songs, and public tags at {address}. My Key, Private Note, and status are never shared.',
   'publicProfile.publishConfirmAction': 'Publish',
   // 版が食い違うとき（別の端末から Publish した、再インストール後、応答を受け取れなかった Publish のあと）。
   'publicProfile.replaceTitle': 'Replace the profile?',
   'publicProfile.replaceMessage':
-    'This profile was changed somewhere else, or your last publish didn’t finish. Continue to replace it with this device’s Display Name, Bio, and Ready songs.',
+    'This profile was changed somewhere else, or your last publish didn’t finish. Continue to replace it with this device’s Display Name, Bio, Ready songs, and public tags.',
   'publicProfile.replaceAction': 'Replace',
   // 公開中と見て確認なしで送ったのに、サーバーは非公開だったとき（別の端末で、画面を開いたあとに非公開にされた）。公開の確認と同じことを伝える。
   'publicProfile.republishTitle': 'Publish again?',
   'publicProfile.republishMessage':
-    'This profile was unpublished since you opened this screen. Continue to publish it again with this device’s Display Name, Bio, and Ready songs. Anyone can see them at {address}. My Key, Private Note, and status are never shared.',
+    'This profile was unpublished since you opened this screen. Continue to publish it again with this device’s Display Name, Bio, Ready songs, and public tags. Anyone can see them at {address}. My Key, Private Note, and status are never shared.',
   'publicProfile.unpublish': 'Unpublish Profile',
   'publicProfile.unpublishNote': 'Hides your public page. Songs on this device are not deleted.',
   'publicProfile.unpublishConfirmTitle': 'Unpublish your profile?',
@@ -337,6 +337,21 @@ export const en = {
   // Publish の応答を受け取れなかったとき。サーバーでは済んでいることがある（送り直すと、置き換えの確認になる）。
   'publicProfile.error.publishNetwork':
     'The connection was lost, so we can’t tell whether your profile was published. Please try again.',
+
+  // 公開するタグの選び方（Public Profile の行と、Public Tags 画面）。
+  'publicProfile.tags': 'Public Tags',
+  'publicProfile.tagsNone': 'None',
+  'publicProfile.tagsCount': { one: '{count} tag', other: '{count} tags' },
+  'publicProfile.tagsHint': 'Choose which tags appear on your public page',
+  'publicTags.title': 'Public Tags',
+  'publicTags.intro':
+    'Turn on the tags you want to show on your public page. They appear on the Ready songs that have them. Tags that are off stay private.',
+  'publicTags.applyNote': 'Changes appear on your public page the next time you publish.',
+  'publicTags.limitNote': 'Each song shows up to {limit} public tags.',
+  'publicTags.songCount': { one: '{count} Ready song', other: '{count} Ready songs' },
+  'publicTags.empty.title': 'No tags yet',
+  'publicTags.empty.message': 'Add tags to your songs, then choose here which ones to show.',
+  'publicTags.saveFailedTitle': 'Couldn’t save',
 
   // ServiceErrorCode → 文言の対応は errors.ts。
   'error.titleRequired': 'Enter a title.',

@@ -241,7 +241,7 @@ export const ja: Record<MessageKey, Message> = {
   'publicProfile.displayName': '表示名',
   'publicProfile.bio': '自己紹介',
   'publicProfile.sharedNote':
-    '公開ページには、表示名・自己紹介と、歌える曲の曲名・アーティスト名が載ります。キー・プライベートメモ・ステータスは公開されません。',
+    '公開ページには、表示名・自己紹介と、歌える曲の曲名・アーティスト名・公開タグが載ります。キー・プライベートメモ・ステータスは公開されません。',
   'publicProfile.readyCount': { other: '歌える曲{count}曲を公開します。' },
   'publicProfile.tooManySongs':
     '歌える曲が{count}曲あります。公開プロフィールに載せられるのは{limit}曲までです。一部を練習中か歌いたいに移すと公開できます。',
@@ -250,15 +250,15 @@ export const ja: Record<MessageKey, Message> = {
   'publicProfile.published': 'プロフィールを公開しました。',
   'publicProfile.publishConfirmTitle': 'プロフィールを公開しますか？',
   'publicProfile.publishConfirmMessage':
-    '{address} で、誰でも表示名・自己紹介・歌える曲を見られるようになります。キー・プライベートメモ・ステータスは公開されません。',
+    '{address} で、誰でも表示名・自己紹介・歌える曲・公開タグを見られるようになります。キー・プライベートメモ・ステータスは公開されません。',
   'publicProfile.publishConfirmAction': '公開',
   'publicProfile.replaceTitle': 'プロフィールを置き換えますか？',
   'publicProfile.replaceMessage':
-    'このプロフィールは、ほかの場所で変更されたか、前回の公開が完了していません。続けると、この端末の表示名・自己紹介・歌える曲に置き換わります。',
+    'このプロフィールは、ほかの場所で変更されたか、前回の公開が完了していません。続けると、この端末の表示名・自己紹介・歌える曲・公開タグに置き換わります。',
   'publicProfile.replaceAction': '置き換える',
   'publicProfile.republishTitle': 'もう一度公開しますか？',
   'publicProfile.republishMessage':
-    'この画面を開いたあとに、このプロフィールは非公開になりました。続けると、この端末の表示名・自己紹介・歌える曲で、もう一度公開します。{address} で、誰でも見られるようになります。キー・プライベートメモ・ステータスは公開されません。',
+    'この画面を開いたあとに、このプロフィールは非公開になりました。続けると、この端末の表示名・自己紹介・歌える曲・公開タグで、もう一度公開します。{address} で、誰でも見られるようになります。キー・プライベートメモ・ステータスは公開されません。',
   'publicProfile.unpublish': '公開をやめる',
   'publicProfile.unpublishNote': '公開ページを見えなくします。この端末の曲は削除されません。',
   'publicProfile.unpublishConfirmTitle': '公開をやめますか？',
@@ -282,6 +282,20 @@ export const ja: Record<MessageKey, Message> = {
     'プロフィールが大きすぎて公開できません。長い曲名を短くするか、歌える曲を減らしてください。',
   'publicProfile.error.publishNetwork':
     '接続が切れたため、公開できたか分かりません。もう一度お試しください。',
+
+  'publicProfile.tags': '公開タグ',
+  'publicProfile.tagsNone': 'なし',
+  'publicProfile.tagsCount': { other: '{count}個' },
+  'publicProfile.tagsHint': '公開ページに出すタグを選びます',
+  'publicTags.title': '公開タグ',
+  'publicTags.intro':
+    '公開ページに出したいタグをオンにします。そのタグが付いた、歌える曲に表示されます。オフのタグは公開されません。',
+  'publicTags.applyNote': '変更は、次に公開したときから公開ページに反映されます。',
+  'publicTags.limitNote': '1曲に表示される公開タグは、{limit}個までです。',
+  'publicTags.songCount': { other: '歌える曲{count}曲' },
+  'publicTags.empty.title': 'まだタグがありません',
+  'publicTags.empty.message': '曲にタグを付けると、ここで公開するタグを選べます。',
+  'publicTags.saveFailedTitle': '保存できませんでした',
 
   'error.titleRequired': '曲名を入力してください。',
   'error.artistRequired': 'アーティスト名を入力してください。',
