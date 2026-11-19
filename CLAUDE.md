@@ -240,13 +240,21 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     （曲を足すと、あとの曲が全部「変更あり」になる）。`published_songs` を `songs` の外部キーにしない（曲を消したあとも、公開した記録を残す）。公開タグは、利用者が選んだタグだけ（下の「公開するタグの選び方」）。`publishSnapshot.ts` に正規表現の後読みを書かない（Hermes で未確認。起動の失敗になりうる。テストが検出する）。`publishSnapshot.test.ts` は `worker/src/snapshot.ts` を import する（実行時のコードは共有しない）ので、そのファイルに Workers の型や `worker/` の依存を持ち込まない。
 -   **Public Profile 画面（`app/public-profile.tsx`・`ui/PublicProfileSection.tsx`。7.4.7）。** 詳細は `docs/singfolio-publishing-backend.md` §8「アプリ側の Public Profile 画面」。
     入口（Profile）もルートも `account.available` のゲートの後ろ（Account と同じ。リリースのビルドでは閉じる）。**Display Name・Bio の下書きは、この画面だけが持ち、保存しない**
-    （初期値はサーバーの `PublicProfile`。端末の `publish_state` ではない）。保存先を先に足さない（Auto Publish との関係は 7.4.9b で決める）。最初の公開・Unpublish・`username` の確保・
+    （初期値はサーバーの `PublicProfile`。端末の `publish_state` ではない）。保存先を足さない（Auto Publish は、Display Name・Bio を載せず、端末が最後に Publish した値で曲の変更だけを送ると決めた。7.4.9b）。最初の公開・Unpublish・`username` の確保・
     版の食い違いの置き換えの確認は外さない（人に見える状態になる・変更できない）。公開中と見て確認なしで送ったのにサーバーが非公開だったときは、置き換えの文言にせず、公開の確認の文言にする。`username` の形の規則は `src/services/username.ts` に、Workerと同じ値を別に持つ。日時は `Intl` を使わない
     （`src/i18n/dateTime.ts`）。失敗の文言は `src/i18n/publishErrors.ts`（Publish の `network` だけ「公開できたか分からない」）。
     **「N unpublished changes」（`publishService.countUnpublishedChanges(profile)`。7.4.9a）は、数えるのを曲だけにする**（Display Name・Bio の下書きを混ぜない）。**端末の記録が、渡された
     サーバーの `profile`（呼ぶ側が最後に読んだもの。公開中・`username` と `baseVersion` が一致）と合うときだけ数え、合わなければ `null`**（再インストール後の空の記録と比べると、全部が「追加」と数えられる。
     別の端末が Publish したあとの記録は、公開内容の基準にならない。ただし画面が読み直すまでは気づかず、表示が古くなるだけ）。Service からサーバーへ聞きに行かない（通信しない）。曲の整え方は Publish と同じ `buildPublishSongs` を使い、
     数え方だけ別に整えない（整えた値のずれが、Publish しても消えない「変更あり」になる）。詳細は同じ docs §8「未公開の変更の数え方」。
+-   **Auto Publish（アプリ側。`Services.autoPublish`・`publishService.publishPendingChanges`。7.4.9b）。** 詳細は docs §8「Auto Publish（7.4.9b）」。
+    **自動で送るのは、サーバーが公開中で、端末の記録（`username`・`baseVersion`）がサーバーの今の状態と一致するときだけ。** 最初の公開・非公開にしたあとの再公開・版の食い違いの置き換え
+    （`replaceVersion`）は、自動では行わない（人に見える状態になる・他の端末の公開を上書きするため、確認つきの Publish Now だけ）。**Display Name・Bio は載せない**（入力の途中を公開しない。
+    下書きの保存先を足さない）。設定 `auto_publish` は既定オフ（未設定・`on` 以外はオフ）で、端末の記録を別のアカウントのものと見て捨てるとき（`reconcile`・`claimUsername`）にオフへ戻す。外さない。
+    **Pending は別に保存しない**（端末の記録との差が、そのまま Pending。「保留キューのテーブル」に「簡略化」しない。再起動しても、次の確認が同じ差を見つける）。差が0なら通信しない。
+    **背景に移るときは送らない**（`flush` は前面に戻ったときだけ。通信の途中でアプリが止まると、サーバーでは済んだのに記録できず、次が版の食い違いになる）。
+    きっかけは、`createServices` が `observeCommits` で `Database` を包んで拾う**DBへの書き込み**（`auth` を注入したビルドだけ）。各 Service に「公開内容が変わった」の通知を足して回る形に
+    「簡略化」しない（足し忘れが、黙って送られない原因になる）。`stopped` は一時的な状態（次の確認でもう一度試す）で、再送のタイマーを作らない。
 -   `expo-secure-store` の config plugin を `app.json` に足さない。Androidのバックアップ規則が `<include>` で、v1.0で今
     バックアップされているSQLiteを外す。
 

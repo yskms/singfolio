@@ -427,7 +427,7 @@ v1.0では公開プロフィールではなく、端末内のプロフィール�
 Profile の `Public Profile` から開く画面（`app/public-profile.tsx`。連打で重ねない）。`username` の確保・Display Name と Bio・Publish Now・Unpublish・
 状態の表示。アカウントが使えるビルドだけで、画面も、リンク `singfolio://public-profile` では開かず、先頭の画面へ戻す（Account と同じ）。
 **ログインを要求しない**: サインインしていなくても、v1.0の機能は何も変わらない。ここでの失敗は、すべてこの画面の中で伝える（ErrorBoundary には伝えない）。
-Preview・Copy Link は公開ページ（7.5）ができてから、Auto Publish は 7.4.9b。「N unpublished changes」は 7.4.9a で入れた（下）。公開するタグの選び方は、下の「Public Tags」（7.4.8）。
+Preview・Copy Link は公開ページ（7.5）ができてから。Auto Publish（7.4.9b）と「N unpublished changes」（7.4.9a）は下。公開するタグの選び方は、下の「Public Tags」（7.4.8）。
 
 ``` text
 Public Profile
@@ -443,6 +443,10 @@ Bio
                  0 / 500
 
 Public Tags                  2 tags  >
+
+Publish changes automatically        [ ON ]
+Sends song changes to your public page a short while ...
+Couldn't send your changes. Trying again automatically.
 
 Your page shows your Display Name, Bio, and ...
 84 Ready songs will be published.
@@ -484,6 +488,11 @@ Hides your public page. ...
 -   **`Public Tags` の行**（`username` を確保したあと。Display Name・Bio の下）: 値は、**オンにしたタグの数**（0なら `None`。読めなかったときは値を出さない）。公開ページに実際に出る
     数ではない（Ready の曲に付いていないタグも数える）。押すと Public Tags（下）を開く（実行中は押せない状態にする）。戻ったときに、数だけを読み直す（入力中の Display Name・Bio には
     触れない）。確認の文言（最初の公開など）にも「公開タグ」を含める。
+-   **`Publish changes automatically`（Auto Publish。7.4.9b。`username` を確保したあと。`Public Tags` の下）**: スイッチ。端末の設定で、**既定はオフ**。説明の文言に、曲の変更は編集を止めて
+    しばらくしてから送ること、Display Name・Bio は `Publish Now` のときだけ更新されることを書く。オンで公開前なら「最初に公開してから始まる」を足す（自動では最初の公開をしない）。
+    オンで公開中のときだけ、状態の行を出す: 通信の失敗は「変更を送れませんでした。自動でやり直します」（控えめな色）、止まっているときは、理由（別の端末から公開ページが変更された・
+    曲が1000を超える・それ以外）をエラーの色で。止まった理由は、`Publish Now` で解決する（置き換えの確認・理由の文言）。保存に失敗したらスイッチを戻して文言を出す。実行中は切り替えられない。
+    自動で Publish できたら、「N unpublished changes」を数え直し、最終公開の時刻などを最新にする（入力中の Display Name・Bio には触れない）。
 
 ### Public Tags
 

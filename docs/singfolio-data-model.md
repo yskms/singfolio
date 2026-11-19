@@ -104,7 +104,7 @@ UIの表示名「My Key」は、モデル・DBでは `keyOffset` / `key_offset` 
 
 | カラム | 型 | 内容 |
 |---|---|---|
-| `key` | TEXT PK | 設定の名前。現在は `appearance` / `language` / `suggestions` / `local_data_id` |
+| `key` | TEXT PK | 設定の名前。現在は `appearance` / `language` / `suggestions` / `local_data_id` / `auto_publish` |
 | `value` | TEXT NOT NULL | 値（文字列） |
 
 -   値の意味・検証はService層（`settingsService`）で行う。DBには制約を置かない
@@ -118,6 +118,8 @@ UIの表示名「My Key」は、モデル・DBでは `keyOffset` / `key_offset` 
     追加した言語など）でも、エラーにせず、端末の言語から決め直して書き込む（起動を止めない）。
 -   `suggestions`: `on` / `off`。曲名・アーティストの候補を外部の楽曲検索から出すか。
     未保存、または `off` 以外の値は `on`（既定）として読む。
+-   `auto_publish`: `on` / `off`。Auto Publish（公開中のページへ、曲の変更を自動で送る。7.4.9b）を使うか。**未保存、または `on` 以外の値は `off`（既定）として読む**
+    （勝手に公開しない）。端末の設定で、アカウントごとではないが、端末の記録を別のアカウントのものと見て捨てるとき（`publishService`）に `off` へ戻す。
 -   `local_data_id`: このローカルDBの識別子（UUID）。利用者の設定ではなく、画面に出さず、公開用データにも含めない。
     DBを新しく作ったあとの最初の `settings.ensureLocalDataId()` で作る（未保存・空なら作る。同時に呼んでも1つに決まる）。
     DBの外に置くセッション（SecureStore）が、このDBに属するかを確かめるために、セッションと一緒に保存する
@@ -149,7 +151,7 @@ UIの表示名「My Key」は、モデル・DBでは `keyOffset` / `key_offset` 
 | `id` | INTEGER PK | 常に `1`（`CHECK`） |
 | `username` | TEXT NOT NULL | この端末が紐づくアカウントの公開URLの名前（Workerの `username`。変更されない） |
 | `base_version` | INTEGER NOT NULL | Publish のリクエストの `baseVersion`。**この端末が最後に Publish した、または置き換えを確認した版**（0以上） |
-| `display_name` / `bio` | TEXT NOT NULL | この端末が最後に Publish した Display Name・Bio（「N unpublished changes」には数えない: 数えるのは曲だけ。Auto Publish が、曲の変更を送るときに使う想定。7.4.9b） |
+| `display_name` / `bio` | TEXT NOT NULL | この端末が最後に Publish した Display Name・Bio（「N unpublished changes」には数えない: 数えるのは曲だけ。Auto Publish が、曲の変更を送るときに、この値を使う。7.4.9b） |
 
 `published_songs`（最後に Publish した曲）:
 

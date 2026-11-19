@@ -125,6 +125,7 @@ singfolio.app/yskms
 編集操作のたびに即時通信するのではなく、一定時間のdebounce後に変更をまとめて送信する。
 
 通信に失敗した場合は変更をPendingとして保持し、ネットワーク復旧後に再送する。
+実装・決定は §8「Auto Publish（7.4.9b）」。
 
 ### Auto Publish OFF
 
@@ -1416,8 +1417,8 @@ Publishのリクエストの本文は、`baseVersion`（7.4.4）に、`profile` 
     リリースのビルドでは 7.3.13 まで閉じている。
 -   **Display Name・Bio の下書きは、この画面だけが持ち、保存しない。** 初期値は `refreshProfile` が返すサーバーの「最後に Publish した値」（端末の `publish_state` ではない。
     再インストール後・別の端末でも、公開中の内容が出る）。変更の有無は、この値との比較で決める。変更があるまま戻るときは、破棄の確認を出す（`usePreventRemove`）。
-    **7.4.9b の Auto Publish は、曲の変更を、端末の `publish_state` の Display Name・Bio（最後に Publish した値）で送る想定**（画面の下書きを待たない）。Display Name・Bio の編集そのものを
-    Auto Publish に載せるなら、下書きの保存先を足す（7.4.9b で決める。決めずに、この画面で先に保存を足さない）。
+    **Auto Publish（7.4.9b）は、曲の変更を、端末の `publish_state` の Display Name・Bio（最後に Publish した値）で送る**（画面の下書きを待たない。決定の理由は「Auto Publish（7.4.9b）」）。
+    下書きの保存先は足さない（Display Name・Bio の編集は Publish Now で送る）。
 -   **確認を出す操作**: `username` の確保（変更できない）、最初の公開と非公開にしたあとの公開（人に見える状態になる）、Unpublish、版の食い違いの置き換え、変更を捨てて戻る。
     公開中の更新（Publish Now）は、確認なしで送る。
 -   **版の食い違い（`version-conflict`）。** 画面の状態（公開中か・最終公開）を、`PublishError.profile`（サーバーの今の内容）に合わせ、入力中の下書きはそのままにして、
@@ -1507,6 +1508,55 @@ Public Profile（`ui/PublicProfileSection.tsx`）の、Publish Now の上の1行
     遅いと分かったら、そのときに見直す。
     **未確認**: 実機（Hermes）での1000曲の読み取りの時間（`getShowView` で Ready の曲をすべて読む。画面を開くたび・Public Tags から戻るたびに1回）、Android、ダークモード、
     VoiceOver・TalkBack（数が変わったときに、読み上げで伝わるか。Publish の成功は notice が伝える）、本物のサーバーとの Publish のあとの 0（7.4.11）。
+
+### Auto Publish（7.4.9b）
+
+公開中のページへ、曲の変更を、編集を止めて一定時間たってからまとめて送る。実装は `src/services/autoPublishService.ts`（いつ試すか）と
+`publishService.publishPendingChanges`（何を送るか・送ってよい状態か）。画面は Public Profile のスイッチと状態の1行（`singfolio-screen-flow.md`）。
+
+**着手前に決めた3点**
+
+-   **設定（ON/OFF）の置き場: `settings` の `auto_publish`（`on` / `off`）。既定は OFF**（未設定・`on` 以外はオフ。勝手に公開しない。候補の設定とは逆の向き）。端末の設定で、アカウントごとではない
+    （Public Tags と同じ）。ただし、**端末の記録を別のアカウントのものと見て捨てるとき（`reconcile`・`claimUsername`）に、OFF へ戻す**（別のアカウントの公開ページを、そのアカウントの利用者が
+    選んでいないのに、自動で更新しない）。同じアカウントなら、サインアウト・サインインし直しでは変えない。`publish_state` の列にはしない（migration が要り、Unpublish・再確保の扱いが絡む）。
+-   **Display Name・Bio は、Auto Publish に載せない。** 曲の変更を、端末が最後に Publish した値（`publish_state`）で送る。Display Name・Bio の編集は Publish Now で送る。
+    下書きの保存先を足さない（入力の途中を、debounce で勝手に公開しないため。「保存した下書き」と「公開済み」の2状態も増やさない）。「N unpublished changes」も曲だけを数える（7.4.9a）ので、
+    数と送る内容が一致する。
+-   **最初の公開・再公開・置き換えは、Auto Publish ではしない。** 自動で送るのは、**サーバーが公開中で、端末の記録（`username`・`baseVersion`）がサーバーの今の状態と一致するとき**だけ
+    （すでに利用者の確認を経た公開の更新）。ON にしても、公開前は何も起きない。非公開にしたあとも、自動で公開し直さない。版の食い違いは止まる（`replaceVersion` は使わない）。
+
+**仕組み**
+
+-   **きっかけ**: ① 端末のDBへの書き込み（`createServices` が `observeCommits` で `Database` を包み、コミットのたびに `notifyChanged`。どの Service が書いても漏れない。何が変わったかは見ない。
+    `auth` を注入しないビルドは包まない）。② アプリの起動の5秒後（`start`。前回送れていない変更の再送）。③ アプリが前面に戻ったとき（`flush`。`services/index.ts` の `AppState`）。④ 設定を ON にしたとき
+    （すぐ）。⑤ Public Profile で Publish Now が成功したあと（`flush`。止まっていた状態を戻す）。
+-   **待ち**: 最後のきっかけから30秒（`AUTO_PUBLISH_DEBOUNCE_MS`）。連続した編集の間は延び続ける（上限なし）。同時に1つだけ実行し、実行中のきっかけは、終わってからもう一度待つ。
+    **背景に移るときは送らない**: 通信の途中でアプリが止まると、サーバーでは済んでいるのに端末は結果を記録できず、次の確認が版の食い違いになる（下）。
+-   **Pending（送れていない変更）は、別に保存しない。** 端末の記録（最後に Publish した曲のハッシュ）と今の公開内容の差が、そのまま Pending（7.4.9a と同じ数え方）。再起動しても、次の確認が同じ差を見つける。
+    `publishPendingChanges` は、**差が0なら通信しない**（サーバーを読みもしない）。
+-   **再送**: 通信の失敗（`network`・`unavailable`・`timeout`）は、30秒・1分・2分・5分・10分（以後10分）の間隔で再送する。成功・OFF で間隔はやり直す。前面への復帰・新しい編集は、待たずに（または待ち直して）試す。
+-   **`publishPendingChanges` の流れ**（`publish` などと直列）: 記録が無い → `idle`（通信しない）。差が0 → `idle`（通信しない）。サインインしていない・401 → `idle`（通信しない）。
+    サーバーを読む → 記録を合わせる（別のアカウントなら捨てて、設定を OFF）→ 非公開なら `idle` → 版が違えば `stopped(version-conflict)` → 本文を組み立てる（`buildPublishBody`。Display Name は記録の値）→ 送る →
+    記録を進める。曲が1000を超える・Display Name が空 → `stopped`（通信の前）。サーバーが断った（`invalid-snapshot`・`too-large`）→ `stopped(rejected)`。通信の失敗は投げる（呼ぶ側が再送を決める）。
+    送る本文の組み立て（許可リスト・公開タグの選択）は Publish と同じ（`loadSources`・`buildPublishBody`）。
+-   **状態（`AutoPublishStatus`）**: `idle` / `retrying`（通信の失敗。あとで再送）/ `stopped`（利用者の対応が要る。理由つき）。**`stopped` は、ずっと続く状態ではない**: 次の確認（編集・復帰・起動）で、
+    もう一度試し、解決していれば `idle` に戻る（再送のタイマーは作らない。止まっている間は、編集のたびに、サーバーを1回読むだけ）。通知は、状態の変化と `published`（自動で Publish できた。
+    開いている Public Profile が、`profile` を最新に合わせる。合わせないと、次の数え直しが「記録の版と合わない」で数えられなくなる）。
+-   **画面**: スイッチは `username` を確保したあとに出す（公開前でも切り替えられる。ON で非公開なら「最初に公開してから始まる」と出す）。状態の行は、ON で公開中のときだけ。`retrying` は
+    控えめな色、`stopped` はエラーの色（理由は3種類の文言: 別の端末の公開との食い違い・曲が多すぎる・それ以外は「今すぐ公開で理由を確かめる」）。
+
+**既知の限界**
+
+-   **応答を受け取れなかった自動の Publish**（`network`。サーバーでは済んでいることがある）のあと、再送が `version-conflict`（自分の Publish が済んでいる）になり、`stopped` で止まる。
+    置き換えの確認つきの Publish Now で解決できる。別の端末の Publish と区別できないので、自動では置き換えない（確認なしに他の端末の公開を上書きしない）。解消するには、Publish に冪等キー
+    （同じ要求の再送と分かる印）が Worker に要る。未実装（7.4.11 で実測してから判断する）。背景に移るときに送らないのは、この確率を減らすため。
+-   背景で動かない。アプリが前面に戻る・起動したときに、たまっていた変更を送る（OSのバックグラウンド実行は使わない）。
+-   DBへの書き込みは、公開に関係しない設定の保存や、Publish の記録でも、確認を予約する（差が0なら通信しない。1000曲で読み取り・照合が約15ms）。
+
+**確かめたこと / 確かめていないこと。** Nodeのテスト（実際のSQL＋偽のサーバー・偽のタイマー）で、変更の送信・Display Name・Bio の扱い・最初の公開/非公開/版の食い違いで送らないこと・別のアカウントでの
+設定の OFF・通信の失敗後の Pending の保持と再送・間隔・直列化・書き込みの通知の配線（`auth` の有無）を確かめた。iOS Simulator（Release のJSだけ差し込み。Service は偽）で、スイッチ ON →
+再送待ちの行 → 停止の行 → 自動で Publish できたあとの「未公開の変更はありません」への更新を確かめた。**未確認**: 本物のサーバーでの自動の Publish（7.4.11）、実機の背景から前面への復帰、
+Android、ダークモード、VoiceOver・TalkBack（状態の行は `accessibilityLiveRegion` で伝える。iOS の読み上げは未実装）、英語の表示、1000曲での確認の所要時間（実機）。
 
 ### Cloudflare
 
