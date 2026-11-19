@@ -114,4 +114,16 @@ export const migrations: readonly Migration[] = [
       ) WITHOUT ROWID;
     `,
   },
+  {
+    // 公開ページに出すタグの選択（7.4.8）。`tags` に公開/非公開の列を足さず、別の表に持つ（タグは、Show Mode に出せる
+    // 管理用の情報のままで、公開の可否は公開機能の設定）。行があるタグだけが公開される（既定は全部非公開）。タグを消すと
+    // 選択も消える（同じ名前で作り直したタグが、黙って公開されない）。`ON DELETE CASCADE` は、接続の
+    // `PRAGMA foreign_keys = ON` が前提（`song_tags` と同じ）。
+    version: 5,
+    sql: `
+      CREATE TABLE public_tags (
+        tag_id TEXT PRIMARY KEY NOT NULL REFERENCES tags (id) ON DELETE CASCADE
+      ) WITHOUT ROWID;
+    `,
+  },
 ];

@@ -74,6 +74,7 @@ describe('runMigrations', () => {
     ).map((t) => t.name);
     assert.deepEqual(tables, [
       'artists',
+      'public_tags',
       'publish_state',
       'published_songs',
       'settings',
@@ -447,7 +448,7 @@ describe('v4: 公開（Publish）の端末側の状態', () => {
     raw.exec(
       "INSERT INTO songs (id, title, artist_id, status, created_at, updated_at) VALUES ('s1', 'Bohemian', 'a1', 'ready', 1, 1)",
     );
-    await runMigrations(db, migrations);
+    await runMigrations(db, migrations.slice(0, 4));
     assert.equal(userVersion(raw), 4);
     assert.equal(count(raw, 'songs'), 1);
     assert.equal(count(raw, 'artists'), 1);
@@ -475,5 +476,33 @@ describe('v4: 公開（Publish）の端末側の状態', () => {
     raw.exec("INSERT INTO published_songs (song_id, content_hash) VALUES ('s1', 'abc')");
     raw.exec("DELETE FROM songs WHERE id = 's1'");
     assert.equal(count(raw, 'published_songs'), 1);
+  });
+});
+
+describe('v5: 公開するタグの選択', () => {
+  async function migratedToV4() {
+    const { raw, db } = openDb();
+    await runMigrations(db, migrations.slice(0, 4));
+    return { raw, db };
+  }
+
+  it('v4 のDBを v5 にしても、タグはそのまま。選択は空（どのタグも公開しない）', async () => {
+    const { raw, db } = await migratedToV4();
+    raw.exec("INSERT INTO tags (id, name, created_at) VALUES ('t1', 'ballad', 1)");
+    await runMigrations(db, migrations);
+    assert.equal(userVersion(raw), 5);
+    assert.equal(count(raw, 'tags'), 1);
+    assert.equal(count(raw, 'public_tags'), 0);
+  });
+
+  it('存在しないタグは選べない。同じタグを2回選べない。タグを消すと選択も消える', async () => {
+    const { raw, db } = openDb();
+    await runMigrations(db, migrations);
+    raw.exec("INSERT INTO tags (id, name, created_at) VALUES ('t1', 'ballad', 1)");
+    assert.throws(() => raw.exec("INSERT INTO public_tags (tag_id) VALUES ('nope')"), /FOREIGN/);
+    raw.exec("INSERT INTO public_tags (tag_id) VALUES ('t1')");
+    assert.throws(() => raw.exec("INSERT INTO public_tags (tag_id) VALUES ('t1')"));
+    raw.exec("DELETE FROM tags WHERE id = 't1'");
+    assert.equal(count(raw, 'public_tags'), 0);
   });
 });

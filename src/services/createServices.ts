@@ -2,6 +2,7 @@ import type { Database } from '../db/appDatabase.ts';
 import type { AuthProvider } from '../domain/types.ts';
 import { createArtistRepository } from '../repositories/artistRepository.ts';
 import { createAuthRepository, type AuthFetchLike } from '../repositories/authRepository.ts';
+import { createPublicTagRepository } from '../repositories/publicTagRepository.ts';
 import { createPublishRepository } from '../repositories/publishRepository.ts';
 import { createPublishStateRepository } from '../repositories/publishStateRepository.ts';
 import type { RepositoryEnv } from '../repositories/env.ts';
@@ -144,6 +145,8 @@ export function createServices(
       publish: createPublishRepository(auth ? auth.fetch : noFetch, { origin: auth?.origin }),
       state: createPublishStateRepository(),
       show,
+      publicTags: createPublicTagRepository(),
+      tags: tagRepository,
     }),
   };
 }

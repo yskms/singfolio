@@ -8,8 +8,11 @@ import type { PublicProfile, SongStatus } from '../domain/types.ts';
 import { AuthError } from '../repositories/authError.ts';
 import { PublishError } from '../repositories/publishError.ts';
 import type { PublishRepository } from '../repositories/publishRepository.ts';
+import { createPublicTagRepository } from '../repositories/publicTagRepository.ts';
 import { createPublishStateRepository } from '../repositories/publishStateRepository.ts';
+import { createTagRepository } from '../repositories/tagRepository.ts';
 import { createTestServices } from '../testing/testDatabase.ts';
+import { ServiceError } from './errors.ts';
 import type { SessionAccess } from './accountService.ts';
 import { createPublishService } from './publishService.ts';
 import { PUBLISH_LIMITS, songContentHash, type PublishBody } from './publishSnapshot.ts';
@@ -75,16 +78,21 @@ async function setup(options: { profile?: PublicProfile | null; access?: Session
   const t = await createTestServices();
   const fake = fakeServer(options.profile === undefined ? profileV(0) : options.profile);
   const state = createPublishStateRepository();
+  const publicTags = createPublicTagRepository();
+  // 読み取りだけに使う（IDや時刻は作らない）。
+  const tagRepository = createTagRepository({ newId: () => 'unused', now: () => 0 });
   const service = createPublishService({
     db: t.db,
     access: options.access ?? signedIn,
     publish: fake.repo,
     state,
     show: t.services.show,
+    publicTags,
+    tags: tagRepository,
   });
   const add = (title: string, artist: string, status: SongStatus = 'ready', extra: { privateNote?: string; keyOffset?: number } = {}) =>
     t.services.songs.createSong({ title, artist, status, ...extra });
-  return { ...t, ...fake, service, state, add };
+  return { ...t, ...fake, service, state, publicTags, tagRepository, add };
 }
 
 const INPUT = { displayName: 'Karaoke Fan', bio: 'bio' };
@@ -136,7 +144,7 @@ describe('publish: 送る内容', () => {
     for (const leaked of ['ひみつのメモ', 'keyOffset', 'ballad', 'Practicing', 'Wanted']) {
       assert.equal(text.includes(leaked), false, leaked);
     }
-    // 公開するタグの選び方（7.4.8）が入るまでは、どのタグも公開しない。
+    // 公開に選んでいないタグは、公開しない（名前も送らない）。
     assert.ok(body.songs.every((s) => s.publicTags.length === 0));
   });
 
@@ -155,6 +163,176 @@ describe('publish: 送る内容', () => {
     const error = await rejectsPublish(t.service.publish(INPUT), 'too-many-songs');
     assert.equal(error.songCount, PUBLISH_LIMITS.songs + 1);
     assert.deepEqual(t.server.calls, []);
+  });
+});
+
+describe('publish: 公開するタグ（7.4.8）', () => {
+  async function tagId(t: Awaited<ReturnType<typeof setup>>, name: string): Promise<string> {
+    const tag = (await t.services.tags.listTags()).find((candidate) => candidate.name === name);
+    assert.ok(tag, name);
+    return tag.id;
+  }
+
+  it('公開に選んだタグだけが、Ready の曲の publicTags に入る。選んでいないタグの名前は本文に出ない', async () => {
+    const t = await setup();
+    await t.services.songs.createSong({ title: 'A', artist: 'X', status: 'ready', newTagNames: ['ballad', 'secret'] });
+    await t.services.songs.createSong({ title: 'B', artist: 'X', status: 'ready', newTagNames: ['rock'] });
+    await t.service.setTagPublic(await tagId(t, 'ballad'), true);
+    await t.service.setTagPublic(await tagId(t, 'rock'), true);
+
+    await t.service.publish(INPUT);
+
+    const body = t.server.published[0]!;
+    assert.deepEqual(
+      body.songs.map((s) => [s.title, s.publicTags]),
+      [
+        ['A', ['ballad']],
+        ['B', ['rock']],
+      ],
+    );
+    assert.equal(JSON.stringify(body).includes('secret'), false);
+  });
+
+  it('Ready でない曲のタグは公開しない（選んだタグでも、その曲は公開されない）', async () => {
+    const t = await setup();
+    await t.services.songs.createSong({ title: 'Practicing', artist: 'X', status: 'practice', newTagNames: ['hidden'] });
+    await t.add('Alive', 'X');
+    await t.service.setTagPublic(await tagId(t, 'hidden'), true);
+
+    await t.service.publish(INPUT);
+
+    const text = JSON.stringify(t.server.published[0]);
+    assert.equal(text.includes('hidden'), false);
+    assert.equal(text.includes('Practicing'), false);
+  });
+
+  it('既定は、どのタグも公開しない。外すと次の Publish から出なくなる', async () => {
+    const t = await setup();
+    await t.services.songs.createSong({ title: 'A', artist: 'X', status: 'ready', newTagNames: ['ballad'] });
+    await t.service.publish(INPUT);
+    assert.deepEqual(t.server.published[0]!.songs[0]!.publicTags, []);
+
+    const id = await tagId(t, 'ballad');
+    await t.service.setTagPublic(id, true);
+    await t.service.publish(INPUT);
+    assert.deepEqual(t.server.published[1]!.songs[0]!.publicTags, ['ballad']);
+
+    await t.service.setTagPublic(id, false);
+    await t.service.publish(INPUT);
+    assert.deepEqual(t.server.published[2]!.songs[0]!.publicTags, []);
+  });
+
+  it('タグの名前を変えると、次の Publish では新しい名前で出る（選択はIDに付く）', async () => {
+    const t = await setup();
+    await t.services.songs.createSong({ title: 'A', artist: 'X', status: 'ready', newTagNames: ['ballad'] });
+    const id = await tagId(t, 'ballad');
+    await t.service.setTagPublic(id, true);
+
+    await t.services.tags.renameTag(id, 'slow song');
+    await t.service.publish(INPUT);
+    assert.deepEqual(t.server.published[0]!.songs[0]!.publicTags, ['slow song']);
+  });
+
+  it('タグを消すと選択も消える。同じ名前で作り直したタグは、黙って公開されない', async () => {
+    const t = await setup();
+    await t.services.songs.createSong({ title: 'A', artist: 'X', status: 'ready', newTagNames: ['ballad'] });
+    await t.service.setTagPublic(await tagId(t, 'ballad'), true);
+
+    await t.services.tags.deleteTag(await tagId(t, 'ballad'));
+    assert.equal(
+      Number((t.sqlite.prepare('SELECT COUNT(*) AS n FROM public_tags').get() as { n: number }).n),
+      0,
+    );
+
+    const song = (await t.services.songs.listSongs({}))[0]!;
+    await t.services.songs.updateSong(song.id, {
+      title: 'A',
+      artist: 'X',
+      status: 'ready',
+      keyOffset: 0,
+      privateNote: '',
+      tagIds: [],
+      newTagNames: ['ballad'],
+    });
+    await t.service.publish(INPUT);
+    assert.deepEqual(t.server.published[0]!.songs[0]!.publicTags, []);
+  });
+
+  it('選択を変えると、その曲のハッシュが変わる（7.4.9 の「未公開の変更」の数え方が拾える）。付いていない曲は変わらない', async () => {
+    const t = await setup();
+    const tagged = await t.services.songs.createSong({ title: 'A', artist: 'X', status: 'ready', newTagNames: ['ballad'] });
+    const plain = await t.add('B', 'X');
+    await t.service.publish(INPUT);
+    const before = await t.state.listHashes(t.db);
+
+    await t.service.setTagPublic(await tagId(t, 'ballad'), true);
+    await t.service.publish(INPUT);
+    const after = await t.state.listHashes(t.db);
+
+    assert.notEqual(after.get(tagged.id), before.get(tagged.id));
+    assert.equal(after.get(plain.id), before.get(plain.id));
+  });
+
+  it('1曲に付く公開タグは10個まで（超えた分は、公開ページに出ない）', async () => {
+    const t = await setup();
+    const names = Array.from({ length: PUBLISH_LIMITS.tagsPerSong + 2 }, (_, i) => `tag${String(i).padStart(2, '0')}`);
+    await t.services.songs.createSong({ title: 'A', artist: 'X', status: 'ready', newTagNames: names });
+    for (const name of names) await t.service.setTagPublic(await tagId(t, name), true);
+
+    await t.service.publish(INPUT);
+
+    assert.equal(t.server.published[0]!.songs[0]!.publicTags.length, PUBLISH_LIMITS.tagsPerSong);
+  });
+
+  describe('listPublicTagChoices / setTagPublic', () => {
+    it('すべてのタグを名前の昇順で返す。選択の有無と、付いている Ready の曲の数つき', async () => {
+      const t = await setup();
+      await t.services.songs.createSong({ title: 'A', artist: 'X', status: 'ready', newTagNames: ['rock', 'ballad'] });
+      await t.services.songs.createSong({ title: 'B', artist: 'X', status: 'ready', newTagNames: ['rock'] });
+      await t.services.songs.createSong({ title: 'C', artist: 'X', status: 'practice', newTagNames: ['rock', 'only practice'] });
+      await t.services.tags.getOrCreateTag('unused');
+      await t.service.setTagPublic(await tagId(t, 'rock'), true);
+
+      const choices = await t.service.listPublicTagChoices();
+      assert.deepEqual(
+        choices.map((c) => [c.name, c.isPublic, c.readySongCount]),
+        [
+          ['ballad', false, 1],
+          ['only practice', false, 0],
+          ['rock', true, 2],
+          ['unused', false, 0],
+        ],
+      );
+    });
+
+    it('通信しない・サインインも要らない（端末内だけの設定）', async () => {
+      const t = await setup({ access: signedOut });
+      await t.services.songs.createSong({ title: 'A', artist: 'X', status: 'ready', newTagNames: ['ballad'] });
+      const id = await tagId(t, 'ballad');
+
+      await t.service.setTagPublic(id, true);
+      assert.equal((await t.service.listPublicTagChoices())[0]!.isPublic, true);
+      assert.deepEqual(t.server.calls, []);
+    });
+
+    it('同じ値をもう一度設定しても成功する。存在しないタグを選ぶと tag-not-found、外すときは何もしない', async () => {
+      const t = await setup();
+      await t.services.songs.createSong({ title: 'A', artist: 'X', status: 'ready', newTagNames: ['ballad'] });
+      const id = await tagId(t, 'ballad');
+
+      await t.service.setTagPublic(id, true);
+      await t.service.setTagPublic(id, true);
+      assert.equal((await t.service.listPublicTagChoices())[0]!.isPublic, true);
+      await t.service.setTagPublic(id, false);
+      await t.service.setTagPublic(id, false);
+      assert.equal((await t.service.listPublicTagChoices())[0]!.isPublic, false);
+
+      await assert.rejects(
+        t.service.setTagPublic('missing', true),
+        (error) => error instanceof ServiceError && error.code === 'tag-not-found',
+      );
+      await t.service.setTagPublic('missing', false);
+    });
   });
 });
 
@@ -248,7 +426,15 @@ describe('publish: 端末の記録と版', () => {
         throw new Error('disk full');
       },
     } as typeof t.db;
-    const service = createPublishService({ db: failing, access: signedIn, publish: t.repo, state: t.state, show: t.services.show });
+    const service = createPublishService({
+      db: failing,
+      access: signedIn,
+      publish: t.repo,
+      state: t.state,
+      show: t.services.show,
+      publicTags: t.publicTags,
+      tags: t.tagRepository,
+    });
     const result = await service.publish(INPUT);
     assert.equal(result.version, 1);
     assert.equal(await service.getState(), null);
@@ -467,6 +653,8 @@ describe('サーバーで済んだ操作を、記録の失敗で失敗に見せ�
         },
       },
       show: t.services.show,
+      publicTags: t.publicTags,
+      tags: t.tagRepository,
     });
     const profile = await service.unpublish();
     assert.equal(profile?.published, false);

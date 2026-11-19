@@ -66,6 +66,19 @@ export interface Tag {
   createdAt: number;
 }
 
+/**
+ * 公開ページに出すタグを選ぶ画面（Public Tags）の1行。`Tag` に公開の属性は持たせず、選択は別に持つ
+ * （`public_tags`。docs/singfolio-data-model.md）。
+ */
+export interface PublicTagChoice {
+  id: string;
+  name: string;
+  /** 公開に選んでいるか（選んだタグは、Ready の曲に付いているところに出る） */
+  isPublic: boolean;
+  /** このタグが付いた Ready の曲の数（選んだときに、公開ページに出る曲の数） */
+  readySongCount: number;
+}
+
 /** 端末内の曲（Local Song）。公開用のモデルとは別（My Key・Private Noteを持つ）。 */
 /**
  * アーティスト。曲は、アーティストを1つ持つ（`Song.artistId`）。同じアーティストの曲は、

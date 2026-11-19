@@ -1,10 +1,13 @@
 import type { Database } from '../db/appDatabase.ts';
-import type { PublicProfile, ShowTag } from '../domain/types.ts';
+import type { PublicProfile, PublicTagChoice } from '../domain/types.ts';
 import { AuthError } from '../repositories/authError.ts';
+import type { PublicTagRepository } from '../repositories/publicTagRepository.ts';
 import { PublishError } from '../repositories/publishError.ts';
 import type { PublishRepository } from '../repositories/publishRepository.ts';
 import type { PublishState, PublishStateRepository } from '../repositories/publishStateRepository.ts';
+import type { TagRepository } from '../repositories/tagRepository.ts';
 import type { SessionAccess } from './accountService.ts';
+import { ServiceError } from './errors.ts';
 import { buildPublishBody, songContentHash, type PublishSongSource } from './publishSnapshot.ts';
 import type { ShowService } from './showService.ts';
 import { normalizeUsernameInput } from './username.ts';
@@ -16,6 +19,10 @@ export interface PublishServiceDeps {
   publish: PublishRepository;
   state: PublishStateRepository;
   show: ShowService;
+  /** 公開に選んだタグの保存先（7.4.8。`public_tags`） */
+  publicTags: PublicTagRepository;
+  /** 公開に選べるタグ（端末のタグ）の読み取り */
+  tags: TagRepository;
 }
 
 export interface PublishInput {
@@ -30,14 +37,6 @@ export interface PublishInput {
 }
 
 /**
- * 公開するタグの名前。**公開するタグの選び方（7.4.8）を入れるまでは、どのタグも公開しない**（安全側。タグは、人に見せる
- * 情報に含めるかを、利用者が選んで決める）。
- */
-function publicTagNames(_tags: readonly ShowTag[]): string[] {
-  return [];
-}
-
-/**
  * 公開（Public Profile・Publish・Unpublish）。**ログインを要求しない**（サインインしていなければ、どの操作も `not-signed-in`
  * で、端末の機能は何も変わらない）。失敗はすべて `AuthError`（通信・認証）か `PublishError`（サーバーが断った、アプリ側の前提の不備）。
  *
@@ -47,7 +46,7 @@ function publicTagNames(_tags: readonly ShowTag[]): string[] {
  * `publish`・`unpublish`・`claimUsername`・`refreshProfile` は1本ずつ順に実行する（同じ端末の Publish が重なると、2つ目が1つ目の版を知らずに
  * 送って、自分自身と食い違う。`refreshProfile` は記録を捨てる処理を持つ）。
  */
-export function createPublishService({ db, access, publish, state, show }: PublishServiceDeps) {
+export function createPublishService({ db, access, publish, state, show, publicTags, tags }: PublishServiceDeps) {
   let tail: Promise<unknown> = Promise.resolve();
   function serialize<T>(task: () => Promise<T>): Promise<T> {
     const result = tail.then(task);
@@ -86,10 +85,66 @@ export function createPublishService({ db, access, publish, state, show }: Publi
     }
   }
 
+  /**
+   * 公開する曲の元。Ready の曲だけが、Show Mode のアーティスト順（公開ページの既定の並び）で来る。**曲のタグのうち、公開に選んだタグ
+   * （`public_tags`）だけ**を `publicTags` に入れる（選んでいないタグは、名前も送らない。7.4.8）。
+   */
+  async function loadSources(): Promise<PublishSongSource[]> {
+    const [view, publicIds] = await Promise.all([show.getShowView({ sort: 'artist' }), publicTags.listIds(db)]);
+    return view.groups.flatMap((group) =>
+      group.songs.map((song) => ({
+        id: song.id,
+        title: song.title,
+        artist: group.artist,
+        publicTags: song.tags.filter((tag) => publicIds.has(tag.id)).map((tag) => tag.name),
+      })),
+    );
+  }
+
   return {
     /** この端末が最後に合意した公開の状態。まだ（`username` を確保していない、別のアカウントになった）なら `null`。通信しない。 */
     getState(): Promise<PublishState | null> {
       return known(() => state.get(db));
+    },
+
+    /**
+     * 公開ページに出すタグの選択（7.4.8）。端末のすべてのタグを名前の昇順で返す。`readySongCount` は、そのタグが付いた Ready の曲の数
+     * （選んだときに出る曲の数）。**端末内だけの設定で、通信しない・サインインも要らない**（失敗は `ServiceError`・DBのエラーのまま）。
+     */
+    async listPublicTagChoices(): Promise<PublicTagChoice[]> {
+      const [all, publicIds, view] = await Promise.all([
+        tags.list(db),
+        publicTags.listIds(db),
+        show.getShowView({ sort: 'artist' }),
+      ]);
+      const readyCounts = new Map<string, number>();
+      for (const group of view.groups) {
+        for (const song of group.songs) {
+          for (const tag of song.tags) readyCounts.set(tag.id, (readyCounts.get(tag.id) ?? 0) + 1);
+        }
+      }
+      return all.map((tag) => ({
+        id: tag.id,
+        name: tag.name,
+        isPublic: publicIds.has(tag.id),
+        readySongCount: readyCounts.get(tag.id) ?? 0,
+      }));
+    },
+
+    /**
+     * タグを公開ページに出すか（`isPublic`）を決める。既定は、どのタグも出さない。次の Publish から反映される（公開中の内容はすぐには変わらない）。
+     * 同じ値をもう一度設定しても成功する。存在しないタグを公開に選ぶと `tag-not-found`（外すときは何もしない）。タグを消すと選択も消える
+     * （作り直した同じ名前のタグが、黙って公開されない）。名前を変えると、公開されるタグの名前も、次の Publish で変わる。
+     */
+    setTagPublic(tagId: string, isPublic: boolean): Promise<void> {
+      return db.transaction(async (tx) => {
+        if (!isPublic) {
+          await publicTags.remove(tx, tagId);
+          return;
+        }
+        if ((await tags.get(tx, tagId)) === null) throw new ServiceError('tag-not-found');
+        await publicTags.add(tx, tagId);
+      });
     },
 
     /**
@@ -145,15 +200,7 @@ export function createPublishService({ db, access, publish, state, show }: Publi
     publish(input: PublishInput): Promise<PublicProfile> {
       return serialize(() =>
         known(async () => {
-          const view = await show.getShowView({ sort: 'artist' });
-          const sources: PublishSongSource[] = view.groups.flatMap((group) =>
-            group.songs.map((song) => ({
-              id: song.id,
-              title: song.title,
-              artist: group.artist,
-              publicTags: publicTagNames(song.tags),
-            })),
-          );
+          const sources = await loadSources();
           // 通信の前に、内容を確かめる（`baseVersion` は、サーバーの状態を見てから入れる）。
           const built = buildPublishBody({ baseVersion: 0, displayName: input.displayName, bio: input.bio, songs: sources });
           if (!built.ok) {
