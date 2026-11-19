@@ -427,7 +427,7 @@ v1.0では公開プロフィールではなく、端末内のプロフィール�
 Profile の `Public Profile` から開く画面（`app/public-profile.tsx`。連打で重ねない）。`username` の確保・Display Name と Bio・Publish Now・Unpublish・
 状態の表示。アカウントが使えるビルドだけで、画面も、リンク `singfolio://public-profile` では開かず、先頭の画面へ戻す（Account と同じ）。
 **ログインを要求しない**: サインインしていなくても、v1.0の機能は何も変わらない。ここでの失敗は、すべてこの画面の中で伝える（ErrorBoundary には伝えない）。
-Preview・Copy Link は公開ページ（7.5）ができてから、「N unpublished changes」と Auto Publish は 7.4.9。公開するタグの選び方は、下の「Public Tags」（7.4.8）。
+Preview・Copy Link は公開ページ（7.5）ができてから、Auto Publish は 7.4.9b。「N unpublished changes」は 7.4.9a で入れた（下）。公開するタグの選び方は、下の「Public Tags」（7.4.8）。
 
 ``` text
 Public Profile
@@ -446,6 +446,7 @@ Public Tags                  2 tags  >
 
 Your page shows your Display Name, Bio, and ...
 84 Ready songs will be published.
+3 unpublished changes
 
 [ Publish Now ]
 Unpublish Profile
@@ -470,6 +471,10 @@ Hides your public page. ...
     置き換えるなら、サーバーの今の版で送り直す。**ただし、公開中と見て確認なしで送ったのに、サーバーは非公開だったとき**（画面を開いたあとに、別の端末で非公開にされた）は、
     置き換えの文言ではなく、「もう一度公開しますか」（公開の確認と同じ内容: 誰でも見られるようになる・キーなどは公開されない）を出す。画面の状態は、確認の前に、サーバーの今の内容
     （非公開）に合わせる（取りやめても、今の状態が出る）。
+-   **未公開の変更の数**（Publish Now の上の1行。公開中で、数えられるときだけ）: 最後に Publish したあとの、曲の変更の数（「3 unpublished changes」。変更が無ければ「No unpublished changes」）。
+    曲ごとに1つ（追加・曲名やアーティストや公開タグの変更・Ready でなくなった／削除）。並び・Practice や Want の曲・My Key・Private Note は数えない。**Display Name・Bio の下書きも数えない**
+    （入力欄が、変更の有無を持つ）。この端末の記録が、サーバーの今の公開内容と合わないとき（再インストール後・別の端末が Publish した）は出さない（Publish は、置き換えの確認を通る）。
+    読み込み・Publish のあと・Public Tags から戻ったときに数え直す。数えられなくても、画面のほかの操作は使える（補助の情報）。Publish Now は、変更が 0 でも押せる。
 -   **Unpublish Profile**（公開中のときだけ）: 確認を出す（公開ページが見えなくなる・端末の曲は削除されない・`username` は残る）。入力中の下書きは残る。
     サーバーに `username` が無かった（Service が `null` を返した）ときは、「先にユーザー名を決めてください」を出し、読み直して `username` の確保から始める（何も伝えずに画面を変えない）。
 -   **操作は1つずつ**。実行中は、ほかの操作を押せず、戻る操作も止める（結果を伝える画面が無くなるため）。結果は画面の上に1行で出す。

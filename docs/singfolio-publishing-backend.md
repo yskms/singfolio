@@ -1132,7 +1132,8 @@ nonce・セッションの失効・Appleのトークン失効の方式は、「�
 実装時に決めること：
 
 -   端末側のPublishの状態（「3 unpublished changes」の数え方のために、何を端末に持つか）。
-    **決定（7.4）: 最後にPublishした曲ごとのハッシュを端末に持ち、今の公開対象（Readyの曲と公開タグ、プロフィール）と比べて数える。**
+    **決定（7.4）: 最後にPublishした曲ごとのハッシュを端末に持ち、今の公開対象（Readyの曲と公開タグ）と比べて数える。** Display Name・Bio は数えない
+    （保存しない下書きで、画面が変更の有無を持つ。7.4.9a。§8「未公開の変更の数え方」）。
 -   D1の版の用途。端末の「公開済み」の判定に使うか、複数の端末のPublishの衝突の検知に使うか。
 -   複数の端末から同じアカウントでPublishしたときの扱い（端末ごとのローカルDBなので、後勝ちで全体が
     差し替わる。版で衝突を検知するか）。再インストール後・別の端末で、空のローカルから最初にPublishして、
@@ -1390,8 +1391,8 @@ Publishのリクエストの本文は、`baseVersion`（7.4.4）に、`profile` 
     サインアウト・削除・別のアカウントでのサインインは、記録を消さない。Serviceが保証し、画面の約束事に頼らない）。サーバーに `username` が無ければ `username-required`、
     版が食い違えば `version-conflict`（今の `profile` つき）を、本文を送らずに返す（大きな本文を無駄に送らない）。読んだあとに別の端末が Publish しても、サーバーの照合が 409 にする。
     代償は、Publish ごとに読み取りが1回増えること（D1の読み取りは小さい）。
-    **7.4.9 の「N unpublished changes」の数え方は、`refreshProfile` で記録が今のアカウントのものと確かめたあとで使う**（確かめる前の `getState`・`published_songs` は、
-    前のアカウントのものでありうる）。
+    **「N unpublished changes」の数え方（7.4.9a）は、サーバーの今の状態（`refreshProfile` などが返す `profile`）を受け取り、記録が今のアカウントの、今の公開内容のものと確かめられたときだけ数える**
+    （確かめる前の `getState`・`published_songs` は、前のアカウントのものでありうる。§8「未公開の変更の数え方」）。
 -   **記録に失敗しても、サーバーで済んだ操作は成功として返す**（`publish`・`unpublish`）。記録できなければ、次の Publish が版の食い違いの確認を通る。
 -   **`publish`・`unpublish`・`claimUsername` は1本ずつ順に実行する。** 同じ端末の Publish が重なると、2つ目が1つ目の版を知らずに送って、自分自身と食い違う。
 -   **応答を受け取れなかった Publish**（`network`。Publish だけ待つ上限は30秒）は、サーバーで済んでいることがある。送り直すと `version-conflict` になり、置き換えの確認で解決する
@@ -1404,7 +1405,7 @@ Publishのリクエストの本文は、`baseVersion`（7.4.4）に、`profile` 
 -   **正規表現の後読み（`(?<!…)`）を使わない**（`publishSnapshot.ts`）。Hermes で解釈できるかを確かめていない。解釈できないと、ファイルを読み込んだ時点でアプリの起動が失敗する
     （Nodeのテストでは検出できない）。対になっていないサロゲートは、1文字ずつ見て取り除く。`publishSnapshot.test.ts` が、ソースに後読みが無いことを確かめる。
 -   **曲ごとのハッシュ**（`songContentHash`。cyrb53。暗号ではなく、変更の検出用）は曲名・アーティスト・公開タグから作り、`sortOrder` を含めない（曲を足すと、あとの曲の番号がずれて、
-    全部が「変更あり」になる）。Publish の成功のとき、送った内容（整えたあと）から作って、`published_songs` を丸ごと差し替える。「N unpublished changes」の数え方は 7.4.9。
+    全部が「変更あり」になる）。Publish の成功のとき、送った内容（整えたあと）から作って、`published_songs` を丸ごと差し替える。「N unpublished changes」の数え方は 7.4.9a（§8「未公開の変更の数え方」）。
 
 ### アプリ側の Public Profile 画面（7.4.7）
 
@@ -1415,8 +1416,8 @@ Publishのリクエストの本文は、`baseVersion`（7.4.4）に、`profile` 
     リリースのビルドでは 7.3.13 まで閉じている。
 -   **Display Name・Bio の下書きは、この画面だけが持ち、保存しない。** 初期値は `refreshProfile` が返すサーバーの「最後に Publish した値」（端末の `publish_state` ではない。
     再インストール後・別の端末でも、公開中の内容が出る）。変更の有無は、この値との比較で決める。変更があるまま戻るときは、破棄の確認を出す（`usePreventRemove`）。
-    **7.4.9 の Auto Publish は、曲の変更を、端末の `publish_state` の Display Name・Bio（最後に Publish した値）で送る想定**（画面の下書きを待たない）。Display Name・Bio の編集そのものを
-    Auto Publish に載せるなら、下書きの保存先を足す（7.4.9 で決める。決めずに、この画面で先に保存を足さない）。
+    **7.4.9b の Auto Publish は、曲の変更を、端末の `publish_state` の Display Name・Bio（最後に Publish した値）で送る想定**（画面の下書きを待たない）。Display Name・Bio の編集そのものを
+    Auto Publish に載せるなら、下書きの保存先を足す（7.4.9b で決める。決めずに、この画面で先に保存を足さない）。
 -   **確認を出す操作**: `username` の確保（変更できない）、最初の公開と非公開にしたあとの公開（人に見える状態になる）、Unpublish、版の食い違いの置き換え、変更を捨てて戻る。
     公開中の更新（Publish Now）は、確認なしで送る。
 -   **版の食い違い（`version-conflict`）。** 画面の状態（公開中か・最終公開）を、`PublishError.profile`（サーバーの今の内容）に合わせ、入力中の下書きはそのままにして、
@@ -1456,12 +1457,12 @@ Publishのリクエストの本文は、`baseVersion`（7.4.4）に、`profile` 
     `setTagPublic(tagId, isPublic)`（同じ値の再設定は成功。存在しないタグを選ぶと `tag-not-found`、外すときは何もしない）。`publish`・`unpublish` の直列化には入れない
     （サーバーの操作を、端末内の設定の保存と待ち合わせない。`publish` は、始めに選択を1回読む）。**画面は `publish` Service だけを使い、`publicTagRepository` に触れない。**
 -   **Publish への反映は `loadSources`**（`publishService.ts`）。曲のタグを、選んだタグのIDで絞り、名前を `publicTags` に入れる。1曲10個・名前50字の上限と整形は、これまでどおり
-    `buildPublishBody`（`publishSnapshot.ts`）。**曲ごとのハッシュは公開タグを含む**ので、選択を変えると、そのタグが付いた曲だけが「変更あり」になる（7.4.9 の
-    「N unpublished changes」が、選択の変更も数えられる）。7.4.9 は、`loadSources` を使って今の公開内容を作ること（公開用の曲の組み立てを2か所に書かない）。
+    `buildPublishBody`（`publishSnapshot.ts`）。**曲ごとのハッシュは公開タグを含む**ので、選択を変えると、そのタグが付いた曲だけが「変更あり」になる（7.4.9a の
+    「N unpublished changes」が、選択の変更も数える）。数え方も Auto Publish（7.4.9b）も、`loadSources` で今の公開内容を作る（公開用の曲の組み立てを2か所に書かない）。
 -   **1曲の公開タグが10個を超えるとき**は、名前の昇順（ASCIIの大文字小文字を区別しない。`song.tags` の順は `ORDER BY t.name, t.id`）の先頭の10個だけが出て、名前が後ろのタグは、黙って落ちる。
     どの曲で何が落ちたかを伝える画面も、どれを落とすかを選ばせる画面も作らない（通常は起きない。上限は画面の注記に書く）。
 -   **Public Profile の行の値**（`countPublicTags`）は、**オンにしたタグの数**で、Public Tags 画面のオンのスイッチの数と同じ。公開ページに実際に出るタグの数ではない
-    （Ready の曲に付いていないタグも数える。画面は、行ごとに付いている Ready の曲の数を出して、この違いを伝える）。**7.4.9 の「N unpublished changes」は、この数とは別**
+    （Ready の曲に付いていないタグも数える。画面は、行ごとに付いている Ready の曲の数を出して、この違いを伝える）。**「N unpublished changes」（7.4.9a）は、この数とは別**
     （曲ごとのハッシュの違いを数えるので、選択の変更も、その曲の変更として数えられる）。値は `public_tags` の `COUNT` だけで読む（Ready の曲は読まない）。
     **行の値は補助の情報**: 画面を開くときの読み込み（`load`）では、読めなくても Display Name・Bio・Publish を使えなくせず（値を出さない。「サーバーの状態を読めなかった」の表示にも混ぜない）、
     戻ったときの読み直しに失敗したときは、前の数のまま。実行中（Publish など）は、行を押せない（見た目・読み上げにも出す。`SettingsRow` の `disabled`）。
@@ -1469,6 +1470,34 @@ Publishのリクエストの本文は、`baseVersion`（7.4.4）に、`profile` 
     名前の変更がついてくること・選択でハッシュが変わること・通信しないことを確かめた。iOS Simulator（Release のJSだけ差し込み。サインインと公開の通信は偽、タグの選択とDBは本物）で、
     行の値（なし→2個）・オンオフの保存・戻ったあとの値の更新・Tags でタグを削除すると `public_tags` の行が消えること（expo-sqlite）を確かめた。**未確認**: Android（スイッチのつまみの色）、
     ダークモード、VoiceOver・TalkBack（行は `switch` として1つにまとめ、中のスイッチは隠している）、英語の表示、保存失敗の見た目、タグが多いとき（FlatList）の操作、本物のサーバーへの Publish（7.4.11）。
+
+### 未公開の変更の数え方（7.4.9a）
+
+Public Profile（`ui/PublicProfileSection.tsx`）の、Publish Now の上の1行。「3 unpublished changes」。0 のときは「No unpublished changes」。公開中で、数えられるときだけ出す
+（出さないとき: 非公開・まだ公開していない、数えられない、読めなかった）。補助の情報なので、数えられなくても、Display Name・Bio・Publish は使える。
+
+-   **数えるのは `publishService.countUnpublishedChanges(profile)`。通信しない。** 端末の `published_songs`（最後に Publish した曲のハッシュ）と、今の公開内容
+    （`loadSources` → `buildPublishSongs`）を比べる。結果は `added`（公開の対象になった曲）・`changed`（曲名・アーティスト・公開タグが変わった曲）・`removed`（公開の対象でなくなった曲。
+    Ready でなくなった、削除）と、その合計 `total`。**曲ごとに1つ**（曲名とアーティストを同時に変えても1つ）。表示は合計だけ。
+-   **Publish と同じ整え方を使う**（`buildPublishSongs`。`buildPublishBody` もこれを使う）。数え方だけ別に整えると、整えたあとの値のずれ（前後の空白、使えない文字、切り詰め）が、
+    Publish しても消えない「変更あり」になる。曲数の上限は見ない（1000曲を超えていても数える。Publish を断るのは Publish の側）。
+-   **数えるもの**: 曲名・アーティスト・公開タグ。公開タグは、選択の変更も数える（そのタグが付いた Ready の曲だけが「変更あり」になる。ハッシュが公開タグを含むため）。
+    **数えないもの**: 並び（`sortOrder` を含めないハッシュ。曲を足しても、あとの曲が全部「変更あり」にならない）、Practice・Want の曲の追加や変更、My Key・Private Note の変更
+    （公開内容ではない）、Display Name・Bio（保存しない下書き。変更の有無は、この画面が持つ下書きと基準の比較で、戻るときの確認に使う。数に混ぜない）。
+-   **数えられるのは、端末の記録が、サーバーに今ある公開内容そのもののときだけ**: 公開中で、記録の `username` と `baseVersion` が、渡された `profile`（`refreshProfile`・Publish の応答・
+    版の食い違いの `profile`）と一致する。そうでなければ `null`（出さない）。記録が無い（再インストール後）、前のアカウントのもの（サインアウトでは消さない）、
+    別の端末が Publish した（記録の版より新しい）ときの記録は、今の公開内容と比べる基準にならない（比べると、再インストール後は全部が「追加」と数えられる）。
+    そのときの Publish は、版の食い違いの確認を通る。**Service が自分でサーバーに聞かない**（`profile` を渡す。通信しないので、オフラインでも数えられる）。
+-   `publish`・`unpublish`・`claimUsername`・`refreshProfile` と直列に実行する（Publish の途中の、一部だけ新しい記録を読まない）。
+-   **画面が数え直す場所**: 読み込み（`load`）、Publish の応答のあと、版の食い違いで画面の状態をサーバーに合わせたとき（記録の版と合わないので、普通は出さなくなる）、Unpublish のあと（出さない）、
+    Public Tags から戻ったとき。**後から始めた数え直し・読み込みがあれば、先の結果は捨てる**（`changesIdRef`）。数えられなかった・失敗したときは、古い数を出し続けず、出さない。
+-   **確かめたこと / 確かめていないこと。** Nodeのテスト（実際のSQL）で、追加・変更・取り下げ・Ready でなくす・削除・公開タグの選択・並びが影響しないこと・記録が無い／別のアカウント／
+    別の端末が Publish したときの `null`・非公開のとき `null`・1000曲超・Publish との直列化を確かめた。
+    iOS Simulator（Release のJSだけ差し込み。サインインと公開の通信は偽、曲・タグ・`publish_state`・`published_songs` のDBは本物）で、非公開のときは出ないこと・最初の公開のあと
+    「未公開の変更はありません」・Public Tags で `ballad`（Ready の曲2つに付く）をオンにして戻ると「2件」・オフに戻すと 0・曲の追加と曲名の変更と Ready でなくしたあとに画面を開き直すと「3件」
+    （追加・変更・取り下げが1つずつ）・「今すぐ公開」で 0・「公開をやめる」で行が消えることを確かめた。
+    **未確認**: 実機（Hermes）での1000曲の読み取りの時間（`getShowView` で Ready の曲をすべて読む。画面を開くたび・Public Tags から戻るたびに1回）、Android、ダークモード、VoiceOver・TalkBack、
+    本物のサーバーとの Publish のあとの 0（7.4.11）。
 
 ### Cloudflare
 

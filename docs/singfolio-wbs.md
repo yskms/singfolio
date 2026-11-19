@@ -7,7 +7,7 @@ v1.0の作業（0〜6章。保存・管理は端末内で完結し、外部通�
 v1.0より後（公開機能・Requests）の実装順序は、
 `singfolio-publishing-backend.md` §9 を参照。進捗は「7. 公開機能」に書く。
 
-**現在地**：6. リリース準備（6.5・6.8が残り。6.1・6.2・6.3・6.4・6.6・6.7は完了。6.4は、iOS の 1.0 を審査に提出して、審査を通って公開された。Android は、6.8 の変更を含む AAB（versionCode 4）を作って、内部テストへアップロードして、Pixel 11 で確認した。Play Console の申告・掲載を入力して、製品版の審査へ送信し、審査を通って公開された。iOS も審査を通って公開され、紹介ページに両ストアのバッジを載せた。6.8は、アプリの変更・スクリーンショットの撮り直し・ストアの文の修正・両ストアへの入力・Android の実機での確認まで済んだ）。7. 公開機能（v1.0より後）は、7.1（バックエンドの技術検証と選定）が済み、7.2（実装前に確かめること）も済んだ（Appleの公開鍵の取得・`singfolio.app` の取得・認証の方式の決定・Freeプランでの放置後の再アクセス。ログイン手段はiOS・Androidとも、AppleとGoogleに決めた）。7.3 は、小さな作業（7.3.1 から 7.3.13）に分けた。7.3.1（利用者の前提の準備）は済んだ。7.3.2（Workerの土台）も済んだ（本番のD1とWorkerを作り、`singfolio.app` で404を返す状態）。7.3.3（nonce の発行・検証・使用済みの記録と HTTPS の検査）も済んだ（本番へデプロイして、HTTPが403、HTTPSが200になることを実測した。レート制限は Worker に入れない。WAFが Worker より前で効くことも実測した）。7.3.4（IDトークンの検証と、ログイン手段の引き当て）も済んだ（jose で検証し、模擬の発行元でテストした。本物のトークンでの確認は 7.3.7・7.3.8）。7.3.5（セッションとログイン・ログアウトのエンドポイント）も済んだ（模擬の発行元とローカルのD1でテストし、workerd でも動きを確かめた）。7.3.4 以降の Worker は、7.3.13 で本番へデプロイした。7.3.6（アプリ側の認証の土台）も済んだ（HTTP・SecureStore・初回起動での破棄・ログアウト。画面は無く、何も送らない。AndroidエミュレータとiOS Simulatorで確かめた）。7.3.7（Appleのサインイン）も済んだ（AppleのIDトークンの `nonce` の確認は、7.3.13 へ移した）。7.3.8（Googleのサインイン）も済んだ（iOS Simulatorで、取りやめ・成功・2回目のログインを確かめた。Androidの成功経路は、7.3.13 へ移した）。7.3.9（AndroidのAppleログイン。Web経由）も済んだ（Workerのコールバックと認可コードの交換、アプリのCustom Tabと戻りのURL。Androidエミュレータで、Custom Tab から Worker の302、アプリが `code` を受け取るまでを確かめた。本物のAppleでの交換は 7.3.13）。7.3.10（ほかの端末のログアウト・アカウントの削除・Appleのサーバー間通知）も済んだ（Worker: `POST /auth/logout-others`・`POST /auth/delete`・`POST /auth/apple/notifications`、アプリ: `account.signOutOthers()`・`account.deleteAccount()`。Nodeのテストと、workerd での疎通を確かめた。画面は 7.3.11、本物のAppleでの確認は 7.3.13）。7.3.11（アカウントの画面）も済んだ（Settings の `Account`。サインイン・サインアウト・ほかの端末のサインアウト・削除。iOS Simulator で、サインアウト中・サインイン中・各確認・取りやめ・失敗の表示を確かめた。リリースのビルドでは 7.3.13 まで出さない）。7.3.12（申告と文書。未使用のアカウントの自動削除、ポリシーとストアの申告の下書き）も済んだ。7.3.13（実機と署名したビルドでの確認。本番のWorkerへデプロイして、主要な経路を確かめた）も済み、7.3 は完了した。7.4 は、小さな作業（7.4.1 から 7.4.11）に分けた。7.4.1（準備と決定。R2 のバケット `singfolio-snapshots` を作成済み。公開アクセスは無効）から 7.4.5（Worker）までと、7.4.6（アプリの Publish の土台。Service まで）と 7.4.7（Public Profile の画面。Profile から開く。`account.available` のビルドだけ）と、7.4.8（公開するタグの選び方。Public Profile から開く Public Tags 画面）は済んだ。次は 7.4.9
+**現在地**：6. リリース準備（6.5・6.8が残り。6.1・6.2・6.3・6.4・6.6・6.7は完了。6.4は、iOS の 1.0 を審査に提出して、審査を通って公開された。Android は、6.8 の変更を含む AAB（versionCode 4）を作って、内部テストへアップロードして、Pixel 11 で確認した。Play Console の申告・掲載を入力して、製品版の審査へ送信し、審査を通って公開された。iOS も審査を通って公開され、紹介ページに両ストアのバッジを載せた。6.8は、アプリの変更・スクリーンショットの撮り直し・ストアの文の修正・両ストアへの入力・Android の実機での確認まで済んだ）。7. 公開機能（v1.0より後）は、7.1（バックエンドの技術検証と選定）が済み、7.2（実装前に確かめること）も済んだ（Appleの公開鍵の取得・`singfolio.app` の取得・認証の方式の決定・Freeプランでの放置後の再アクセス。ログイン手段はiOS・Androidとも、AppleとGoogleに決めた）。7.3 は、小さな作業（7.3.1 から 7.3.13）に分けた。7.3.1（利用者の前提の準備）は済んだ。7.3.2（Workerの土台）も済んだ（本番のD1とWorkerを作り、`singfolio.app` で404を返す状態）。7.3.3（nonce の発行・検証・使用済みの記録と HTTPS の検査）も済んだ（本番へデプロイして、HTTPが403、HTTPSが200になることを実測した。レート制限は Worker に入れない。WAFが Worker より前で効くことも実測した）。7.3.4（IDトークンの検証と、ログイン手段の引き当て）も済んだ（jose で検証し、模擬の発行元でテストした。本物のトークンでの確認は 7.3.7・7.3.8）。7.3.5（セッションとログイン・ログアウトのエンドポイント）も済んだ（模擬の発行元とローカルのD1でテストし、workerd でも動きを確かめた）。7.3.4 以降の Worker は、7.3.13 で本番へデプロイした。7.3.6（アプリ側の認証の土台）も済んだ（HTTP・SecureStore・初回起動での破棄・ログアウト。画面は無く、何も送らない。AndroidエミュレータとiOS Simulatorで確かめた）。7.3.7（Appleのサインイン）も済んだ（AppleのIDトークンの `nonce` の確認は、7.3.13 へ移した）。7.3.8（Googleのサインイン）も済んだ（iOS Simulatorで、取りやめ・成功・2回目のログインを確かめた。Androidの成功経路は、7.3.13 へ移した）。7.3.9（AndroidのAppleログイン。Web経由）も済んだ（Workerのコールバックと認可コードの交換、アプリのCustom Tabと戻りのURL。Androidエミュレータで、Custom Tab から Worker の302、アプリが `code` を受け取るまでを確かめた。本物のAppleでの交換は 7.3.13）。7.3.10（ほかの端末のログアウト・アカウントの削除・Appleのサーバー間通知）も済んだ（Worker: `POST /auth/logout-others`・`POST /auth/delete`・`POST /auth/apple/notifications`、アプリ: `account.signOutOthers()`・`account.deleteAccount()`。Nodeのテストと、workerd での疎通を確かめた。画面は 7.3.11、本物のAppleでの確認は 7.3.13）。7.3.11（アカウントの画面）も済んだ（Settings の `Account`。サインイン・サインアウト・ほかの端末のサインアウト・削除。iOS Simulator で、サインアウト中・サインイン中・各確認・取りやめ・失敗の表示を確かめた。リリースのビルドでは 7.3.13 まで出さない）。7.3.12（申告と文書。未使用のアカウントの自動削除、ポリシーとストアの申告の下書き）も済んだ。7.3.13（実機と署名したビルドでの確認。本番のWorkerへデプロイして、主要な経路を確かめた）も済み、7.3 は完了した。7.4 は、小さな作業（7.4.1 から 7.4.11）に分けた。7.4.1（準備と決定。R2 のバケット `singfolio-snapshots` を作成済み。公開アクセスは無効）から 7.4.5（Worker）までと、7.4.6（アプリの Publish の土台。Service まで）と 7.4.7（Public Profile の画面。Profile から開く。`account.available` のビルドだけ）と、7.4.8（公開するタグの選び方。Public Profile から開く Public Tags 画面）と、7.4.9a（未公開の変更の数え方。Public Profile に「N unpublished changes」を出す）は済んだ。次は 7.4.9b（Auto Publish）
 
 ## 0. 企画・設計
 
@@ -325,7 +325,7 @@ v1.0より後（公開機能・Requests）の実装順序は、
         （debug・EASのlocal build・Play App Signing）。成功経路で通らなければ、まず疑う。確認用のアカウントは、プロジェクトの所有者でもテストユーザーでもないものを使う（同意画面が「テスト中」でも入れるか。
         先にテストユーザーへ登録しない: 確かめられなくなる）。
 -   [ ] 7.4 Public ProfileとPublish（Auto Publishを含む）。内容は `singfolio-publishing-backend.md` §3〜§6・§8。公開ページ（7.5）とRequests（7.6）は入れない。
-    アプリの画面は、7.3 と同じ `ACCOUNT_ENABLED` のゲートの後ろに置く。Worker（7.4.1〜7.4.5）を先に完成させ、アプリ（7.4.6〜7.4.9）へ進む。
+    アプリの画面は、7.3 と同じ `ACCOUNT_ENABLED` のゲートの後ろに置く。Worker（7.4.1〜7.4.5）を先に完成させ、アプリ（7.4.6〜7.4.9b）へ進む。
     アカウントの削除（`worker/src/account.ts` の `deleteUserAccount`。自己削除とAppleの `account-deleted` が使う）に、
     R2のスナップショット・`profiles` の削除を足す（順序: `username` を読む → R2を消す → D1の行を消す。R2に失敗したらD1の行を残して失敗にする。§8）。Requestの削除は 7.6。
     **未使用のアカウントの自動削除（1年）の見直し**（決めずに公開機能を出さない）: 公開ページが載ると、端末の中だけで使い続ける人は、サーバーとの通信が無く、
@@ -366,15 +366,19 @@ v1.0より後（公開機能・Requests）の実装順序は、
         （§8「アプリ側の Publish の土台」）
     -   [x] 7.4.7 アプリ: Public Profile の画面（Display Name・Bio・`username` の確保・Publish Now・Unpublish・状態の表示）。入口は Profile タブ。`account.available` でゲート。
         en / ja の文言。`singfolio-screen-flow.md` を更新した。Preview・Copy Link は公開ページ（7.5）ができてから。Display Name・Bio は、この画面だけが持つ保存しない下書き
-        （初期値はサーバーの最後に Publish した値。Auto Publish との関係は 7.4.9 で決める）。最初の公開・Unpublish・版の食い違いの置き換えは確認つき。
+        （初期値はサーバーの最後に Publish した値。Auto Publish との関係は 7.4.9b で決める）。最初の公開・Unpublish・版の食い違いの置き換えは確認つき。
         iOS Simulator で、偽の Service を差し込んで主要な流れを確かめた（§8「アプリ側の Public Profile 画面」）。本物のサーバーでの確認と Android は 7.4.11
     -   [x] 7.4.8 アプリ: 公開するタグ（`publicTags`）の選び方。ローカルのタグに `isPublic` を足さず、別の表 `public_tags`（`tag_id` だけ。migration 5。タグのIDで持つ。タグを消すと選択も消える）に持つ。
         **決定: タグごとに選ぶ。既定は全部非公開。** `publishService` の `listPublicTagChoices`・`setTagPublic`（端末内だけ。通信・サインイン不要）、`loadSources`（曲のタグのうち、選んだものだけを `publicTags` に入れる。
-        7.4.9 は、これで今の公開内容を作る）。画面は Public Tags（`app/public-tags.tsx`。入口は Public Profile の `Public Tags` の行。`account.available` でゲート。押すたびに保存）。
+        7.4.9a・7.4.9b は、これで今の公開内容を作る）。画面は Public Tags（`app/public-tags.tsx`。入口は Public Profile の `Public Tags` の行。`account.available` でゲート。押すたびに保存）。
         確認の文言に「公開タグ」を足した。Nodeのテストと、iOS Simulator（Release のJSだけ差し込み。通信は偽、タグの選択とDBは本物）で確かめた（§8「公開するタグの選び方」）
-    -   [ ] 7.4.9 アプリ: 未公開の変更の数え方（「N unpublished changes」）と Auto Publish（debounce、Pending の保持、再送）。いちばん重いので、必要なら
-        7.4.9a（数え方）と 7.4.9b（自動送信）に分ける。
-        数えるのは、`refreshProfile` で端末の記録が今のアカウントのものと確かめたあと（確かめる前の記録は、前のアカウントのものでありうる。§8「アプリ側の Publish の土台」）
+    -   [x] 7.4.9a アプリ: 未公開の変更の数え方（「N unpublished changes」）。**7.4.9 を、数え方（a）と Auto Publish（b）に分けた**（Auto Publish は、Display Name・Bio の保存先、設定の置き場、
+        通信の再送・Pending の保持など、決めることが多く、数え方と別に決めたほうが確かめやすい）。`publishService.countUnpublishedChanges(profile)`（通信しない。端末の `published_songs` のハッシュと、
+        `loadSources` の今の公開内容を比べる。曲ごとに1つ: 追加・変更・取り下げ）。Publish と同じ整え方（`buildPublishSongs`）を使う。数えるのは曲だけで、Display Name・Bio の下書きは数えない。
+        端末の記録が今の公開内容と合うとき（公開中で、`username` と `baseVersion` が一致）だけ数える。画面は Public Profile の Publish Now の上の1行（公開中のときだけ）。
+        Nodeのテストと、iOS Simulator（通信は偽、DBは本物）で確かめた（§8「未公開の変更の数え方」）
+    -   [ ] 7.4.9b アプリ: Auto Publish（debounce、Pending の保持、再送）。設定（ON/OFF）の置き場、Display Name・Bio の扱い（下書きの保存先を足すか、最後に Publish した値で送るか）、
+        最初の公開は確認つき（人に見える状態になる）との関係を、着手前に決める。OFF のときの表示は 7.4.9a の数え方を使う
     -   [ ] 7.4.10 文書。`singfolio-privacy-policy-next.md` と `singfolio-store-listing.md` §6 に、公開される内容（Display Name・Bio・Ready の曲・公開タグ・`username`）を足し、
         自動削除の説明を直す。公開中の `privacy-policy.md` は、アカウントを出す版が出るまで書き換えない
     -   [ ] 7.4.11 確認。マイグレーション 0004 と R2 を本番へ適用する。実機から Publish。R2 のオブジェクトの中身に My Key・Private Note が無いこと。Unpublish。2台での衝突。

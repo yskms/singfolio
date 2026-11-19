@@ -149,7 +149,7 @@ UIの表示名「My Key」は、モデル・DBでは `keyOffset` / `key_offset` 
 | `id` | INTEGER PK | 常に `1`（`CHECK`） |
 | `username` | TEXT NOT NULL | この端末が紐づくアカウントの公開URLの名前（Workerの `username`。変更されない） |
 | `base_version` | INTEGER NOT NULL | Publish のリクエストの `baseVersion`。**この端末が最後に Publish した、または置き換えを確認した版**（0以上） |
-| `display_name` / `bio` | TEXT NOT NULL | この端末が最後に Publish した Display Name・Bio（「N unpublished changes」の数え方に使う） |
+| `display_name` / `bio` | TEXT NOT NULL | この端末が最後に Publish した Display Name・Bio（「N unpublished changes」には数えない: 数えるのは曲だけ。Auto Publish が、曲の変更を送るときに使う想定。7.4.9b） |
 
 `published_songs`（最後に Publish した曲）:
 

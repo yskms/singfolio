@@ -240,9 +240,13 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     （曲を足すと、あとの曲が全部「変更あり」になる）。`published_songs` を `songs` の外部キーにしない（曲を消したあとも、公開した記録を残す）。公開タグは、利用者が選んだタグだけ（下の「公開するタグの選び方」）。`publishSnapshot.ts` に正規表現の後読みを書かない（Hermes で未確認。起動の失敗になりうる。テストが検出する）。`publishSnapshot.test.ts` は `worker/src/snapshot.ts` を import する（実行時のコードは共有しない）ので、そのファイルに Workers の型や `worker/` の依存を持ち込まない。
 -   **Public Profile 画面（`app/public-profile.tsx`・`ui/PublicProfileSection.tsx`。7.4.7）。** 詳細は `docs/singfolio-publishing-backend.md` §8「アプリ側の Public Profile 画面」。
     入口（Profile）もルートも `account.available` のゲートの後ろ（Account と同じ。リリースのビルドでは閉じる）。**Display Name・Bio の下書きは、この画面だけが持ち、保存しない**
-    （初期値はサーバーの `PublicProfile`。端末の `publish_state` ではない）。保存先を先に足さない（Auto Publish との関係は 7.4.9 で決める）。最初の公開・Unpublish・`username` の確保・
+    （初期値はサーバーの `PublicProfile`。端末の `publish_state` ではない）。保存先を先に足さない（Auto Publish との関係は 7.4.9b で決める）。最初の公開・Unpublish・`username` の確保・
     版の食い違いの置き換えの確認は外さない（人に見える状態になる・変更できない）。公開中と見て確認なしで送ったのにサーバーが非公開だったときは、置き換えの文言にせず、公開の確認の文言にする。`username` の形の規則は `src/services/username.ts` に、Workerと同じ値を別に持つ。日時は `Intl` を使わない
     （`src/i18n/dateTime.ts`）。失敗の文言は `src/i18n/publishErrors.ts`（Publish の `network` だけ「公開できたか分からない」）。
+    **「N unpublished changes」（`publishService.countUnpublishedChanges(profile)`。7.4.9a）は、数えるのを曲だけにする**（Display Name・Bio の下書きを混ぜない）。**端末の記録が、渡された
+    サーバーの `profile`（公開中・`username` と `baseVersion` が一致）と合うときだけ数え、合わなければ `null`**（再インストール後の空の記録と比べると、全部が「追加」と数えられる。
+    別の端末が Publish したあとの記録は、今の公開内容の基準にならない）。Service からサーバーへ聞きに行かない（通信しない）。曲の整え方は Publish と同じ `buildPublishSongs` を使い、
+    数え方だけ別に整えない（整えた値のずれが、Publish しても消えない「変更あり」になる）。詳細は同じ docs §8「未公開の変更の数え方」。
 -   `expo-secure-store` の config plugin を `app.json` に足さない。Androidのバックアップ規則が `<include>` で、v1.0で今
     バックアップされているSQLiteを外す。
 
@@ -301,7 +305,7 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     名前で持たない**（タグを消して同じ名前で作り直したタグが、黙って公開される）。既定は全部非公開で、「全タグを公開する」「Ready の曲のタグを自動で公開する」に
     「簡略化」しない（タグは、利用者が管理のために付ける情報で、人に見せるかは利用者が選ぶ）。選択は端末内だけの設定で、アカウントと結びつけず、サインアウト・別のアカウントでも
     消さない。画面は `publish` Service（`listPublicTagChoices`・`setTagPublic`）だけを使う。Publish に載せる公開タグは `publishService` の `loadSources` の1か所で作る
-    （7.4.9 の未公開の変更の数え方も、これを使う）。詳細は `docs/singfolio-publishing-backend.md` §8「公開するタグの選び方」。
+    （7.4.9a の未公開の変更の数え方も、これを使う）。詳細は `docs/singfolio-publishing-backend.md` §8「公開するタグの選び方」。
 
 ### Repository / Service層
 
