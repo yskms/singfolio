@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { PublicProfile } from '../src/domain/types';
+import type { PublicProfile, UnpublishedChanges } from '../src/domain/types';
 import {
   needsProfileReload,
   publicProfileErrorMessageKey,
@@ -33,7 +33,14 @@ type ScreenState =
   | { kind: 'signedOut' }
   // `profile` が `null` なら、まだ `username` を確保していない。`readyCount` は、公開する曲（Ready）の数、`publicTagCount` は、
   // 公開に選んだタグの数（Public Tags 画面から戻ったときに読み直す。行の値だけの補助の情報なので、読めなければ `null` で、値を出さない）。
-  | { kind: 'ready'; profile: PublicProfile | null; readyCount: number; publicTagCount: number | null };
+  // `changes` は、最後に Publish したあとの曲の変更の数（公開中で、端末の記録が今の公開内容と合うときだけ。数えられない・読めないときは `null` で、出さない。補助の情報）。
+  | {
+      kind: 'ready';
+      profile: PublicProfile | null;
+      readyCount: number;
+      publicTagCount: number | null;
+      changes: UnpublishedChanges | null;
+    };
 
 type NoticeKey = PublicProfileErrorMessageKey | 'publicProfile.published' | 'publicProfile.unpublished';
 
@@ -79,6 +86,9 @@ export function PublicProfileSection() {
   const mountedRef = useRef(true);
   const loadIdRef = useRef(0);
   const viewKindRef = useRef<ScreenState['kind']>('loading');
+  // 画面が準備できているときの、サーバーの公開の状態（フォーカスが戻ったときの数え直しに使う）。
+  const profileRef = useRef<PublicProfile | null>(null);
+  const changesIdRef = useRef(0);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -88,6 +98,7 @@ export function PublicProfileSection() {
   }, []);
   useEffect(() => {
     viewKindRef.current = view.kind;
+    profileRef.current = view.kind === 'ready' ? view.profile : null;
   });
 
   const resetForm = useCallback((profile: PublicProfile | null) => {
@@ -104,6 +115,7 @@ export function PublicProfileSection() {
    */
   const load = useCallback(async () => {
     const id = ++loadIdRef.current;
+    changesIdRef.current += 1; // 読み込み中の数え直しの結果は捨てる
     setView({ kind: 'loading' });
     let next: ScreenState;
     let nextNotice: Notice | null = null;
@@ -119,7 +131,9 @@ export function PublicProfileSection() {
         // 行の値という補助の情報のために、Display Name・Bio・Publish まで使えなくしない（読めなければ、値を出さないだけ。
         // `catch` の「サーバーの状態を読めなかった」にも混ぜない）。
         const publicTagCount = await publish.countPublicTags().catch(() => null);
-        next = { kind: 'ready', profile, readyCount: counts.ready, publicTagCount };
+        // 未公開の変更の数も同じ（補助の情報。数えられなければ出さない）。
+        const changes = profile === null ? null : await publish.countUnpublishedChanges(profile).catch(() => null);
+        next = { kind: 'ready', profile, readyCount: counts.ready, publicTagCount, changes };
       }
     } catch (error) {
       if (needsProfileReload(error)) {
@@ -149,8 +163,28 @@ export function PublicProfileSection() {
     if (focusKey > 0 && (viewKindRef.current === 'signedOut' || viewKindRef.current === 'failed')) void load();
   }, [focusKey, load]);
 
+  /**
+   * 未公開の変更の数を数え直す（`profile` は、画面が今、サーバーの公開の状態として持っているもの）。公開中でなければ出さない。数えられない・読めないときは、
+   * 数を出さない（古い数を出し続けない）。後から始めた数え直し・読み込みがあれば、先の結果は捨てる。
+   */
+  const refreshChanges = useCallback((profile: PublicProfile | null) => {
+    const id = ++changesIdRef.current;
+    const apply = (changes: UnpublishedChanges | null) => {
+      if (!mountedRef.current || id !== changesIdRef.current) return;
+      setView((current) => (current.kind === 'ready' ? { ...current, changes } : current));
+    };
+    if (profile === null || !profile.published) {
+      apply(null);
+      return;
+    }
+    getServices()
+      .then(({ publish }) => publish.countUnpublishedChanges(profile))
+      .then(apply, () => apply(null));
+  }, []);
+
   // Public Tags から戻ったとき（選んだタグの数が変わったかもしれない）、数だけを読み直す。入力中の下書きには触れない。
-  // 読めなくても、前の数のまま（行の値が古くなるだけ。選択そのものは Public Tags 画面が持つ）。
+  // 読めなくても、前の数のまま（行の値が古くなるだけ。選択そのものは Public Tags 画面が持つ）。選んだタグが変わると、そのタグが付いた曲が
+  // 「変更あり」になるので、未公開の変更の数も数え直す。
   useEffect(() => {
     if (focusKey === 0 || viewKindRef.current !== 'ready') return;
     let cancelled = false;
@@ -163,10 +197,11 @@ export function PublicProfileSection() {
         },
         () => {},
       );
+    refreshChanges(profileRef.current);
     return () => {
       cancelled = true;
     };
-  }, [focusKey]);
+  }, [focusKey, refreshChanges]);
 
   const isDirty = displayName !== base.displayName || bio !== base.bio;
 
@@ -227,6 +262,8 @@ export function PublicProfileSection() {
   const applyProfile = (profile: PublicProfile) => {
     setView((current) => (current.kind === 'ready' ? { ...current, profile } : current));
     resetForm(profile);
+    // Publish したあとは 0 になる（記録が新しい版に合う）。確保（`claimUsername`）・非公開の状態では出さない。
+    refreshChanges(profile);
   };
 
   const confirmClaim = () => {
@@ -257,7 +294,9 @@ export function PublicProfileSection() {
    */
   const confirmReplace = (server: PublicProfile, visibleConfirmed: boolean) => {
     // 画面の状態（公開中か・最終公開）は、サーバーの今の内容に合わせる。入力中の Display Name・Bio は、そのまま。
+    // 未公開の変更の数も合わせる（別の端末が Publish したなら、端末の記録は今の公開内容の基準にならず、数えない）。
     setView((current) => (current.kind === 'ready' ? { ...current, profile: server } : current));
+    refreshChanges(server);
     const republish = !server.published && !visibleConfirmed;
     Alert.alert(
       republish ? t('publicProfile.republishTitle') : t('publicProfile.replaceTitle'),
@@ -324,6 +363,7 @@ export function PublicProfileSection() {
             if (profile === null) throw new PublishError('username-required');
             // 入力中の下書きは、そのまま残す（非公開にしても、Display Name・Bio の控えはサーバーに残る）。
             setView((current) => (current.kind === 'ready' ? { ...current, profile } : current));
+            refreshChanges(profile);
             return 'publicProfile.unpublished';
           }),
       },
@@ -340,6 +380,7 @@ export function PublicProfileSection() {
   const profile = view.kind === 'ready' ? view.profile : null;
   const readyCount = view.kind === 'ready' ? view.readyCount : 0;
   const publicTagCount = view.kind === 'ready' ? view.publicTagCount : null;
+  const changes = view.kind === 'ready' ? view.changes : null;
   const tooManySongs = readyCount > PUBLISH_LIMITS.songs;
 
   return (
@@ -465,6 +506,17 @@ export function PublicProfileSection() {
               ? t('publicProfile.tooManySongs', { count: readyCount, limit: PUBLISH_LIMITS.songs })
               : t('publicProfile.readyCount', { count: readyCount })}
           </Text>
+
+          {changes !== null && (
+            // 公開中で、数えられるときだけ（最後に Publish したあとの、曲の変更の数）。0 でも出す（「最新」だと分かる）。
+            <Text
+              style={[styles.changes, { color: changes.total > 0 ? colors.textPrimary : colors.textSecondary }]}
+            >
+              {changes.total > 0
+                ? t('publicProfile.changes.count', { count: changes.total })
+                : t('publicProfile.changes.none')}
+            </Text>
+          )}
 
           <ActionButton
             variant="primary"
@@ -603,6 +655,7 @@ const styles = StyleSheet.create({
   dot: { width: 10, height: 10, borderRadius: 5, borderWidth: 1.5 },
   address: { fontSize: 15, lineHeight: 22 },
   counter: { fontSize: 13, lineHeight: 18, textAlign: 'right' },
+  changes: { fontSize: 15, lineHeight: 22 },
   unpublish: { gap: 0 },
   row: { minHeight: 48, justifyContent: 'center' },
   rowLabel: { fontSize: 16, lineHeight: 22 },

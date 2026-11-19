@@ -243,6 +243,8 @@ export const ja: Record<MessageKey, Message> = {
   'publicProfile.sharedNote':
     '公開ページには、表示名・自己紹介と、歌える曲の曲名・アーティスト名・公開タグが載ります。キー・プライベートメモ・ステータスは公開されません。',
   'publicProfile.readyCount': { other: '歌える曲{count}曲を公開します。' },
+  'publicProfile.changes.none': '未公開の変更はありません',
+  'publicProfile.changes.count': { other: '未公開の変更が{count}件あります' },
   'publicProfile.tooManySongs':
     '歌える曲が{count}曲あります。公開プロフィールに載せられるのは{limit}曲までです。一部を練習中か歌いたいに移すと公開できます。',
   'publicProfile.publish': '今すぐ公開',

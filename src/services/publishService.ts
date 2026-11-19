@@ -1,5 +1,5 @@
 import type { Database } from '../db/appDatabase.ts';
-import type { PublicProfile, PublicTagChoice } from '../domain/types.ts';
+import type { PublicProfile, PublicTagChoice, UnpublishedChanges } from '../domain/types.ts';
 import { AuthError } from '../repositories/authError.ts';
 import type { PublicTagRepository } from '../repositories/publicTagRepository.ts';
 import { PublishError } from '../repositories/publishError.ts';
@@ -8,7 +8,13 @@ import type { PublishState, PublishStateRepository } from '../repositories/publi
 import type { TagRepository } from '../repositories/tagRepository.ts';
 import type { SessionAccess } from './accountService.ts';
 import { ServiceError } from './errors.ts';
-import { buildPublishBody, songContentHash, type PublishSongSource } from './publishSnapshot.ts';
+import {
+  buildPublishBody,
+  buildPublishSongs,
+  countSongChanges,
+  songContentHash,
+  type PublishSongSource,
+} from './publishSnapshot.ts';
 import type { ShowService } from './showService.ts';
 import { normalizeUsernameInput } from './username.ts';
 
@@ -152,6 +158,27 @@ export function createPublishService({ db, access, publish, state, show, publicT
         }
         if ((await tags.get(tx, tagId)) === null) throw new ServiceError('tag-not-found');
         await publicTags.add(tx, tagId);
+      });
+    },
+
+    /**
+     * 最後に Publish したあとの、公開する曲の変更の数（「N unpublished changes」。7.4.9a）。**通信しない**。曲ごとに1つと数える
+     * （曲名・アーティスト・公開タグのどれが変わっても1つ。Ready になった・Ready でなくなった・削除も）。並びと、Display Name・Bio の下書きは数えない。
+     *
+     * `profile` は、`refreshProfile`（または Publish の応答）が返した、サーバーの今の状態。**数えられるのは、端末の記録が、サーバーに今ある
+     * 公開内容そのもののとき**だけ: 公開中で、記録の `username` と `baseVersion` が一致する。そうでなければ `null`（数えない）。
+     * 記録が無い（再インストール後）、前のアカウントのもの、別の端末が Publish した（記録より新しい版がある）ときは、端末の記録は、
+     * 今の公開内容と比べる基準にならない。次の Publish は、版の食い違いの確認を通る。
+     * 失敗（DBの読み取り）は、そのまま投げる。
+     * `publish`・`unpublish` などと直列に実行する（待つのは、実行中の操作が終わるまで）。
+     */
+    countUnpublishedChanges(profile: PublicProfile): Promise<UnpublishedChanges | null> {
+      if (!profile.published) return Promise.resolve(null);
+      // 端末の記録（`publish_state` と `published_songs`）を書く操作と直列にする（Publish の途中の、一部だけ新しい記録を読まない）。
+      return serialize(async () => {
+        const [current, hashes, sources] = await Promise.all([state.get(db), state.listHashes(db), loadSources()]);
+        if (current === null || current.username !== profile.username || current.baseVersion !== profile.version) return null;
+        return countSongChanges(hashes, buildPublishSongs(sources));
       });
     },
 

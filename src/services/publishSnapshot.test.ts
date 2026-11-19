@@ -7,6 +7,8 @@ import { describe, it } from 'node:test';
 import { parseSnapshotContent, SNAPSHOT_LIMITS } from '../../worker/src/snapshot.ts';
 import {
   buildPublishBody,
+  buildPublishSongs,
+  countSongChanges,
   PUBLISH_LIMITS,
   songContentHash,
   type PublishBody,
@@ -228,5 +230,60 @@ describe('songContentHash', () => {
   it('1000曲分の値が、ほぼ衝突しない', () => {
     const hashes = new Set(Array.from({ length: 1000 }, (_, i) => songContentHash({ ...base, title: `曲${i}` })));
     assert.equal(hashes.size, 1000);
+  });
+});
+
+describe('buildPublishSongs / countSongChanges（未公開の変更の数え方）', () => {
+  const hashesOf = (sources: PublishSongSource[]) =>
+    new Map(buildPublishSongs(sources).map((s) => [s.id, songContentHash(s)]));
+  const count = (published: Map<string, string>, sources: PublishSongSource[]) =>
+    countSongChanges(published, buildPublishSongs(sources));
+
+  it('buildPublishSongs は、buildPublishBody の曲と同じ（Publish と数え方が同じ整え方を使う）', () => {
+    const sources = [song(1, { title: '  長い\n曲名  ', publicTags: ['a', 'a', ' b '] }), song(2, { title: '   ' }), song(3)];
+    assert.deepEqual(buildPublishSongs(sources), bodyOf(build(sources)).songs);
+  });
+
+  it('曲数の上限は見ない（上限を超えていても数えられる）', () => {
+    const many = Array.from({ length: PUBLISH_LIMITS.songs + 5 }, (_, i) => song(i));
+    assert.equal(buildPublishSongs(many).length, PUBLISH_LIMITS.songs + 5);
+  });
+
+  it('変更が無ければ 0（公開した内容と同じ）', () => {
+    const sources = [song(1), song(2, { publicTags: ['a'] })];
+    assert.deepEqual(count(hashesOf(sources), sources), { added: 0, changed: 0, removed: 0, total: 0 });
+  });
+
+  it('加わった曲・変わった曲・無くなった曲を、1曲に1つずつ数える', () => {
+    const published = hashesOf([song(1), song(2), song(3), song(4)]);
+    const now = [
+      song(1), // そのまま
+      song(2, { title: '別の曲名' }), // 曲名
+      song(3, { publicTags: ['new'] }), // 公開タグ
+      // 4 は無い（Ready でなくなった、削除された）
+      song(5), // 加わった
+      song(6, { artist: '別の人' }), // 加わった（アーティストが違っても新しい曲）
+    ];
+    assert.deepEqual(count(published, now), { added: 2, changed: 2, removed: 1, total: 5 });
+  });
+
+  it('曲名・アーティスト・タグを同時に変えても、その曲は1つ', () => {
+    const published = hashesOf([song(1)]);
+    assert.deepEqual(count(published, [song(1, { title: 'x', artist: 'y', publicTags: ['z'] })]).total, 1);
+  });
+
+  it('並びが変わっても数えない（曲を足してあとの曲の番号がずれても、足した1曲だけ）', () => {
+    const published = hashesOf([song(1), song(2), song(3)]);
+    assert.deepEqual(count(published, [song(0), song(1), song(2), song(3)]), { added: 1, changed: 0, removed: 0, total: 1 });
+    assert.deepEqual(count(published, [song(3), song(2), song(1)]).total, 0);
+  });
+
+  it('公開した曲が空（非公開・初めて）なら、今の曲は全部「加わった」', () => {
+    assert.deepEqual(count(new Map(), [song(1), song(2)]), { added: 2, changed: 0, removed: 0, total: 2 });
+  });
+
+  it('整えたあとの値が同じなら、変更ではない（前後の空白だけの違い）', () => {
+    const published = hashesOf([song(1, { title: '曲' })]);
+    assert.equal(count(published, [song(1, { title: ' 曲 ' })]).total, 0);
   });
 });

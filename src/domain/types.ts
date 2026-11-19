@@ -59,6 +59,21 @@ export interface PublicProfile {
   bio: string;
 }
 
+/**
+ * 最後に Publish したあとの、公開する曲の変更の数（「N unpublished changes」。7.4.9a）。曲ごとに1つと数える
+ * （曲名・アーティスト・公開タグのどれが変わっても、その曲は1つ）。並びの変化と、Display Name・Bio の下書きは数えない。
+ */
+export interface UnpublishedChanges {
+  /** 公開していない曲が、公開の対象になった（新しく Ready になった、追加された） */
+  added: number;
+  /** 公開した曲の、曲名・アーティスト・公開タグが変わった */
+  changed: number;
+  /** 公開した曲が、公開の対象でなくなった（Ready でなくなった、削除された） */
+  removed: number;
+  /** 上の合計 */
+  total: number;
+}
+
 export interface Tag {
   id: string;
   name: string;

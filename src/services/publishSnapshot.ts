@@ -11,6 +11,8 @@
 // 文字は空白にし、空になった曲は外す。1曲の事情で、全体の Publish を止めない。曲数だけは切り詰めない（どの曲を落とすかを
 // 勝手に決めない）: 上限を超えるときは断り、理由を返す。数字を変えるときは、Workerの `SNAPSHOT_LIMITS` と一緒に直す。
 
+import type { UnpublishedChanges } from '../domain/types.ts';
+
 /** Workerの `SNAPSHOT_LIMITS` と同じ値（本文のバイト数の上限は、アプリでは数えない。超えたら 413 を `too-large` にする）。 */
 export const PUBLISH_LIMITS = {
   songs: 1000,
@@ -112,8 +114,25 @@ function toTags(tags: readonly string[]): string[] {
 }
 
 /**
+ * 公開する曲を、Publish の本文に載せる形に整える（曲数の上限は見ない）。`songs` の並びが `sortOrder` になる。整えたあとで曲名かアーティストが
+ * 空になる曲は、外す（普通は起きない。曲名は保存時に空を断っている）。**Publish と「N unpublished changes」の数え方が、同じ整え方を使う**
+ * （別々に書くと、整えた値のずれが、いつまでも消えない「変更あり」になる）。
+ */
+export function buildPublishSongs(sources: readonly PublishSongSource[]): PublishSongBody[] {
+  const songs: PublishSongBody[] = [];
+  for (const source of sources) {
+    const title = toLine(source.title, PUBLISH_LIMITS.titleChars);
+    const artist = toLine(source.artist, PUBLISH_LIMITS.artistChars);
+    if (title === '' || artist === '') continue;
+    // 許可リストの項目だけで、新しく作る。
+    songs.push({ id: source.id, title, artist, publicTags: toTags(source.publicTags), sortOrder: songs.length });
+  }
+  return songs;
+}
+
+/**
  * Publish のリクエストの本文を作る。`songs` の並びが、公開ページの既定の並び（`sortOrder`）になる（呼ぶ側が、Show Mode の
- * アーティスト順に並べて渡す）。整えたあとで曲名かアーティストが空になる曲は、外す（普通は起きない。曲名は保存時に空を断っている）。
+ * アーティスト順に並べて渡す）。曲の整え方は `buildPublishSongs`。
  * 曲数の上限は、外す前の数で見る（渡された数が多いときに、外れた曲で上限の内側に戻るのを当てにしない）。
  */
 export function buildPublishBody(input: {
@@ -128,18 +147,13 @@ export function buildPublishBody(input: {
     return { ok: false, reason: 'too-many-songs', songCount: input.songs.length };
   }
 
-  const songs: PublishSongBody[] = [];
-  for (const source of input.songs) {
-    const title = toLine(source.title, PUBLISH_LIMITS.titleChars);
-    const artist = toLine(source.artist, PUBLISH_LIMITS.artistChars);
-    if (title === '' || artist === '') continue;
-    // 許可リストの項目だけで、新しく作る。
-    songs.push({ id: source.id, title, artist, publicTags: toTags(source.publicTags), sortOrder: songs.length });
-  }
-
   return {
     ok: true,
-    body: { baseVersion: input.baseVersion, profile: { displayName, bio: toBio(input.bio) }, songs },
+    body: {
+      baseVersion: input.baseVersion,
+      profile: { displayName, bio: toBio(input.bio) },
+      songs: buildPublishSongs(input.songs),
+    },
   };
 }
 
@@ -167,4 +181,29 @@ function cyrb53(text: string): number {
  */
 export function songContentHash(song: Pick<PublishSongBody, 'title' | 'artist' | 'publicTags'>): string {
   return cyrb53(JSON.stringify([song.title, song.artist, song.publicTags])).toString(16);
+}
+
+/**
+ * 最後に Publish した曲（曲のID → `songContentHash`）と、今 Publish するはずの曲（`buildPublishSongs` で整えたもの）を比べて、
+ * 変更の数を数える（「N unpublished changes」）。曲ごとに1つ: 公開していない曲が加わったら `added`、公開した曲の内容が変わったら
+ * `changed`、公開した曲が無くなったら `removed`。並び（`sortOrder`）は見ない。
+ */
+export function countSongChanges(
+  published: ReadonlyMap<string, string>,
+  songs: readonly Pick<PublishSongBody, 'id' | 'title' | 'artist' | 'publicTags'>[],
+): UnpublishedChanges {
+  let added = 0;
+  let changed = 0;
+  const seen = new Set<string>();
+  for (const song of songs) {
+    seen.add(song.id);
+    const before = published.get(song.id);
+    if (before === undefined) added += 1;
+    else if (before !== songContentHash(song)) changed += 1;
+  }
+  let removed = 0;
+  for (const id of published.keys()) {
+    if (!seen.has(id)) removed += 1;
+  }
+  return { added, changed, removed, total: added + changed + removed };
 }

@@ -295,6 +295,9 @@ export const en = {
     one: '{count} Ready song will be published.',
     other: '{count} Ready songs will be published.',
   },
+  // 最後に Publish したあとの、Ready の曲の変更の数（追加・変更・取り下げ。7.4.9a）。
+  'publicProfile.changes.none': 'No unpublished changes',
+  'publicProfile.changes.count': { one: '{count} unpublished change', other: '{count} unpublished changes' },
   'publicProfile.tooManySongs':
     'You have {count} Ready songs, but a public profile can show up to {limit}. Move some to Practice or Want to publish.',
   'publicProfile.publish': 'Publish Now',

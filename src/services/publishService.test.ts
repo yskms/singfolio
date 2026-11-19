@@ -700,3 +700,141 @@ describe('refreshProfile も直列に実行する（レビュー指摘）', () =
     assert.deepEqual(await t.service.getState(), { username: 'karaoke_fan', baseVersion: 0, displayName: '', bio: '' });
   });
 });
+
+describe('countUnpublishedChanges（未公開の変更の数え方。7.4.9a）', () => {
+  const zero = { added: 0, changed: 0, removed: 0, total: 0 };
+  async function tagId(t: Awaited<ReturnType<typeof setup>>, name: string): Promise<string> {
+    const tag = (await t.services.tags.listTags()).find((candidate) => candidate.name === name);
+    assert.ok(tag, name);
+    return tag.id;
+  }
+  const input = (title: string, artist: string, extra: { keyOffset?: number; privateNote?: string } = {}) => ({
+    title,
+    artist,
+    status: 'ready' as const,
+    keyOffset: extra.keyOffset ?? 0,
+    privateNote: extra.privateNote ?? '',
+    tagIds: [],
+  });
+
+  it('Publish した直後は 0。曲を足す・変える・消す・Ready でなくすと、1曲ずつ数える', async () => {
+    const t = await setup();
+    const keep = await t.add('Keep', 'A');
+    const edit = await t.add('Edit', 'B');
+    const drop = await t.add('Drop', 'C');
+    const demote = await t.add('Demote', 'D');
+    const profile = await t.service.publish(INPUT);
+    assert.deepEqual(await t.service.countUnpublishedChanges(profile), zero);
+
+    await t.add('New', 'E');
+    await t.services.songs.updateSong(edit.id, input('Edited', 'B'));
+    await t.services.songs.deleteSong(drop.id);
+    await t.services.songs.setStatus(demote.id, 'practice');
+
+    assert.deepEqual(await t.service.countUnpublishedChanges(profile), { added: 1, changed: 1, removed: 2, total: 4 });
+    // 通信しない（Publish のときの2回だけ）
+    assert.deepEqual(t.server.calls, ['getProfile', 'publish']);
+    assert.ok(keep);
+  });
+
+  it('Practice・Want の曲の追加、My Key・Private Note の変更は数えない', async () => {
+    const t = await setup();
+    const song = await t.add('A', 'X');
+    const profile = await t.service.publish(INPUT);
+
+    await t.add('Practice', 'X', 'practice');
+    await t.add('Want', 'X', 'want');
+    await t.services.songs.updateSong(song.id, input('A', 'X', { keyOffset: 2, privateNote: 'memo' }));
+
+    assert.deepEqual(await t.service.countUnpublishedChanges(profile), zero);
+  });
+
+  it('公開タグの選択の変更は、そのタグが付いた Ready の曲だけを「変更あり」にする', async () => {
+    const t = await setup();
+    await t.services.songs.createSong({ title: 'Tagged', artist: 'X', status: 'ready', newTagNames: ['ballad'] });
+    await t.add('Plain', 'X');
+    await t.services.songs.createSong({ title: 'Practicing', artist: 'X', status: 'practice', newTagNames: ['ballad'] });
+    const profile = await t.service.publish(INPUT);
+
+    await t.service.setTagPublic(await tagId(t, 'ballad'), true);
+    assert.deepEqual(await t.service.countUnpublishedChanges(profile), { added: 0, changed: 1, removed: 0, total: 1 });
+
+    await t.service.setTagPublic(await tagId(t, 'ballad'), false); // 元に戻せば 0
+    assert.deepEqual(await t.service.countUnpublishedChanges(profile), zero);
+  });
+
+  it('Publish し直すと 0 に戻る（応答の profile で数える）', async () => {
+    const t = await setup();
+    await t.add('A', 'X');
+    const first = await t.service.publish(INPUT);
+    await t.add('B', 'X');
+    assert.equal((await t.service.countUnpublishedChanges(first))?.total, 1);
+
+    const second = await t.service.publish(INPUT);
+    assert.deepEqual(await t.service.countUnpublishedChanges(second), zero);
+  });
+
+  it('公開中でなければ null（非公開・まだ公開していない）。非公開にしたあとも null', async () => {
+    const t = await setup();
+    await t.add('A', 'X');
+    assert.equal(await t.service.countUnpublishedChanges(profileV(0)), null);
+    await t.service.publish(INPUT);
+    const unpublished = (await t.service.unpublish())!;
+    assert.equal(await t.service.countUnpublishedChanges(unpublished), null);
+  });
+
+  it('端末の記録が無い（再インストール後）、または前のアカウントのものなら null', async () => {
+    const t = await setup({ profile: profileV(3) });
+    await t.add('A', 'X');
+    // 記録が無い
+    assert.equal(await t.service.countUnpublishedChanges(profileV(3)), null);
+
+    // 別のアカウントの記録（同じ版でも、基準にしない）
+    t.sqlite.exec(`INSERT INTO publish_state (id, username, base_version, display_name, bio) VALUES (1, 'old_user', 3, 'x', 'y')`);
+    assert.equal(await t.service.countUnpublishedChanges(profileV(3)), null);
+  });
+
+  it('別の端末が Publish した（サーバーの版が記録より新しい）なら null。記録は、今の公開内容と比べる基準にならない', async () => {
+    const t = await setup();
+    await t.add('A', 'X');
+    await t.service.publish(INPUT); // 記録の版は 1
+    await t.add('B', 'X');
+    assert.equal((await t.service.countUnpublishedChanges(profileV(1)))?.total, 1);
+    assert.equal(await t.service.countUnpublishedChanges(profileV(2)), null);
+  });
+
+  it('1000曲を超えていても数えられる（Publish を断るのは Publish の側）', async () => {
+    const t = await setup();
+    await t.add('A', 'X');
+    const profile = await t.service.publish(INPUT);
+    for (let i = 0; i < PUBLISH_LIMITS.songs; i += 1) {
+      t.sqlite.exec(`INSERT INTO songs (id, title, artist_id, status, key_offset, private_note, created_at, updated_at)
+        SELECT 'extra-${i}', 'Extra ${i}', artist_id, 'ready', 0, '', 1, 1 FROM songs LIMIT 1`);
+    }
+    const changes = await t.service.countUnpublishedChanges(profile);
+    assert.equal(changes?.added, PUBLISH_LIMITS.songs);
+  });
+
+  it('Publish と重なっても、記録の途中を読まない（直列に実行する）', async () => {
+    const t = await setup();
+    await t.add('A', 'X');
+    const first = await t.service.publish(INPUT);
+    await t.add('B', 'X');
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const original = t.repo.publish;
+    t.repo.publish = async (session, body) => {
+      await gate; // 応答を遅らせる（その間、記録はまだ古い）
+      return original(session, body);
+    };
+
+    const publishing = t.service.publish(INPUT);
+    const counting = t.service.countUnpublishedChanges(first); // Publish が終わるまで待つ
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    release();
+    const second = await publishing;
+    // Publish のあとの記録で数える（版が合わなければ null。ここでは古い profile を渡しているので null）。
+    assert.equal(await counting, null);
+    assert.deepEqual(await t.service.countUnpublishedChanges(second), zero);
+  });
+});
