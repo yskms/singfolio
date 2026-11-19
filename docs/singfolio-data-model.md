@@ -124,6 +124,35 @@ UIの表示名「My Key」は、モデル・DBでは `keyOffset` / `key_offset` 
     （`singfolio-publishing-backend.md` §8「アプリ側の認証の土台」）。バックアップでDBが戻れば、同じ値も戻る。
     消したり作り直したりする処理を足さない（セッションが、サインイン中として扱われなくなる）。
 
+### publish_state・published_songs
+
+公開（Publish。`singfolio-publishing-backend.md` §5・§8）の、**この端末が最後に合意した状態**（migration 4）。サーバーが持つ状態
+（`username`・版・公開中か）の写しではない。公開用データそのものではなく（それはサーバーのR2）、曲・タグとは独立で、`songs` への外部キーも持たない。
+
+`publish_state`（行は1つだけ。`id = 1`）:
+
+| カラム | 型 | 内容 |
+|---|---|---|
+| `id` | INTEGER PK | 常に `1`（`CHECK`） |
+| `username` | TEXT NOT NULL | この端末が紐づくアカウントの公開URLの名前（Workerの `username`。変更されない） |
+| `base_version` | INTEGER NOT NULL | Publish のリクエストの `baseVersion`。**この端末が最後に Publish した、または置き換えを確認した版**（0以上） |
+| `display_name` / `bio` | TEXT NOT NULL | この端末が最後に Publish した Display Name・Bio（「N unpublished changes」の数え方に使う） |
+
+`published_songs`（最後に Publish した曲）:
+
+| カラム | 型 | 内容 |
+|---|---|---|
+| `song_id` | TEXT PK | 曲のID（`songs.id` と同じ値。**外部キーにしない**: 曲を消したあとも、公開した記録として残す。取り下げの変更として数える） |
+| `content_hash` | TEXT NOT NULL | 公開した内容（曲名・アーティスト・公開タグ）のハッシュ（`songContentHash`）。**`sortOrder` を含めない**（曲を足すと、あとの曲の番号がずれて、全部が「変更あり」になる） |
+
+-   `base_version` を、サーバーの今の版に**黙って進めない**（別の端末の Publish を、確認なしに上書きしてしまう）。進めるのは、この端末が
+    Publish した（応答の版）、非公開にした（応答の版）、置き換えを確認した（`replaceVersion`）ときだけ。再インストール後の空のローカルは、
+    行が無く `base_version` が 0 になるので、サーバーに公開があれば Publish は 409（`version-conflict`）で止まる（空で公開を上書きしない）。
+-   サーバーのアカウントと合わなくなったら、2つの表とも捨てる（`publishService.refreshProfile`: サーバーに `username` が無い、別の `username`。
+    別のアカウントでサインインし直した、アカウントを削除した）。
+-   書き込みは、Publish の成功のあと。端末に記録できなくても、Publish は成功として返す（次の Publish が、版の食い違いの確認を通る）。
+-   値の意味は Service 層（`publishService`）。Repository は `publishStateRepository`。
+
 ## Repository / Service層
 
 UI → Service → Repository → SQLite の一方向。UIはRepositoryとDBに触れず、Service
@@ -178,6 +207,11 @@ expo-sqliteの `withTransactionAsync` は排他ではなく、トランザクシ
     （端末の値を先に捨てる。サーバーでの失効を確認できたかを返す）。失敗は `AuthError`（`ServiceError` とは別。`code` は
     `singfolio-publishing-backend.md` §8「アプリ側の認証の土台」）。セッションはSQLiteではなくSecureStoreに置き、SQLiteからは
     `settings.local_data_id` だけを読む。
+-   `publish`: `getState`（端末の `publish_state`。通信しない）/ `refreshProfile`（サーバーの公開の状態。端末の記録がアカウントと合わなければ捨てる。
+    `base_version` は進めない）/ `claimUsername`（小文字にして送る。変更できない）/ `publish`（Ready の曲を、Show Mode のアーティスト順で
+    公開内容にして送る。`replaceVersion` で置き換えの確認のあとの送り直し）/ `unpublish`。サインインしていなければ `not-signed-in`。失敗は
+    `AuthError`（通信・認証）か `PublishError`（サーバーが理由を返して断った・Display Name が空・曲が1000を超える）。`show` から曲を取るので、
+    My Key・Private Note・ステータスは、型の上でも触れない。同じ端末の `publish`・`unpublish`・`claimUsername` は、1本ずつ順に実行する。
 -   `tags`: `listTags` / `getOrCreateTag`（同じ名前のタグがあればそれを返し、なければ作る。
     タグだけを作る操作で、曲の編集画面は使わない。「曲の入力」の `newTagNames`）/
     `renameTag` / `deleteTag`

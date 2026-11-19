@@ -228,6 +228,16 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     操作のあとは、成功・失敗とも、サインインの状態を読み直す。実行中は戻れない（`usePreventRemove`。削除の結果を伝えられなくなる）。iOS の Apple は
     `AppleAuthenticationButton`（`style` に背景色・角丸を入れない。App Store のガイドラインに反する）。つなぐ画面・再認証なしの削除・Googleの
     `clearCredentialState`・Androidの Apple の再開は、作らないと決めた（理由は docs §8「アカウントの画面」）。
+-   **公開（アプリ側。`Services.publish`。7.4.6）。** 詳細は `docs/singfolio-publishing-backend.md` §8「アプリ側の Publish の土台」。
+    認証が要る公開の呼び出しは `access.withSession`（`accountService.ts` の `SessionAccess`）を通す。**`access` を `Services.account` に含めない**
+    （セッションの値を画面に渡さない。`createServices` が取り除く）。公開のHTTPは `publishRepository` に閉じ込め、共通の扱いは `apiClient.ts`（`authRepository` と共有。
+    5xx・429 は `unavailable`、401 は `unauthorized`）。通信・認証の失敗は `AuthError`、サーバーが理由を返して断ったものは `PublishError`。
+    公開する曲は **`show`（Show Mode の Service）から取る**（Readyの曲だけが、My Key・Private Note・ステータスを持たない形で来る）。`songs` / `Song` から作る形に「簡略化」しない。
+    `publishSnapshot.ts` の `PUBLISH_LIMITS` は、Workerの `SNAPSHOT_LIMITS` と同じ数字を**別に持つ**（コードは共有しない。`publishSnapshot.test.ts` が一致と、整えた本文が
+    Workerの検証を通ることを確かめる）。曲数が1000を超えるときは**断る**（切り詰めない）。長さ・文字は整えて切る（1曲の事情で全体の Publish を止めない）。
+    **`publish_state.base_version` は、`refreshProfile` や `claimUsername` のやり直しで、サーバーの今の版へ進めない**（別の端末の Publish を、確認なしに上書きする。再インストール後の
+    空のローカルから公開を消す事故を、これが止める）。進めるのは、Publish・Unpublish の応答と、置き換えの確認（`replaceVersion`）だけ。曲ごとのハッシュに `sortOrder` を含めない
+    （曲を足すと、あとの曲が全部「変更あり」になる）。`published_songs` を `songs` の外部キーにしない（曲を消したあとも、公開した記録を残す）。公開タグは 7.4.8 まで空（安全側）。
 -   `expo-secure-store` の config plugin を `app.json` に足さない。Androidのバックアップ規則が `<include>` で、v1.0で今
     バックアップされているSQLiteを外す。
 

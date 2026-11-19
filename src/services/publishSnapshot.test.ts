@@ -1,0 +1,217 @@
+// Publish のリクエストの組み立て（純粋な関数）のテスト。`npm test` で実行する。
+/// <reference types="node" />
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+
+// Workerの検証と食い違わないことの確認だけに使う（アプリの実行時のコードは、Workerとコードを共有しない）。
+import { parseSnapshotContent, SNAPSHOT_LIMITS } from '../../worker/src/snapshot.ts';
+import {
+  buildPublishBody,
+  PUBLISH_LIMITS,
+  songContentHash,
+  type PublishBody,
+  type PublishSongSource,
+} from './publishSnapshot.ts';
+
+const ID = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+
+const song = (n: number, extra: Partial<PublishSongSource> = {}): PublishSongSource => ({
+  id: ID(n),
+  title: `曲${n}`,
+  artist: 'アーティスト',
+  publicTags: [],
+  ...extra,
+});
+
+function build(songs: PublishSongSource[], input: { displayName?: string; bio?: string; baseVersion?: number } = {}) {
+  return buildPublishBody({
+    baseVersion: input.baseVersion ?? 0,
+    displayName: input.displayName ?? 'Karaoke Fan',
+    bio: input.bio ?? '',
+    songs,
+  });
+}
+
+function bodyOf(result: ReturnType<typeof build>): PublishBody {
+  assert.ok(result.ok, JSON.stringify(result));
+  return result.body;
+}
+
+describe('buildPublishBody: 形', () => {
+  it('曲の並びが sortOrder（0から連番）になり、baseVersion とプロフィールが載る', () => {
+    const body = bodyOf(build([song(1), song(2), song(3)], { baseVersion: 7, displayName: ' Karaoke Fan ', bio: ' hi ' }));
+    assert.equal(body.baseVersion, 7);
+    assert.deepEqual(body.profile, { displayName: 'Karaoke Fan', bio: 'hi' });
+    assert.deepEqual(
+      body.songs.map((s) => [s.id, s.title, s.sortOrder]),
+      [
+        [ID(1), '曲1', 0],
+        [ID(2), '曲2', 1],
+        [ID(3), '曲3', 2],
+      ],
+    );
+  });
+
+  it('曲が0件でも作れる（Ready の曲が無い）', () => {
+    assert.deepEqual(bodyOf(build([])).songs, []);
+  });
+
+  it('許可リストの項目だけを載せる（My Key・Private Note・status が混ざった入力でも、本文に出ない）', () => {
+    const dirty = {
+      ...song(1, { publicTags: ['ballad'] }),
+      keyOffset: -3,
+      privateNote: 'ひみつのメモ',
+      status: 'ready',
+      tags: [{ id: 't', name: 'x' }],
+    } as PublishSongSource;
+    const body = bodyOf(build([dirty]));
+    assert.deepEqual(Object.keys(body.songs[0]!).sort(), ['artist', 'id', 'publicTags', 'sortOrder', 'title']);
+    const text = JSON.stringify(body);
+    for (const leaked of ['keyOffset', 'privateNote', 'ひみつのメモ', 'status']) {
+      assert.equal(text.includes(leaked), false, leaked);
+    }
+  });
+
+  it('入力を書き換えない', () => {
+    const input = [song(1, { title: '  padded  ', publicTags: ['a', 'a'] })];
+    const copy = JSON.stringify(input);
+    build(input);
+    assert.equal(JSON.stringify(input), copy);
+  });
+});
+
+describe('buildPublishBody: 断る場合', () => {
+  it('Display Name が空・空白だけ・使えない文字だけなら display-name-required', () => {
+    for (const displayName of ['', '   ', '\n\t', '\u202E']) {
+      assert.deepEqual(build([song(1)], { displayName }), { ok: false, reason: 'display-name-required' });
+    }
+  });
+
+  it('曲が上限を超えたら断る（切り詰めない）。ちょうど上限なら通る', () => {
+    const many = (count: number) => Array.from({ length: count }, (_, i) => song(i + 1));
+    assert.deepEqual(build(many(PUBLISH_LIMITS.songs + 1)), {
+      ok: false,
+      reason: 'too-many-songs',
+      songCount: PUBLISH_LIMITS.songs + 1,
+    });
+    assert.equal(bodyOf(build(many(PUBLISH_LIMITS.songs))).songs.length, PUBLISH_LIMITS.songs);
+  });
+
+  it('曲名かアーティストが、整えたあとで空になる曲は外す。外した分を詰めて sortOrder を振る', () => {
+    const body = bodyOf(build([song(1), song(2, { title: '\u0001\u0002' }), song(3, { artist: '  ' }), song(4)]));
+    assert.deepEqual(
+      body.songs.map((s) => [s.id, s.sortOrder]),
+      [
+        [ID(1), 0],
+        [ID(4), 1],
+      ],
+    );
+  });
+});
+
+describe('buildPublishBody: 文字の整え方', () => {
+  it('1行の項目の改行・タブ・制御文字・向きの制御は空白になり、前後の空白は落ちる', () => {
+    const body = bodyOf(build([song(1, { title: 'a\nb\tc\u202Ed', artist: ' x\r\ny ' })]));
+    assert.equal(body.songs[0]!.title, 'a b c d');
+    assert.equal(body.songs[0]!.artist, 'x y');
+  });
+
+  it('対になっていないサロゲートは取り除く', () => {
+    const body = bodyOf(build([song(1, { title: 'a\uD800b\uDC00c' })]));
+    assert.equal(body.songs[0]!.title, 'abc');
+  });
+
+  it('長いものは切り詰める。サロゲートペア（絵文字・𠮷）の途中では切らない', () => {
+    const title = '𠮷'.repeat(PUBLISH_LIMITS.titleChars + 5);
+    const body = bodyOf(build([song(1, { title, artist: '🎤'.repeat(300) })], { displayName: '😀'.repeat(60) }));
+    assert.equal(Array.from(body.songs[0]!.title).length, PUBLISH_LIMITS.titleChars);
+    assert.equal(Array.from(body.songs[0]!.artist).length, PUBLISH_LIMITS.artistChars);
+    assert.equal(Array.from(body.profile.displayName).length, PUBLISH_LIMITS.displayNameChars);
+    assert.ok(!/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(body.songs[0]!.title));
+  });
+
+  it('切り詰めたあとの末尾の空白は落とす', () => {
+    const title = `${'a'.repeat(PUBLISH_LIMITS.titleChars - 1)} b`;
+    assert.equal(bodyOf(build([song(1, { title })])).songs[0]!.title, 'a'.repeat(PUBLISH_LIMITS.titleChars - 1));
+  });
+
+  it('Bio は改行を残し、CRLF・CR は LF にそろえ、制御文字は空白にして、500字に切る', () => {
+    const bio = bodyOf(build([], { bio: 'one\r\ntwo\rthree\u0000four' })).profile.bio;
+    assert.equal(bio, 'one\ntwo\nthree four');
+    const long = bodyOf(build([], { bio: 'あ'.repeat(600) })).profile.bio;
+    assert.equal(Array.from(long).length, PUBLISH_LIMITS.bioChars);
+  });
+
+  it('Bio は空でもよい', () => {
+    assert.equal(bodyOf(build([], { bio: '  \n ' })).profile.bio, '');
+  });
+});
+
+describe('buildPublishBody: 公開タグ', () => {
+  it('空・重複を落とし、1曲10個までに切り、長いタグは50字に切る', () => {
+    const tags = ['', '  ', 'a', 'a', ...Array.from({ length: 12 }, (_, i) => `t${i}`), 'x'.repeat(80)];
+    const body = bodyOf(build([song(1, { publicTags: tags })]));
+    assert.deepEqual(body.songs[0]!.publicTags, ['a', ...Array.from({ length: 9 }, (_, i) => `t${i}`)]);
+    const long = bodyOf(build([song(1, { publicTags: ['x'.repeat(80)] })])).songs[0]!.publicTags[0]!;
+    assert.equal(long.length, PUBLISH_LIMITS.tagChars);
+  });
+
+  it('切り詰めて同じになったタグは1つにする', () => {
+    const body = bodyOf(build([song(1, { publicTags: ['x'.repeat(60), 'x'.repeat(70)] })]));
+    assert.equal(body.songs[0]!.publicTags.length, 1);
+  });
+});
+
+describe('Workerとの整合', () => {
+  it('上限の数字がWorkerの SNAPSHOT_LIMITS と同じ', () => {
+    for (const key of Object.keys(PUBLISH_LIMITS) as (keyof typeof PUBLISH_LIMITS)[]) {
+      assert.equal(PUBLISH_LIMITS[key], SNAPSHOT_LIMITS[key], key);
+    }
+  });
+
+  it('整えた本文は、Workerの検証をそのまま通る（極端な入力でも）', () => {
+    const nasty = '\u0000\u0007\n\r\t\u2028\u2029\u202A\u202E\u2066\u2069𐀀\uDFFF 😀𠮷a\u200Eb';
+    const songs = [
+      song(1, { title: nasty, artist: nasty, publicTags: [nasty, 'x'.repeat(80), nasty] }),
+      song(2, { title: 'あ'.repeat(500), artist: '🎤'.repeat(500) }),
+      song(3, { publicTags: Array.from({ length: 30 }, (_, i) => `tag${i}`) }),
+    ];
+    const body = bodyOf(build(songs, { displayName: nasty.repeat(10), bio: `${nasty}\n${nasty}`.repeat(50) }));
+    const parsed = parseSnapshotContent({ profile: body.profile, songs: body.songs });
+    assert.ok(parsed.ok, JSON.stringify(parsed));
+    // Workerが整え直しても、同じ内容（アプリが整えたものが、そのまま公開される）。
+    assert.deepEqual(parsed.content.songs, body.songs);
+    assert.deepEqual(parsed.content.profile, body.profile);
+  });
+});
+
+describe('songContentHash', () => {
+  const base = { title: 'チェリー', artist: 'スピッツ', publicTags: ['a', 'b'] };
+
+  it('同じ内容は同じ値、違う内容は違う値（曲名・アーティスト・タグのどれが変わっても）', () => {
+    assert.equal(songContentHash(base), songContentHash({ ...base, publicTags: [...base.publicTags] }));
+    assert.notEqual(songContentHash(base), songContentHash({ ...base, title: 'チェリ' }));
+    assert.notEqual(songContentHash(base), songContentHash({ ...base, artist: 'スピッツ ' }));
+    assert.notEqual(songContentHash(base), songContentHash({ ...base, publicTags: ['a'] }));
+    assert.notEqual(songContentHash(base), songContentHash({ ...base, publicTags: ['b', 'a'] }));
+  });
+
+  it('項目の境目を取り違えない（"ab" + "c" と "a" + "bc"）', () => {
+    assert.notEqual(
+      songContentHash({ title: 'ab', artist: 'c', publicTags: [] }),
+      songContentHash({ title: 'a', artist: 'bc', publicTags: [] }),
+    );
+  });
+
+  it('sortOrder は含めない（曲を足してあとの曲の番号がずれても、内容は変わらない）', () => {
+    const a = bodyOf(build([song(1), song(2)])).songs[1]!;
+    const b = bodyOf(build([song(0), song(1), song(2)])).songs[2]!;
+    assert.notEqual(a.sortOrder, b.sortOrder);
+    assert.equal(songContentHash(a), songContentHash(b));
+  });
+
+  it('1000曲分の値が、ほぼ衝突しない', () => {
+    const hashes = new Set(Array.from({ length: 1000 }, (_, i) => songContentHash({ ...base, title: `曲${i}` })));
+    assert.equal(hashes.size, 1000);
+  });
+});

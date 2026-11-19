@@ -90,4 +90,28 @@ export const migrations: readonly Migration[] = [
       CREATE INDEX idx_songs_artist_id ON songs (artist_id);
     `,
   },
+  {
+    // 公開（Publish。7.4）の、端末側の状態。サーバーが持つ状態（`username`・版・公開中か）の写しではなく、
+    // **この端末が最後に合意した状態**: `base_version` は Publish のリクエストの `baseVersion`（この端末が最後に
+    // Publish した、または置き換えを確認した版。サーバーの今の版を黙って取り込まない: 別の端末の Publish を確認なしに
+    // 上書きしてしまう）。`display_name`・`bio` は、この端末が最後に Publish した値。`published_songs` は、最後に Publish
+    // した曲ごとの内容のハッシュ（「N unpublished changes」を数える。曲が消えても行は残る: 取り下げの変更として数える）。
+    // `songs` への外部キーは持たない（曲を消したあとも、公開した記録として残す）。行が1つだけ（`id = 1`）なのは、
+    // アカウントが1つだけ端末に紐づくため。`username` が変わったら（別のアカウントでサインインし直したら）捨てる。
+    version: 4,
+    sql: `
+      CREATE TABLE publish_state (
+        id INTEGER PRIMARY KEY NOT NULL CHECK (id = 1),
+        username TEXT NOT NULL,
+        base_version INTEGER NOT NULL CHECK (base_version >= 0),
+        display_name TEXT NOT NULL,
+        bio TEXT NOT NULL
+      );
+
+      CREATE TABLE published_songs (
+        song_id TEXT PRIMARY KEY NOT NULL,
+        content_hash TEXT NOT NULL
+      ) WITHOUT ROWID;
+    `,
+  },
 ];

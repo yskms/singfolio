@@ -138,13 +138,33 @@ export interface AccountService {
 }
 
 /**
+ * 認証が要るサーバーの呼び出しの入口。**公開の Service（`publishService`）だけが使う。** `Services.account`（画面が使う型）には
+ * 含めない: セッションの値を画面に渡さない。
+ */
+export interface SessionAccess {
+  /**
+   * サインイン中のセッションで `task` を実行する。していなければ（別のローカルDBのセッション・読めない値を含む）`not-signed-in`。
+   * サーバーが認めなかったとき（`task` が `AuthError('unauthorized')` を投げたとき）だけ、端末のセッションを捨てる
+   * （503・5xx・通信の失敗では捨てない）。`task` の失敗は、そのまま投げる（`AuthError` に包まない）。
+   * サインイン・ログアウトとは直列にしない（公開の通信を、各社のサインインの待ちに巻き込まない）。
+   */
+  withSession<T>(task: (session: string) => Promise<T>): Promise<T>;
+}
+
+/**
+ * `createAccountService` の戻り値。`access` は公開の Service へ渡し、残り（`AccountService`）が画面へ届く
+ * （`createServices` が `access` を取り除く）。
+ */
+export type AccountServiceWithAccess = AccountService & { readonly access: SessionAccess };
+
+/**
  * アカウント（ログイン・ログアウト）。**ログインを要求しない**ので、ここが使えなくても（`deps` が
  * `null`、SecureStoreが読めない、サインインしていない）、v1.0の機能は何も変わらない。
  *
  * `deps` が `null` のとき（注入しないとき）は、サインインしていない状態のままで、`signIn` は
  * `provider-unavailable`（候補検索の `suggestions.available` と同じ「注入しなければ無効」）。
  */
-export function createAccountService(deps: AccountServiceDeps | null): AccountService {
+export function createAccountService(deps: AccountServiceDeps | null): AccountServiceWithAccess {
   if (deps === null) {
     return {
       available: false,
@@ -158,6 +178,11 @@ export function createAccountService(deps: AccountServiceDeps | null): AccountSe
       },
       deleteAccount: async () => {
         throw new AuthError('not-signed-in');
+      },
+      access: {
+        withSession: async () => {
+          throw new AuthError('not-signed-in');
+        },
       },
     };
   }
@@ -434,6 +459,14 @@ export function createAccountService(deps: AccountServiceDeps | null): AccountSe
           return { appleRevoked: result.appleRevoked, sessionCleared };
         }),
       );
+    },
+
+    access: {
+      async withSession<T>(task: (session: string) => Promise<T>): Promise<T> {
+        // セッションを読めない・DBの識別子を読めない失敗は、`AuthError` に包む（`task` の失敗は包まない）。
+        const current = await asAuthError(requireSession);
+        return authorized(() => task(current.session));
+      },
     },
   };
 }

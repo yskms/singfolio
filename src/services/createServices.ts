@@ -2,6 +2,8 @@ import type { Database } from '../db/appDatabase.ts';
 import type { AuthProvider } from '../domain/types.ts';
 import { createArtistRepository } from '../repositories/artistRepository.ts';
 import { createAuthRepository, type AuthFetchLike } from '../repositories/authRepository.ts';
+import { createPublishRepository } from '../repositories/publishRepository.ts';
+import { createPublishStateRepository } from '../repositories/publishStateRepository.ts';
 import type { RepositoryEnv } from '../repositories/env.ts';
 import { createSessionRepository, type SecureStorage } from '../repositories/sessionRepository.ts';
 import { createSettingsRepository } from '../repositories/settingsRepository.ts';
@@ -18,11 +20,17 @@ import {
   type IdTokenProvider,
 } from './accountService.ts';
 import { createArtistService, type ArtistService } from './artistService.ts';
+import { createPublishService, type PublishService } from './publishService.ts';
 import { createSettingsService, type SettingsService } from './settingsService.ts';
 import { createShowService, type ShowService } from './showService.ts';
 import { createSongService, type SongService } from './songService.ts';
 import { createSuggestionsService, type SuggestionsService } from './suggestionsService.ts';
 import { createTagService, type TagService } from './tagService.ts';
+
+// `auth` を注入しないビルドの公開の Repository に渡す。呼ばれることは無い（`access` が先に断る）。
+const noFetch: AuthFetchLike = async () => {
+  throw new Error('network is not available');
+};
 
 export interface Services {
   songs: SongService;
@@ -35,6 +43,11 @@ export interface Services {
   suggestions: SuggestionsService;
   /** アカウント（ログイン・ログアウト）。ログインを要求しない: 使えなくても、v1.0の機能は変わらない */
   account: AccountService;
+  /**
+   * 公開（Public Profile・Publish・Unpublish）。サインインしていなければ、どの操作も `not-signed-in`（`account.available` が
+   * 偽のビルドでは、画面が入口ごと出さない）。画面が呼ぶまで、何も送らない
+   */
+  publish: PublishService;
 }
 
 /** アカウントの通信・保存に使うもの。渡さなければ、`account` はサインインできない（常にログアウト中）。 */
@@ -94,11 +107,26 @@ export function createServices(
   });
   const tags = createTagService({ db, tags: tagRepository });
   const { auth } = options;
+  const show = createShowService({ songs, tags });
+  // `access`（セッションの値を渡す入口）は公開の Service だけに渡し、画面へ届く `account` には含めない。
+  const { access, ...account } = createAccountService(
+    auth
+      ? {
+          auth: createAuthRepository(auth.fetch, { origin: auth.origin }),
+          sessions: createSessionRepository(auth.storage),
+          sha256Base64Url: auth.sha256Base64Url,
+          localDataId: () => settings.ensureLocalDataId(),
+          idTokenProviders: auth.idTokenProviders ?? {},
+          authCodeProviders: auth.authCodeProviders ?? {},
+          randomVerifier: auth.randomVerifier,
+        }
+      : null,
+  );
   return {
     songs,
     tags,
     artists: createArtistService({ db, artists: artistRepository }),
-    show: createShowService({ songs, tags }),
+    show,
     settings,
     suggestions: createSuggestionsService({
       db,
@@ -108,18 +136,14 @@ export function createServices(
       isEnabled: () => settings.getSuggestionsEnabled(),
       now: env.now,
     }),
-    account: createAccountService(
-      auth
-        ? {
-            auth: createAuthRepository(auth.fetch, { origin: auth.origin }),
-            sessions: createSessionRepository(auth.storage),
-            sha256Base64Url: auth.sha256Base64Url,
-            localDataId: () => settings.ensureLocalDataId(),
-            idTokenProviders: auth.idTokenProviders ?? {},
-            authCodeProviders: auth.authCodeProviders ?? {},
-            randomVerifier: auth.randomVerifier,
-          }
-        : null,
-    ),
+    account,
+    publish: createPublishService({
+      db,
+      access,
+      // `auth` を注入しないビルドでは、`access` が `not-signed-in` で断るので、この `fetch` は呼ばれない。
+      publish: createPublishRepository(auth ? auth.fetch : noFetch, { origin: auth?.origin }),
+      state: createPublishStateRepository(),
+      show,
+    }),
   };
 }

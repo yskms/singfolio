@@ -5,6 +5,9 @@ export { DatabaseTooNewError } from '../db/errors.ts';
 // アカウントの失敗（`code` で区別する）。ServiceError とは別（利用者向けの文言への対応は `src/i18n/authErrors.ts`）。
 export { AuthError, isTemporaryAuthError, type AuthErrorCode } from '../repositories/authError.ts';
 
+// 公開（Publish など）の失敗のうち、サーバーが理由を返して断ったもの・アプリ側の前提の不備。通信の失敗は `AuthError`。
+export { PublishError, type PublishErrorCode } from '../repositories/publishError.ts';
+
 // UIが利用者向けの文言（多言語化の仕組みを通す）に変換できるよう、
 // 失敗の種類は `message` ではなく `code` で区別する。`message` はログ用の英語。
 export type ServiceErrorCode =

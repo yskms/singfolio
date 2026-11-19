@@ -1357,6 +1357,43 @@ Publishのリクエストの本文は、`baseVersion`（7.4.4）に、`profile` 
     （Workersの有料プランにすれば、CPU時間は大きく取れる）、`npm run bench:snapshot -- <曲数>` と、使い捨てのWorker（`snapshot.ts` を呼ぶだけ。`wrangler dev` に本文を `curl` で送り、
     `time_total` から `GET` の所要を引く）で測り直す。本番の確認は、`wrangler tail` の `outcome` が `exceededCpu` にならないこと（7.4.11）。
 
+### アプリ側の Publish の土台（7.4.6）
+
+画面は 7.4.7 以降。ここまでは、Service までで、Nodeのテスト（偽のHTTP・実際のSQL）で確かめた。本物のWorkerでの確認は 7.4.11。
+
+-   **構成。** `publishSnapshot.ts`（Publish のリクエストの組み立て。純粋な関数）、`publishRepository.ts`（HTTP）、`publishStateRepository.ts`（端末側の状態。
+    `publish_state`・`published_songs`。`singfolio-data-model.md`）、`publishService.ts`（`Services.publish`）。HTTPの共通の扱い（再試行しない・5xx と 429 は
+    `unavailable`・Cookie を送らない・タイムアウト）は `apiClient.ts` に1か所だけ置き、`authRepository` と共有する。
+-   **認証が要る呼び出しは `access.withSession` を通す**（`accountService.ts` の `SessionAccess`）。サインイン中のセッションを渡して `task` を実行し、`task` が
+    `AuthError('unauthorized')`（401）を投げたときだけ、端末のセッションを捨てる（503・5xx・通信の失敗では捨てない。`signOutOthers`・`deleteAccount` と同じ）。
+    `access` は `createServices` が公開の Service だけに渡し、`Services.account`（画面の型）には含めない（セッションの値を画面に渡さない）。サインイン・ログアウトの
+    直列化には入れない（公開の通信を、各社のサインインの待ちに巻き込まない）。
+-   **失敗の型。** 通信・認証の失敗（`network`・`unavailable`・`unauthorized`・`invalid-response`・`invalid-request`・`not-signed-in`）は `AuthError`。サーバーが理由を返して
+    断ったもの（`username-invalid`・`username-unavailable`・`username-already-set`・`username-required`・`version-conflict`・`invalid-snapshot`・`too-large`）と、アプリ側の前提の
+    不備（`display-name-required`・`too-many-songs`）は `PublishError`（`code`。`version-conflict` は `profile`、`too-many-songs` は `songCount` を持つ）。それ以外は
+    `AuthError('unexpected')` に包む（元の例外は載せない）。
+-   **組み立て（`buildPublishBody`）。** 公開する曲は `show.getShowView({ sort: 'artist' })` から取る（Ready の曲だけが、My Key・Private Note・ステータスを持たない形で来る）。
+    並びが公開ページの既定の並び（`sortOrder` は0から連番）。Workerと**同じ数字・同じ文字の規則を別に持つ**（`PUBLISH_LIMITS`。コードは共有しない。`publishSnapshot.test.ts` が、数字の一致と、
+    整えた本文がWorkerの検証をそのまま通ることを確かめる）。Workerは1つでも規則に合わない値があると Publish 全体を 400 にするので、アプリが先に整える:
+    使えない文字（制御文字・改行・向きの制御）は空白にし、対になっていないサロゲートは取り除き、前後の空白を落とし、長すぎる曲名・アーティスト・タグは切り詰める
+    （サロゲートペアの途中では切らない）。タグは空・重複を落として1曲10個まで。曲名かアーティストが空になる曲は外す（普通は起きない）。**曲数が1000を超えるときだけは切り詰めず、
+    Publishを断る**（`too-many-songs`。どの曲を落とすかを勝手に決めない）。Display Name が空なら `display-name-required`。どちらも通信の前に断る。
+-   **公開タグは、選び方を入れる 7.4.8 まで、どのタグも公開しない**（安全側。`publicTagNames`）。
+-   **「最後に合意した版」（`publish_state.base_version`）。** Publish のリクエストの `baseVersion` に使う。進めるのは、この端末が Publish した（応答の版）、非公開にした（応答の版）、
+    置き換えを確認した（`replaceVersion`）ときだけ。`refreshProfile`（サーバーの今の状態を読む）では**進めない**: 進めると、別の端末の Publish を確認なしに上書きする。
+    `claimUsername` も、すでに同じ `username` の記録があれば触れない（同じ名前の確保のやり直しで進めない）。サーバーに公開がある状態で、端末の記録が無い（再インストール後）と、
+    `baseVersion` は 0 になり、Publish は 409（`version-conflict`）で止まる。画面（7.4.7）は「別の端末から公開した内容があります。置き換えますか」を出し、確認を受けたら
+    `replaceVersion` に `profile.version` を渡して送り直す。
+-   **端末の記録は、サーバーのアカウントと合わなければ捨てる**（`refreshProfile`: サーバーに `username` が無い、別の `username`）。別のアカウントでサインインし直した、アカウントを
+    削除した、のあとの記録を引き継がないため。`publish` は `refreshProfile` を挟まない（通信を1回に保つ）。記録が別のアカウントのものでも、版が合わなければ 409 で止まり、
+    合っていたとしても、送った内容で記録を作り直す。
+-   **記録に失敗しても、サーバーで済んだ操作は成功として返す**（`publish`・`unpublish`）。記録できなければ、次の Publish が版の食い違いの確認を通る。
+-   **`publish`・`unpublish`・`claimUsername` は1本ずつ順に実行する。** 同じ端末の Publish が重なると、2つ目が1つ目の版を知らずに送って、自分自身と食い違う。
+-   **応答を受け取れなかった Publish**（`network`。Publish だけ待つ上限は30秒）は、サーバーで済んでいることがある。送り直すと `version-conflict` になり、置き換えの確認で解決する
+    （「Publish と Unpublish のエンドポイント」）。
+-   **曲ごとのハッシュ**（`songContentHash`。cyrb53。暗号ではなく、変更の検出用）は曲名・アーティスト・公開タグから作り、`sortOrder` を含めない（曲を足すと、あとの曲の番号がずれて、
+    全部が「変更あり」になる）。Publish の成功のとき、送った内容（整えたあと）から作って、`published_songs` を丸ごと差し替える。「N unpublished changes」の数え方は 7.4.9。
+
 ### Cloudflare
 
 API（Workers）・公開Webのホスティング・公開スナップショット（R2）の配信に利用する。

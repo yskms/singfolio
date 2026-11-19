@@ -1171,3 +1171,130 @@ describe('deleteAccount（アカウントの削除）', () => {
     assert.equal((await sessions.read()).kind, 'none');
   });
 });
+
+describe('access.withSession（公開の Service が使う、認証が要る呼び出しの入口）', () => {
+  it('サインイン中のセッションを渡して task を実行し、結果を返す。端末のセッションは残す', async () => {
+    const { account, sessions } = setup();
+    await account.signIn('apple');
+    assert.equal(await account.access.withSession(async (session) => `got:${session}`), 'got:SESSION-1');
+    assert.equal((await sessions.read()).kind, 'found');
+  });
+
+  it('サインインしていなければ not-signed-in。task を実行しない（別のローカルDBのセッションも、していない扱い）', async () => {
+    const { account, state } = setup();
+    let ran = 0;
+    const task = async () => void (ran += 1);
+    await rejectsWith(account.access.withSession(task), 'not-signed-in');
+    await account.signIn('apple');
+    state.id = 'data-2';
+    await rejectsWith(account.access.withSession(task), 'not-signed-in');
+    assert.equal(ran, 0);
+  });
+
+  it('auth を注入していないビルド（account.available が偽）でも、not-signed-in', async () => {
+    const { account } = { account: createAccountService(null) };
+    await rejectsWith(account.access.withSession(async () => 1), 'not-signed-in');
+  });
+
+  it('task が unauthorized（401）を投げたときだけ、端末のセッションを捨てる', async () => {
+    const { account, sessions } = setup();
+    await account.signIn('apple');
+    for (const code of ['network', 'unavailable', 'invalid-response', 'invalid-request'] as const) {
+      await rejectsWith(
+        account.access.withSession(async () => {
+          throw new AuthError(code);
+        }),
+        code,
+      );
+      assert.equal((await sessions.read()).kind, 'found', code);
+    }
+    await rejectsWith(
+      account.access.withSession(async () => {
+        throw new AuthError('unauthorized');
+      }),
+      'unauthorized',
+    );
+    assert.equal((await sessions.read()).kind, 'none');
+    assert.equal(await account.getSignedInProvider(), null);
+  });
+
+  it('task が AuthError 以外を投げたら、そのまま投げる（包まない）。端末のセッションは捨てない', async () => {
+    const { account, sessions } = setup();
+    await account.signIn('apple');
+    const failure = new Error('domain failure');
+    await assert.rejects(
+      account.access.withSession(async () => {
+        throw failure;
+      }),
+      (error) => error === failure,
+    );
+    assert.equal((await sessions.read()).kind, 'found');
+  });
+
+  it('401 のとき、端末のセッションを捨てられなくても、失敗は unauthorized のまま', async () => {
+    const { account, sessions } = setup();
+    await account.signIn('apple');
+    sessions.clear = async () => {
+      throw new Error('keychain error');
+    };
+    await rejectsWith(
+      account.access.withSession(async () => {
+        throw new AuthError('unauthorized');
+      }),
+      'unauthorized',
+    );
+  });
+
+  it('サインイン・ログアウトの待ち（各社の画面を開いている間）に、巻き込まれない', async () => {
+    let release: (token: string) => void = () => {};
+    const slow: IdTokenProvider = { getIdToken: () => new Promise<string>((resolve) => (release = resolve)) };
+    const { account, sessions } = setup({ providers: { apple: slow } });
+    // 先に別の手段で入っているわけではない: サインイン中（画面が開いたまま）でも、access は待たずに not-signed-in を返す。
+    const signingIn = account.signIn('apple');
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    await rejectsWith(account.access.withSession(async () => 1), 'not-signed-in');
+    release('ID-TOKEN');
+    await signingIn;
+    assert.equal((await sessions.read()).kind, 'found');
+  });
+});
+
+describe('createServices: 公開の入口', () => {
+  it('Services.account（画面が使う型）に、セッションを渡す入口 access を含めない', async () => {
+    const { services } = await createTestServices();
+    assert.equal('access' in services.account, false);
+  });
+
+  it('auth を渡さなければ、publish の操作は not-signed-in（通信の部品も無いので、何も送れない）', async () => {
+    const { services } = await createTestServices();
+    await rejectsWith(services.publish.refreshProfile(), 'not-signed-in');
+    await rejectsWith(services.publish.publish({ displayName: 'x', bio: '' }), 'not-signed-in');
+  });
+
+  it('サインイン中なら、公開の通信にセッションを Bearer で付ける。401 なら端末のセッションを捨てる', async () => {
+    const { storage } = memoryStorage();
+    const sent: { url: string; authorization: string | undefined }[] = [];
+    let profileStatus = 200;
+    const { services } = await createTestServices({
+      auth: {
+        storage,
+        sha256Base64Url,
+        idTokenProviders: { apple: { getIdToken: async () => 'ID-TOKEN' } },
+        fetch: async (url, init) => {
+          sent.push({ url, authorization: init.headers.Authorization });
+          if (url.endsWith('/auth/nonce')) return { ok: true, status: 200, json: async () => ({ nonce: 'T-1' }) };
+          if (url.endsWith('/auth/login')) return { ok: true, status: 200, json: async () => ({ session: 'SESSION-1' }) };
+          return { ok: profileStatus === 200, status: profileStatus, json: async () => ({ profile: null }) };
+        },
+      },
+    });
+    await services.account.signIn('apple');
+    assert.equal(await services.publish.refreshProfile(), null);
+    const call = sent.find((request) => request.url.endsWith('/me/profile'));
+    assert.equal(call?.authorization, 'Bearer SESSION-1');
+
+    profileStatus = 401;
+    await rejectsWith(services.publish.refreshProfile(), 'unauthorized');
+    assert.equal(await services.account.getSignedInProvider(), null);
+  });
+});

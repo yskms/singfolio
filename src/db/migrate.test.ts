@@ -72,7 +72,15 @@ describe('runMigrations', () => {
         .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
         .all() as { name: string }[]
     ).map((t) => t.name);
-    assert.deepEqual(tables, ['artists', 'settings', 'song_tags', 'songs', 'tags']);
+    assert.deepEqual(tables, [
+      'artists',
+      'publish_state',
+      'published_songs',
+      'settings',
+      'song_tags',
+      'songs',
+      'tags',
+    ]);
 
     await runMigrations(db, migrations);
     assert.equal(userVersion(raw), migrations.length);
@@ -353,7 +361,7 @@ describe('v3: アーティストのテーブル', () => {
     raw.exec("INSERT INTO song_tags VALUES ('s1', 't1')");
 
     await runMigrations(db, migrations);
-    assert.equal(userVersion(raw), 3);
+    assert.equal(userVersion(raw), migrations.length);
 
     const artists = raw
       .prepare('SELECT id, name, reading, created_at FROM artists ORDER BY name')
@@ -423,5 +431,49 @@ describe('v3: アーティストのテーブル', () => {
     raw.exec("DELETE FROM songs WHERE id = 's1'");
     raw.exec("DELETE FROM artists WHERE id = 'a1'");
     assert.equal(count(raw, 'artists'), 0);
+  });
+});
+
+describe('v4: 公開（Publish）の端末側の状態', () => {
+  async function migratedToV3() {
+    const { raw, db } = openDb();
+    await runMigrations(db, migrations.slice(0, 3));
+    return { raw, db };
+  }
+
+  it('v3 のDBを v4 にしても、曲・アーティスト・タグはそのまま。公開の状態は空', async () => {
+    const { raw, db } = await migratedToV3();
+    raw.exec("INSERT INTO artists (id, name, reading, created_at) VALUES ('a1', 'Queen', 'Queen', 1)");
+    raw.exec(
+      "INSERT INTO songs (id, title, artist_id, status, created_at, updated_at) VALUES ('s1', 'Bohemian', 'a1', 'ready', 1, 1)",
+    );
+    await runMigrations(db, migrations);
+    assert.equal(userVersion(raw), 4);
+    assert.equal(count(raw, 'songs'), 1);
+    assert.equal(count(raw, 'artists'), 1);
+    assert.equal(count(raw, 'publish_state'), 0);
+    assert.equal(count(raw, 'published_songs'), 0);
+  });
+
+  it('publish_state は1行だけ（id = 1）。base_version は 0 以上', async () => {
+    const { raw, db } = openDb();
+    await runMigrations(db, migrations);
+    raw.exec("INSERT INTO publish_state (id, username, base_version, display_name, bio) VALUES (1, 'karaoke_fan', 0, '', '')");
+    assert.throws(() =>
+      raw.exec("INSERT INTO publish_state (id, username, base_version, display_name, bio) VALUES (2, 'x', 0, '', '')"),
+    );
+    assert.throws(() => raw.exec("UPDATE publish_state SET base_version = -1 WHERE id = 1"));
+  });
+
+  it('published_songs は songs に結びつけない（曲を消しても、公開した記録は残る）', async () => {
+    const { raw, db } = openDb();
+    await runMigrations(db, migrations);
+    raw.exec("INSERT INTO artists (id, name, reading, created_at) VALUES ('a1', 'Queen', 'Queen', 1)");
+    raw.exec(
+      "INSERT INTO songs (id, title, artist_id, status, created_at, updated_at) VALUES ('s1', 'Bohemian', 'a1', 'ready', 1, 1)",
+    );
+    raw.exec("INSERT INTO published_songs (song_id, content_hash) VALUES ('s1', 'abc')");
+    raw.exec("DELETE FROM songs WHERE id = 's1'");
+    assert.equal(count(raw, 'published_songs'), 1);
   });
 });

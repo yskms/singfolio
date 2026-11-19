@@ -40,6 +40,25 @@ export function isAuthProvider(value: unknown): value is AuthProvider {
   return AUTH_PROVIDERS.some((provider) => provider === value);
 }
 
+/**
+ * 公開プロフィール（Workerの `Profile`。docs/singfolio-publishing-backend.md §8「公開プロフィールのエンドポイント」）。
+ * サーバーが持つ、アカウントの公開の状態。端末は、`version` を `baseVersion` にして Publish する。
+ */
+export interface PublicProfile {
+  /** 確保した公開URLの名前（小文字の英数字と `_` の3〜20字。変更できない） */
+  username: string;
+  /** Publish と Unpublish のたびに+1する整数（0 は一度も Publish していない） */
+  version: number;
+  /** 公開中か */
+  published: boolean;
+  /** 最後に Publish した時刻（Unixエポックのミリ秒）。非公開なら `null` */
+  publishedAt: number | null;
+  /** 最後に Publish した Display Name（まだなら空） */
+  displayName: string;
+  /** 最後に Publish した Bio（まだなら空） */
+  bio: string;
+}
+
 export interface Tag {
   id: string;
   name: string;
