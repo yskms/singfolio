@@ -1333,7 +1333,7 @@ Publishのリクエストの本文は、`baseVersion`（7.4.4）に、`profile` 
 
 -   **許可リストで作る。** 入力から公開してよい項目だけを取り出して新しいオブジェクトを作り、余分な項目（My Key・Private Note・ステータス・端末のタグなど、
     送られてきても）は、検証も保存もしない。入力のオブジェクトをそのまま保存する形に「簡略化」しない。`PublishedSong` に My Key・Private Note・status を足さない。
--   **Display Name・Bio は、Publishのリクエストに載せる。** 端末が持つ（Profile の設定）下書きで、Publishしたときに公開内容になる（公開内容は「最後に正常にPublishした
+-   **Display Name・Bio は、Publishのリクエストに載せる。** 端末（Public Profile の画面。保存しない下書き。7.4.7）が持つ値で、Publishしたときに公開内容になる（公開内容は「最後に正常にPublishした
     スナップショット」で、設定の即時の鏡ではない）。D1の `profiles` には、最後にPublishした値の控えを持つ（別の端末・再インストール後に、現在の公開内容を取得して
     表示するため。7.4.3）。Display Name・Bio だけを更新するエンドポイントは作らない。
 -   **項目の規則。** 文字列は前後の空白を落とす。表示名・曲名・アーティスト・タグは、1行（制御文字・行区切り・文字の向きを強制する制御を含まない）で、空にしない。
@@ -1359,7 +1359,7 @@ Publishのリクエストの本文は、`baseVersion`（7.4.4）に、`profile` 
 
 ### アプリ側の Publish の土台（7.4.6）
 
-画面は 7.4.7 以降。ここまでは、Service までで、Nodeのテスト（偽のHTTP・実際のSQL）で確かめた。本物のWorkerでの確認は 7.4.11。
+この節は Service まで（Nodeのテスト。偽のHTTP・実際のSQL）。画面は 7.4.7（次の節）。本物のWorkerでの確認は 7.4.11。
 
 -   **構成。** `publishSnapshot.ts`（Publish のリクエストの組み立て。純粋な関数）、`publishRepository.ts`（HTTP）、`publishStateRepository.ts`（端末側の状態。
     `publish_state`・`published_songs`。`singfolio-data-model.md`）、`publishService.ts`（`Services.publish`）。HTTPの共通の扱い（再試行しない・5xx と 429 は
@@ -1405,6 +1405,33 @@ Publishのリクエストの本文は、`baseVersion`（7.4.4）に、`profile` 
     （Nodeのテストでは検出できない）。対になっていないサロゲートは、1文字ずつ見て取り除く。`publishSnapshot.test.ts` が、ソースに後読みが無いことを確かめる。
 -   **曲ごとのハッシュ**（`songContentHash`。cyrb53。暗号ではなく、変更の検出用）は曲名・アーティスト・公開タグから作り、`sortOrder` を含めない（曲を足すと、あとの曲の番号がずれて、
     全部が「変更あり」になる）。Publish の成功のとき、送った内容（整えたあと）から作って、`published_songs` を丸ごと差し替える。「N unpublished changes」の数え方は 7.4.9。
+
+### アプリ側の Public Profile 画面（7.4.7）
+
+画面は `app/public-profile.tsx`（ゲートとヘッダー）と `ui/PublicProfileSection.tsx`（中身）。入口は Profile タブ。画面の仕様は `singfolio-screen-flow.md` §7「Public Profile」。
+画面は `account`・`publish`（Service）の返す値だけを使い、URL・レスポンスの形・セッションの値に触れない（Account 画面と同じ）。
+
+-   **ゲート。** 入口（Profile の行）も、ルート `singfolio://public-profile` も、`account.available` が真のビルドだけ（偽なら先頭の画面へ戻す）。`ACCOUNT_ENABLED` と同じ条件で、
+    リリースのビルドでは 7.3.13 まで閉じている。
+-   **Display Name・Bio の下書きは、この画面だけが持ち、保存しない。** 初期値は `refreshProfile` が返すサーバーの「最後に Publish した値」（端末の `publish_state` ではない。
+    再インストール後・別の端末でも、公開中の内容が出る）。変更の有無は、この値との比較で決める。変更があるまま戻るときは、破棄の確認を出す（`usePreventRemove`）。
+    **7.4.9 の Auto Publish は、曲の変更を、端末の `publish_state` の Display Name・Bio（最後に Publish した値）で送る想定**（画面の下書きを待たない）。Display Name・Bio の編集そのものを
+    Auto Publish に載せるなら、下書きの保存先を足す（7.4.9 で決める。決めずに、この画面で先に保存を足さない）。
+-   **確認を出す操作**: `username` の確保（変更できない）、最初の公開と非公開にしたあとの公開（人に見える状態になる）、Unpublish、版の食い違いの置き換え、変更を捨てて戻る。
+    公開中の更新（Publish Now）は、確認なしで送る。
+-   **版の食い違い（`version-conflict`）。** 画面の状態（公開中か・最終公開）を、`PublishError.profile`（サーバーの今の内容）に合わせ、入力中の下書きはそのままにして、
+    「置き換えますか」を出す。置き換えるなら、`replaceVersion` に `profile.version` を渡して送り直す。応答を受け取れなかった Publish のあとの送り直しも、ここを通る。
+-   **失敗の文言は `src/i18n/publishErrors.ts`**（`publicProfileErrorMessageKey`。Nodeのテストで、全コード・全操作が英語・日本語の文言に決まることを確かめる）。**Publish の `network` だけは
+    「公開できたか分からない」と伝える**（サーバーで済んでいることがある）。`needsProfileReload`（401・`username-required`・`username-already-set`）のときは、失敗の文言を出したうえで、
+    サーバーの状態を読み直す。
+-   **`username` の形の確認は `src/services/username.ts`**（Worker の `USERNAME_PATTERN` と同じ値を別に持つ。`username.test.ts` が一致を確かめる）。確認は形だけで、小文字にして送る
+    （`publishService.claimUsername` も同じ `normalizeUsernameInput` を通す）。入力欄は自動修正・自動大文字を切り、iOS は `ascii-capable` のキーボードにする。
+-   **日時は `Intl` を使わず `YYYY-MM-DD HH:mm`**（`src/i18n/dateTime.ts`。Hermes の `Intl` が機種で揃うかを確かめていない）。
+-   **Android のキーボード**: `ui/useKeyboardHeight.ts`（`SongForm` と同じ理由・同じやり方。Bio にフォーカスが入ったら、末尾までスクロールする）。
+-   **確かめたこと / 確かめていないこと。** iOS Simulator で、メモリ上の偽の Service（一時的なもの。コミットしていない）を差し込み、`username` の入力（形のエラー・小文字化・確認）→ 確保 →
+    最初の公開の確認 → 版の食い違いと置き換え → 公開中の表示 → 通信が切れた文言 → 変更があるまま戻る確認 → Unpublish（下書きが残る）を確かめた。本物の Service では、
+    サインインしていない画面と、Account への導線・戻ったあとの表示を確かめた。**未確認**: 本物のサーバーとの通信（7.4.11）、読み込み失敗の画面の見た目、Android（キーボードの余白）、
+    VoiceOver・TalkBack、ダークモード。
 
 ### Cloudflare
 

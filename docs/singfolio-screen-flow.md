@@ -414,10 +414,60 @@ v1.0では公開プロフィールではなく、端末内のプロフィール�
     `ui/useFocusRefreshKey.ts`）。読み直すあいだは前の件数を出し続ける。
 -   **`Show My Songs`** は、Show Mode（§8）を開くボタン。Readyの曲が0件でも押せる（Show Mode が
     案内を出す）。連打で重ねて開かない。
--   **表示名は持たない**。ブランド資料のモックアップの `YSKMS` のような名前は、v1.0には保存先も
-    入力する画面も無い（公開用のハンドル名は、公開機能の設定。`singfolio-publishing-backend.md` §6）。
+-   **表示名は持たない**。ブランド資料のモックアップの `YSKMS` のような名前は、Profile 自体には保存先も
+    入力する画面も無い（公開用の Display Name・`username` は、公開機能の設定 = 下の Public Profile。
+    `singfolio-publishing-backend.md` §6）。
+-   **`Public Profile`**（公開機能。`Show My Songs` の下の、枠付きのボタン）は、アカウントが使えるビルド（`account.available`）だけに出す。
+    リリースのビルドでは 7.3.13 まで出さない（Settings の `Account` と同じゲート）。
 -   **設定は持たない**（`Appearance`・`Language`・`Suggestions`・`Tags`・`Artists`・`About` は、Settings タブ。
     §9）。以前は、`Show My Songs` の下に区切り線を挟んで並べていたが、別のタブにした。
+
+### Public Profile
+
+Profile の `Public Profile` から開く画面（`app/public-profile.tsx`。連打で重ねない）。`username` の確保・Display Name と Bio・Publish Now・Unpublish・
+状態の表示。アカウントが使えるビルドだけで、画面も、リンク `singfolio://public-profile` では開かず、先頭の画面へ戻す（Account と同じ）。
+**ログインを要求しない**: サインインしていなくても、v1.0の機能は何も変わらない。ここでの失敗は、すべてこの画面の中で伝える（ErrorBoundary には伝えない）。
+Preview・Copy Link は公開ページ（7.5）ができてから、「N unpublished changes」と Auto Publish は 7.4.9、公開するタグの選び方は 7.4.8。
+
+``` text
+Public Profile
+
+● Published
+singfolio.app/yskms
+Last published 2026-11-19 14:12
+
+Display Name *
+[                    ]
+Bio
+[                    ]
+                 0 / 500
+
+Your page shows your Display Name, Bio, and ...
+84 Ready songs will be published.
+
+[ Publish Now ]
+Unpublish Profile
+Hides your public page. ...
+```
+
+-   **開いた直後**: サインインの状態とサーバーの公開の状態を読むまで、中身を出さない（読み込み中の表示のみ）。読めなかったとき（通信・サーバー）は、
+    「公開プロフィールを読み込めませんでした」と「もう一度試す」だけを出す（「公開していない」とは出さない）。
+-   **サインインしていないとき**: 「サインインすると公開ページで見せられる。アカウントなしで使える」の説明と、`Account` を開くボタン。
+    Account から戻ったときに、サインインしたかもしれないので、読み直す（入力中の下書きがありうる、準備ができた状態では読み直さない）。
+-   **`username` が未確保のとき**: 「ユーザー名を決める」だけを出す（Display Name・Bio・Publish は、確保のあと）。入力は小文字の英数字と `_` の3〜20字
+    （形だけ確かめる。予約語・取られている名前はサーバーが断る。理由は区別して伝えない）。入力すると、公開ページのアドレスの見込みを出す。
+    **押すと、変更できないことを伝える確認を出す**（確保したら変更できない。`username-unavailable` などは、その場の文言で出す）。
+-   **`username` があるとき**: 状態（公開中 / 未公開。塗りと縁の違いに加え、文字でも伝える）・アドレス・最終公開の時刻（公開中のみ。端末の時刻の
+    `YYYY-MM-DD HH:mm`。`Intl` は使わない）・Display Name（必須。50字）・Bio（500字。文字数を出す）。**この2つは、この画面だけが持つ下書きで、保存しない。**
+    初期値は、サーバーの「最後に Publish した値」（再インストール後・別の端末でも、公開中の内容が出る）。変更があるまま戻るときは、破棄の確認を出す。
+-   **Publish Now**: Display Name が空、または Ready の曲が1000を超えるとき（件数を、エラーの色で伝える）は押せない。**最初の公開（と、非公開にしたあとの公開）は、
+    人に見える状態になるので、確認を出す**（公開される内容と、キー・プライベートメモ・ステータスは公開されないことを伝える）。公開中の更新は、確認なしで送る。
+    版が食い違うとき（別の端末が Publish した、再インストール後の空のローカル、応答を受け取れなかった Publish のあと）は、「置き換えますか」を出し、
+    置き換えるなら、サーバーの今の版で送り直す。
+-   **Unpublish Profile**（公開中のときだけ）: 確認を出す（公開ページが見えなくなる・端末の曲は削除されない・`username` は残る）。入力中の下書きは残る。
+-   **操作は1つずつ**。実行中は、ほかの操作を押せず、戻る操作も止める（結果を伝える画面が無くなるため）。結果は画面の上に1行で出す。
+    401（サインインが外れた）・`username` の有無が食い違ったときは、サーバーの状態を読み直す。Publish の通信が切れたときは、サーバーで済んでいることがあるので、
+    「公開できたか分からない」と伝える。
 
 ## 8. Show Mode
 
@@ -629,7 +679,7 @@ Settings の `Account` から開く画面（`app/account.tsx`。連打で重ね�
 画面も、`singfolio://account` では開かず、先頭の画面へ戻す。`src/services/index.ts` の `ACCOUNT_ENABLED`。`singfolio-publishing-backend.md` §8「アカウントの画面」）。
 
 置き場所は Settings（Profile ではない）: Profile は「自分の Singfolio」（件数と Show Mode の入口）で、アカウントの
-管理は設定に近い。公開機能（7.4 以降）で Profile に公開の設定を足すときは、そこから Account へ行く導線を足せる。
+管理は設定に近い。公開の設定（Public Profile。§7）は Profile に置き、サインインしていないときだけ、そこから Account へ行く導線を出す。
 
 -   **開いた直後**: サインインの状態を読むまで、中身を出さない（数ミリ秒）。読めなかったとき（`getSignedInProvider` が投げた）
     は、「サインインの状態を確認できませんでした」と「もう一度試す」だけを出す（ErrorBoundary には伝えない。「ログアウト中」

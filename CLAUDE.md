@@ -238,6 +238,11 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     **`publish` は、本文を送る前に、同じセッションで `GET /me/profile` を読み、端末の記録が今のアカウントのものと確かめてから `baseVersion` を決める**（「通信を1回にする」ために外さない。サインアウト・別のアカウントでのサインインは記録を消さないので、確かめずに使うと、前のアカウントの版がたまたま同じとき、別の端末の公開を確認なしに上書きする）。**`publish_state.base_version` は、`refreshProfile` や `claimUsername` のやり直しで、サーバーの今の版へ進めない**（別の端末の Publish を、確認なしに上書きする。再インストール後の
     空のローカルから公開を消す事故を、これが止める）。進めるのは、Publish・Unpublish の応答と、置き換えの確認（`replaceVersion`）だけ。曲ごとのハッシュに `sortOrder` を含めない
     （曲を足すと、あとの曲が全部「変更あり」になる）。`published_songs` を `songs` の外部キーにしない（曲を消したあとも、公開した記録を残す）。公開タグは 7.4.8 まで空（安全側）。`publishSnapshot.ts` に正規表現の後読みを書かない（Hermes で未確認。起動の失敗になりうる。テストが検出する）。`publishSnapshot.test.ts` は `worker/src/snapshot.ts` を import する（実行時のコードは共有しない）ので、そのファイルに Workers の型や `worker/` の依存を持ち込まない。
+-   **Public Profile 画面（`app/public-profile.tsx`・`ui/PublicProfileSection.tsx`。7.4.7）。** 詳細は `docs/singfolio-publishing-backend.md` §8「アプリ側の Public Profile 画面」。
+    入口（Profile）もルートも `account.available` のゲートの後ろ（Account と同じ。リリースのビルドでは閉じる）。**Display Name・Bio の下書きは、この画面だけが持ち、保存しない**
+    （初期値はサーバーの `PublicProfile`。端末の `publish_state` ではない）。保存先を先に足さない（Auto Publish との関係は 7.4.9 で決める）。最初の公開・Unpublish・`username` の確保・
+    版の食い違いの置き換えの確認は外さない（人に見える状態になる・変更できない）。`username` の形の規則は `src/services/username.ts` に、Workerと同じ値を別に持つ。日時は `Intl` を使わない
+    （`src/i18n/dateTime.ts`）。失敗の文言は `src/i18n/publishErrors.ts`（Publish の `network` だけ「公開できたか分からない」）。
 -   `expo-secure-store` の config plugin を `app.json` に足さない。Androidのバックアップ規則が `<include>` で、v1.0で今
     バックアップされているSQLiteを外す。
 
