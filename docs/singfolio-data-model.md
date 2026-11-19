@@ -88,7 +88,7 @@ UIの表示名「My Key」は、モデル・DBでは `keyOffset` / `key_offset` 
     登録できてしまう。
 -   全角/半角の統一や前後の空白の除去といったタグ名の正規化は、DBでは行わず、
     Service層で行う（「Repository / Service層」の「タグ名」参照）。
--   タグに公開/非公開などの属性は持たせない（CLAUDE.md「データモデル」）。
+-   タグに公開/非公開などの属性は持たせない（CLAUDE.md「データモデル」）。公開するタグの選択は、別の表 `public_tags`（下）に持つ。
 
 ### song_tags
 
@@ -123,6 +123,19 @@ UIの表示名「My Key」は、モデル・DBでは `keyOffset` / `key_offset` 
     DBの外に置くセッション（SecureStore）が、このDBに属するかを確かめるために、セッションと一緒に保存する
     （`singfolio-publishing-backend.md` §8「アプリ側の認証の土台」）。バックアップでDBが戻れば、同じ値も戻る。
     消したり作り直したりする処理を足さない（セッションが、サインイン中として扱われなくなる）。
+
+### public_tags
+
+公開ページに出すタグの選択（7.4.8。migration 5）。**`tags` に公開の列を足さず、別の表にする。** 行があるタグだけが公開される（既定は全部非公開）。
+
+| カラム | 型 | 内容 |
+|---|---|---|
+| `tag_id` | TEXT PK | 公開に選んだタグのID。`tags.id` への外部キー（`ON DELETE CASCADE`） |
+
+-   **IDで持つ**（名前ではなく）。タグを削除すると行も消えるので、同じ名前で作り直したタグが、黙って公開されない。名前を変えても、選択は残る（公開される名前は、次の Publish で変わる）。
+    このカスケードにも、接続ごとの `PRAGMA foreign_keys = ON` が前提（`song_tags` と同じ）。
+-   アカウントとは結びつけない（端末のタグの設定。サインアウト・別のアカウントでのサインインでも消さない）。公開用データそのものではない（それはサーバーのR2）。
+-   値の意味は Service 層（`publishService` の `listPublicTagChoices`・`setTagPublic`）。Repository は `publicTagRepository`。
 
 ### publish_state・published_songs
 

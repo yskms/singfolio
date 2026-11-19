@@ -427,7 +427,7 @@ v1.0では公開プロフィールではなく、端末内のプロフィール�
 Profile の `Public Profile` から開く画面（`app/public-profile.tsx`。連打で重ねない）。`username` の確保・Display Name と Bio・Publish Now・Unpublish・
 状態の表示。アカウントが使えるビルドだけで、画面も、リンク `singfolio://public-profile` では開かず、先頭の画面へ戻す（Account と同じ）。
 **ログインを要求しない**: サインインしていなくても、v1.0の機能は何も変わらない。ここでの失敗は、すべてこの画面の中で伝える（ErrorBoundary には伝えない）。
-Preview・Copy Link は公開ページ（7.5）ができてから、「N unpublished changes」と Auto Publish は 7.4.9、公開するタグの選び方は 7.4.8。
+Preview・Copy Link は公開ページ（7.5）ができてから、「N unpublished changes」と Auto Publish は 7.4.9。公開するタグの選び方は、下の「Public Tags」（7.4.8）。
 
 ``` text
 Public Profile
@@ -441,6 +441,8 @@ Display Name *
 Bio
 [                    ]
                  0 / 500
+
+Public Tags                  2 tags  >
 
 Your page shows your Display Name, Bio, and ...
 84 Ready songs will be published.
@@ -473,6 +475,38 @@ Hides your public page. ...
 -   **操作は1つずつ**。実行中は、ほかの操作を押せず、戻る操作も止める（結果を伝える画面が無くなるため）。結果は画面の上に1行で出す。
     401（サインインが外れた）・`username` の有無が食い違ったときは、サーバーの状態を読み直す。Publish の通信が切れたときは、サーバーで済んでいることがあるので、
     「公開できたか分からない」と伝える。
+-   **`Public Tags` の行**（`username` を確保したあと。Display Name・Bio の下）: 値は、公開に選んだタグの数（0なら `None`）。押すと Public Tags（下）を開く
+    （実行中は開かない）。戻ったときに、数だけを読み直す（入力中の Display Name・Bio には触れない）。確認の文言（最初の公開など）にも「公開タグ」を含める。
+
+### Public Tags
+
+Public Profile の `Public Tags` から開く画面（`app/public-tags.tsx`。連打で重ねない。Public Profile と同じゲート: アカウントが使えるビルドだけで、
+`singfolio://public-tags` でも、そうでなければ先頭の画面へ戻す）。公開ページに出すタグを選ぶ（7.4.8）。
+
+``` text
+Public Tags
+
+Turn on the tags you want to show on your public page. ...
+Each song shows up to 10 public tags.
+Changes appear on your public page the next time you publish.
+
+Ballad                          [ ●  ]
+3 Ready songs
+Duet                            [  ○ ]
+1 Ready song
+Unused                          [  ○ ]
+0 Ready songs
+```
+
+-   **端末のすべてのタグ**を名前の昇順で並べる（Tags と同じ並び）。行の2行目は、そのタグが付いた Ready の曲の数（オンにしたときに、公開ページに出る曲の数。0曲のタグも出す:
+    あとで Ready にした曲に付いていれば出る）。**既定は全部オフ**（選んだタグだけが公開される）。
+-   **行全体を押して切り替える**。押すたびに、その場で保存する（保存ボタンは無い。端末内だけの設定で、通信しない・サインインも要らない）。保存中のタグは押せない。
+    保存に失敗したら、そのタグの表示は元に戻し、`Couldn’t save` を出す。公開中の内容はすぐには変わらず、**次の Publish から反映される**（画面の注記に書く）。
+-   **オンにしたタグは、Ready の曲のそのタグが付いたところに出る。** オフのタグ、Ready でない曲のタグは、名前も送らない。1曲に出るのは10個まで（超えた分は出ない。注記に書く）。
+-   タグが1つも無いときは、空の状態の案内（`No tags yet`）だけを出す。タグを作るのは、曲の追加・編集（Tags 画面では作れない）。
+-   **Tags での名前の変更・削除との関係**: 選択はタグのIDに付く。名前を変えると、公開されるタグの名前も、次の Publish で変わる。**タグを削除すると、選択も消える**
+    （同じ名前で作り直したタグは、オフから始まる。黙って公開されない）。
+-   読み込みの失敗は、Tags と同じく ErrorBoundary に任せる（端末内のDBの読み取りで、通信は無い）。
 
 ## 8. Show Mode
 
