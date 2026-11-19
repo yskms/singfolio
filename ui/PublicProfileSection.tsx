@@ -244,7 +244,9 @@ export function PublicProfileSection() {
         { text: t('common.cancel'), style: 'cancel' },
         {
           text: republish ? t('publicProfile.publishConfirmAction') : t('publicProfile.replaceAction'),
-          onPress: () => publishNow(server.version, true),
+          // 送り直すまでの間に、また食い違うことがある。置き換えの確認では、「人に見える状態になる」ことは伝えていない（公開中だったため）ので、
+          // 引き継ぐのは、すでに伝えた分だけ（もう一度公開する確認を出したときと、元から済んでいたとき）。
+          onPress: () => publishNow(server.version, republish || visibleConfirmed),
         },
       ],
     );
