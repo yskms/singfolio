@@ -5,6 +5,7 @@ import { handleDeleteAccount } from './deleteAccount.ts';
 import { handleLogin, handleLogout, handleLogoutOthers, handleNonce } from './auth.ts';
 import { httpsRequiredResponse, isInsecureRequest } from './https.ts';
 import { runInactiveAccountDeletion } from './inactiveAccounts.ts';
+import { handleClaimUsername, handleGetProfile } from './profile.ts';
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -20,6 +21,9 @@ export default {
     if (pathname === '/auth/apple/callback') return handleAppleCallback(request);
     if (pathname === '/auth/apple/notifications') return handleAppleNotification(request, env, Date.now());
     if (pathname === '/auth/apple/login') return handleAppleWebLogin(request, env, Date.now());
+    // 公開プロフィール（7.4）。認証が要る。パスの最上位（`me`）は、確保させない名前（src/username.ts）。
+    if (pathname === '/me/profile') return handleGetProfile(request, env, Date.now());
+    if (pathname === '/me/username') return handleClaimUsername(request, env, Date.now());
 
     return new Response('Not Found', {
       status: 404,

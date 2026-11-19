@@ -345,10 +345,11 @@ v1.0より後（公開機能・Requests）の実装順序は、
     -   [x] 7.4.2 スナップショットの形と検証（Worker の純粋な関数。`worker/src/snapshot.ts`）。プロフィール（Display Name・Bio）と曲（`id`・`title`・`artist`・`publicTags`・`sortOrder`）、
         形の版・版・時刻。許可リストで作り、My Key・Private Note・status は型にも入れず、送られてきても保存しない。長さ・件数・本文の上限は、Free の CPU 10ms に初回でも収まるよう
         実測して決めた（曲 **1000**・本文 512KiB。3000曲は初回に10msを超えた。`npm run bench:snapshot` と workerd。§8「公開スナップショットの形と上限」）
-    -   [ ] 7.4.3 プロフィールと `username`（`migrations/0004` の `profiles`）。`username` の確保（`[a-z0-9_]` の3〜20字、予約語、UNIQUE、同時の確保の競合）。
+    -   [x] 7.4.3 プロフィールと `username`（`migrations/0004` の `profiles`）。`username` の確保（`[a-z0-9_]` の3〜20字、予約語、UNIQUE、同時の確保の競合）。
         自分のプロフィールの取得（`username`・版・公開中か・最後にPublishした Display Name・Bio の控え）。最初の Publish より前に確保する。
         Display Name・Bio は、Publish のリクエストに載せる（Publishしたときに公開内容になる。単独で更新するエンドポイントは作らない。§8「公開スナップショットの形と上限」）。
-        削除後に再利用させない `username` を残す表も、ここで作る
+        削除後に再利用させない `username` を残す表（`retired_usernames`）も、ここで作った（書き込みは 7.4.5）。`GET /me/profile`・`PUT /me/username`（競合は一意制約に任せる。同時の確保でも勝つのは1つ）。
+        Node のテストと、`wrangler dev`（workerd）で確かめた（§8「公開プロフィールのエンドポイント」）
     -   [ ] 7.4.4 Publish と Unpublish（Worker）。R2 を先に書き、成功したら D1 の版を更新する。`baseVersion` の照合（食い違いは 409）。Unpublish は R2 を消す
         （`username` と D1 のプロフィールは残す）。公開の状態（公開中か、版、最終 Publish）の取得。D1 の書き込みは最小にする
     -   [ ] 7.4.5 アカウントの削除と自動削除の見直し。`deleteUserAccount` に「`username` を読む → R2 を消す → D1 を消す」を足す（R2 の失敗なら D1 の行を残して失敗にする）。

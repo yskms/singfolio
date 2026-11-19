@@ -46,14 +46,14 @@ describe('D1のスキーマ（migrations/）', () => {
     return row?.n;
   };
 
-  it('4つのテーブルがある（wranglerの管理用のテーブルを除く）', async () => {
+  it('6つのテーブルがある（wranglerの管理用のテーブルを除く）', async () => {
     const { results } = await db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
       .all<{ name: string }>();
     const names = results
       .map((row) => row.name)
       .filter((name) => name !== 'd1_migrations' && !name.startsWith('sqlite_') && !name.startsWith('_cf_'));
-    assert.deepEqual(names, ['identities', 'sessions', 'used_nonces', 'users']);
+    assert.deepEqual(names, ['identities', 'profiles', 'retired_usernames', 'sessions', 'used_nonces', 'users']);
   });
 
   it('identities: provider は apple か google だけ', async () => {
@@ -178,5 +178,73 @@ describe('D1のスキーマ（migrations/）', () => {
       db.prepare('UPDATE identities SET consent_revoked_at = ? WHERE id = ?').bind('yesterday', identityId).run(),
       /cannot store TEXT value in INTEGER column/,
     );
+  });
+
+  describe('profiles・retired_usernames（0004）', () => {
+    const addProfile = (userId: string, username: string) =>
+      db.prepare('INSERT INTO profiles (user_id, username, created_at) VALUES (?, ?, ?)').bind(userId, username, 1).run();
+
+    it('profiles: 既定は 版0・非公開(NULL)・空の控え。username は一意', async () => {
+      const userId = await addUser();
+      await addProfile(userId, 'schema_a');
+      assert.deepEqual(
+        await db
+          .prepare('SELECT username, display_name, bio, version, published_at FROM profiles WHERE user_id = ?')
+          .bind(userId)
+          .first(),
+        { username: 'schema_a', display_name: '', bio: '', version: 0, published_at: null },
+      );
+      const other = await addUser();
+      await assert.rejects(addProfile(other, 'schema_a'), /UNIQUE constraint failed: profiles\.username/);
+      // 1ユーザーに1行（主キー）。
+      await assert.rejects(addProfile(userId, 'schema_b'), /UNIQUE constraint failed: profiles\.user_id/);
+    });
+
+    it('profiles: username の CHECK（小文字の英数字と _ の3〜20字。アプリの検査をすり抜けた値への備え）', async () => {
+      const bad = ['ab', 'a'.repeat(21), 'Upper', 'with-hyphen', 'sp ace', 'dot.dot', 'あいう', 'nl\n'];
+      for (const username of bad) {
+        await assert.rejects(addProfile(await addUser(), username), /CHECK constraint failed/, JSON.stringify(username));
+      }
+      for (const username of ['abc', 'a'.repeat(20), 'a_1']) {
+        await addProfile(await addUser(), `${username}${username.length === 3 ? seq : ''}`.slice(0, 20));
+      }
+    });
+
+    it('profiles: version は負にならない。時刻の列に文字列は入らない', async () => {
+      const userId = await addUser();
+      await addProfile(userId, 'schema_ver');
+      await assert.rejects(
+        db.prepare('UPDATE profiles SET version = -1 WHERE user_id = ?').bind(userId).run(),
+        /CHECK constraint failed/,
+      );
+      await assert.rejects(
+        db.prepare("UPDATE profiles SET published_at = 'today' WHERE user_id = ?").bind(userId).run(),
+        /cannot store TEXT value in INTEGER column/,
+      );
+    });
+
+    it('profiles: users を消すと一緒に消える。retired_usernames は users を指さず、消えない', async () => {
+      const userId = await addUser();
+      await addProfile(userId, 'schema_gone');
+      await db
+        .prepare('INSERT INTO retired_usernames (username, retired_at) SELECT username, ? FROM profiles WHERE user_id = ?')
+        .bind(5, userId)
+        .run();
+      await db.prepare('DELETE FROM users WHERE id = ?').bind(userId).run();
+      assert.equal(await count('profiles', 'user_id', userId), 0);
+      assert.equal(await count('retired_usernames', 'username', 'schema_gone'), 1);
+      // 同じ名前を二度記録しても壊れない（INSERT OR IGNORE で足せる）。主キーは重複を拒否する。
+      await assert.rejects(
+        db.prepare("INSERT INTO retired_usernames (username, retired_at) VALUES ('schema_gone', 6)").run(),
+        /UNIQUE constraint failed: retired_usernames\.username/,
+      );
+    });
+
+    it('retired_usernames: username の CHECK は profiles と同じ', async () => {
+      await assert.rejects(
+        db.prepare("INSERT INTO retired_usernames (username, retired_at) VALUES ('Bad-Name', 1)").run(),
+        /CHECK constraint failed/,
+      );
+    });
   });
 });

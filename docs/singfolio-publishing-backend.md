@@ -1224,7 +1224,8 @@ D1
   identities   ログイン手段（Apple / Google。1ユーザーに複数をつなげられる）
   sessions     セッション（トークンのハッシュ。失効できる）
   used_nonces  使用済みのnonce（リプレイを弾く。期限を過ぎたものは消す）
-  profiles     username・Display Name・Bio・スナップショットの版
+  profiles     username・Display Name と Bio の控え・スナップショットの版・公開中の印（0004）
+  retired_usernames  削除したアカウントの username（再利用させない。ユーザーIDと結びつけない。0004）
   requests     Request（曲ID・曲名・アーティスト名・ニックネーム・日時）
 
 R2
@@ -1242,8 +1243,32 @@ D1に触れない」が成り立たない。
 取れないようにする。紹介ページの最上位のパスが効くのは、紹介ページを `singfolio.app` の最上位へ移す場合だけ
 （今は別のURLにある）。
 
-`username` を変更できるようにするなら、R2のオブジェクトの付け替え（新しいキーへ書き、古いキーを消す）と、
-旧URLの扱いが要る。検証では、変更を許さない形で確かめた。変更の可否は未定。
+`username` は変更を許さない（決定。7.4。「実装時に決めること」）。変更できるようにするなら、R2のオブジェクトの付け替え
+（新しいキーへ書き、古いキーを消す）と、旧URLの扱いが要る。
+
+### 公開プロフィールのエンドポイント（7.4.3）
+
+実装は `worker/src/profile.ts`（エンドポイントと D1 の操作）・`worker/src/username.ts`（規則と予約語）、スキーマは `worker/migrations/0004_profiles.sql`。
+どちらも認証が要る（`Authorization: Bearer <セッションの値>`。ユーザーIDは、セッションから決める）。ヘッダーが無い・形が違う・セッションが無効は 401。
+
+-   **`GET /me/profile`**。200 `{"profile": <Profile>|null}`。`null` は、まだ `username` を確保していない。`Profile` は
+    `{"username","version","published","publishedAt","displayName","bio"}`: `version` は Publish のたびに+1する整数（0 は一度もPublishしていない）、
+    `published` は公開中か、`publishedAt` は最後にPublishした時刻（ミリ秒。非公開なら `null`）、`displayName`・`bio` は最後にPublishした値の控え
+    （まだなら空）。端末は、別の端末・再インストール後に、これで今の公開内容を知る（`baseVersion`。7.4.4）。
+-   **`PUT /me/username`**。`{"username":"…"}` を確保して、200 `{"profile": <Profile>}`。同じアカウントが同じ名前をもう一度確保しても200（何度呼んでも同じ。連打でも）。
+    -   400 `username_invalid`: 規則に合わない（小文字の英数字と `_` の3〜20字。大文字は受け付けない。黙って小文字にしない。アプリが小文字にして送る）。本文の形の不備も400。
+    -   409 `username_unavailable`: 取られている、削除したアカウントの名前（`retired_usernames`）、予約語。**区別しない**（どれも「使えない」）。
+    -   409 `username_already_set`: このアカウントは、すでに別の名前を確保している（変更しない）。
+    -   形の不備（400）は、認証の前に断る。予約語は、認証のあとに 409（未認証の呼び出しには教えない）。
+-   **競合は一意制約に任せる。** `INSERT OR IGNORE`（名前が取られている・このアカウントがすでに確保している、のどちらでも黙って何も入れない）と、このアカウントの行の `SELECT` を
+    1つの `db.batch()` で行い、読んだ行で見分ける。同時の確保（別のアカウントが同じ名前、同じアカウントの連打）でも、勝つのは1つだけで、エラーの文言（`UNIQUE constraint failed: …`）には頼らない。
+    削除したアカウントの名前は、入れる文の条件（`NOT EXISTS (SELECT 1 FROM retired_usernames …)`）で弾く。
+-   **スキーマの CHECK**（`length(username) BETWEEN 3 AND 20 AND username NOT GLOB '*[^a-z0-9_]*'`）は、アプリの検査をすり抜けた値への備え。`retired_usernames` も同じ。
+-   **予約語**（`RESERVED_USERNAMES`）は、Workerのパス（`api`・`auth`・`me`・`oauth` など）、サイトのパス（`images`・`privacy` など）、運営・公式と取り違えやすい名前（`singfolio`・`admin`・
+    `support` など）。足すのはよい。**外す・変えるときは、すでに確保された名前を確かめる**（確保済みの名前が予約語になると、公開ページがそのパスのものに食われる）。
+-   Display Name・Bio は、このエンドポイントでは更新しない（Publish のリクエストに載せる。「公開スナップショットの形と上限」）。
+-   `wrangler dev` で確かめた（`--persist-to` に `migrations apply` で適用したDBを渡し、セッションの行は `wrangler d1 execute --local` で入れた）: 認証なし 401、確保前 `{"profile":null}`、
+    確保 200、同じ名前の再確保 200、別の名前 409 `username_already_set`。
 
 v1.0では導入しない。公開プロフィール機能を実装する段階で導入する。
 
@@ -1411,7 +1436,8 @@ Repositoryを、同じコミットで直せるため）。
     binding のバケットが無いと失敗するので、7.4 のコードのデプロイの前に作る。ローカルの開発・テストでは、バケットを作らずに、ローカルの代用が使われる。
 -   **ローカルのD1の置き場所。** `wrangler.jsonc` に `database_id` を足したので、ローカルのD1のファイル名（ハッシュ）が変わる
     （足す前後の設定で `wrangler d1 migrations apply --local` を比べて確かめた）。`migrations apply` とテスト（`getPlatformProxy`）は
-    同じ設定を読むので一貫する。`wrangler dev` 自身がD1を使う経路は、まだ無い（D1に触れるエンドポイントを足すときに確かめる）。
+    同じ設定を読むので一貫する。`wrangler dev` がD1を使う経路は、7.4.3 のエンドポイントで確かめた（`wrangler dev --persist-to <ディレクトリ>` と `wrangler d1 migrations apply DB --local --persist-to <同じディレクトリ>` を揃える。
+ディレクトリを揃えないと、`wrangler dev` は別の（空の）DBを使う）。
 
 ## 9. 実装順序
 
