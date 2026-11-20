@@ -1704,14 +1704,21 @@ Free の CPU 時間は1リクエスト10ms。「isolate ごとに、たまに上
 -   **CPU時間（実測）。** 公開ページは、閲覧のたびに作る（読み取りと描画。304 は作らない）。`npm run bench:page -- <曲数>`（Node。Apple M4）で、**1000曲は、初回が約3.0ms
     （読み取り 0.9 + 描画 2.1。HTML は約125KiB で、配信時に圧縮される）、温まったあとは約1.1ms**。100曲は、初回が約1.0ms。ローカルの workerd（`wrangler dev`）では、1000曲の GET の所要が、
     curl の壁時計で約6〜9ms（中継を含む。CPU時間ではない）。Cloudflare のエッジは、手元より遅いかもしれない（7.4.11 の Publish は、手元の2〜4倍だった）。
-    **本番のCPU時間は、未確認**（Workers の Metrics の CPU Time per execution で、公開後に見る。WBS 7.7）。上限（Free の 10ms）に近い曲数で、閲覧が多いと効く。
+    **本番のCPU時間（`wrangler tail` の `cpuTime`。7.5.4 で、仮のスナップショットを R2 に置いて測った）**: 3曲は 0〜1ms、1000曲（約200KB。曲名15字・タグ2つ）は 2〜5ms（12回）、
+    304 は 0ms。**Publish できる最大に近い形（1000曲・約490KB。曲名55字・アーティスト35字・タグ4つ。ページは圧縮前で約590KB）は 7〜11ms（11回）で、Free の上限（10ms）を超えた回が2回あった。
+    12回とも 200 で、打ち切りは起きていない**（資料にある繰り越しの余裕で通ったと読めるが、確かめていない）。ふつうの大きさなら余裕があり、上限いっぱいの利用者の公開ページが、
+    閲覧の多いときに打ち切られうる。上限（曲数・本文の大きさ）を保つかは、WBS 7.7 の判断(1)と合わせて決める。Workers の Metrics（Exceeded CPU Time Limits）は、まだ見ていない。
 -   **確かめたこと。** Node のテスト（URL・ヘッダー・ETag・304・301・404・503・CSP のハッシュと HTML の一致・エスケープ・検索とタグの動作。ページのスクリプトは、描画した HTML から作った
     最小のDOMで実行して確かめる。スクリプトの規則を壊すとテストが落ちることも確かめた）、`wrangler dev`（workerd。ローカルのR2）で 200・304・301・404・HEAD・日本語・1000曲、
     ヘッドレスの Chrome（CDP。幅390px）で、ライト・ダークの見た目、CSP の違反とスクリプトの例外が無いこと、検索・タグの絞り込み、横スクロールが無いこと。
     304 のヘッダーの反映は、使い捨ての Node のサーバーと Chrome で確かめた（ETag が同じまま CSP だけ変えた 304 で、保存済みの HTML のインラインの style が止まる）。
--   **確かめていないこと。** 本番での表示、Safari・iOS・Android のブラウザ、日本語IMEでの入力（変換中の絞り込み）、スクリーンリーダー、リンクのプレビュー（`og:image`）、
-    長い曲名・多数のタグでの見た目、本番の CPU 時間、**本番で 304 が実際に返るか**（Cloudflare は、圧縮するときに強い ETag を弱い ETag `W/` に変える。`matchesEtag` は `W/` を外して比べるが、
-    本番でヘッダーが残るかは未確認。`curl` で `If-None-Match` を付けて確かめる）。
+    **本番（7.5.4）**: Worker をデプロイしたあと、仮のスナップショットを R2（`--remote`）に置いて、`curl` で確かめた（終わって削除した。アプリの Publish・Unpublish は通していない）。
+    200（ヘッダー・CSP・`private, no-cache`・`noindex`）、利用者の値のエスケープ、`Accept-Language: ja` で `lang="ja"`、HEAD が GET と同じヘッダー。`If-None-Match` で 304
+    （強い ETag も `W/` 付きも。**Cloudflare は、圧縮（`content-encoding: br`）するとき ETag を `W/` に変えて返し、それを付けて送ると 304 になる**）。違う ETag では 200。
+    R2 のオブジェクトを消すと、次のリクエストから 404。`http://` の GET は 308（`Location` は HTTPS の正規のURL、`no-store`）、`http://` の POST は 403。大文字のパスは 301。
+    存在しない名前は 404（`no-store`）。予約語（`/privacy-policy.html`）と `/` は 404。
+-   **確かめていないこと。** Safari・iOS・Android のブラウザ、日本語IMEでの入力（変換中の絞り込み）、スクリーンリーダー、リンクのプレビュー（`og:image`）、
+    長い曲名・多数のタグでの見た目、本番の Metrics（Exceeded CPU Time Limits。Workers Logs が無効でも見られるか）、アプリから Publish したスナップショットの表示と、アプリの Unpublish での 404。
 -   **決めていないこと。** `singfolio.app/`（ルート）は 404 のまま（紹介ページへ移すかは、別に決める）。Google の同意画面のホームページに `singfolio.app` を使うか（ストア掲載の §6）。
     （サイトの `sitemap.xml`・`robots.txt` は置かない。`noindex` のため。）
 
