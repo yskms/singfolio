@@ -151,6 +151,8 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     「R2を先に書き、成功したらD1の版を更新」に「簡略化」しない（同じ版からの同時の Publish が、負けた側もR2を上書きする）。
 -   公開スナップショット（`snapshot.ts`）は**許可リストで新しく作る**。入力をそのまま（`{ ...song }` で）保存しない。My Key・Private Note・status は型にも入れない。
     上限（曲 **1000**・本文512KiB）は、Free の CPU 10ms に初回でも収まるよう**実測して決めた値**。上げるときは `npm run bench:snapshot` と workerd で実測し直す（3000曲は初回に10msを超えた）。
+    **ただし、本番の実測（7.4.11）では、1000曲の Publish が 8〜19ms で、10ms を超えた回があった（打ち切りは起きていない）。「収まる」と前提にしない。
+    上限を保つかは未決**（docs §8「7.4.11 の本番での確認の結果」、WBS 7.7）。
     Display Name・Bio は Publish のリクエストに載せる（単独で更新するエンドポイントを作らない。D1の `profiles` は最後にPublishした値の控え）。`username` は変更しない（R2のキーに使う）。
     予約語（`username.ts`）を外す・変えるときは、確保済みの名前を確かめる。R2の公開アクセス（r2.dev・カスタムドメイン）は有効にしない（読み書きはWorkerだけ）。
 -   Appleのサーバー間通知（`worker/src/appleNotification.ts`）とセッション発行の競合: **`createSession` の INSERT にある `consent_revoked_at` の条件
