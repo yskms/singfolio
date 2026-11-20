@@ -270,6 +270,8 @@ export const ja: Record<MessageKey, Message> = {
   'publicProfile.republishTitle': 'もう一度公開しますか？',
   'publicProfile.republishMessage':
     'この画面を開いたあとに、このプロフィールは非公開になりました。続けると、この端末の表示名・自己紹介・歌える曲・公開タグで、もう一度公開します。{address} で、誰でも見られるようになります。キー・プライベートメモ・ステータスは公開されません。',
+  'publicProfile.openPage': 'ページを開く',
+  'publicProfile.shareLink': 'リンクを共有',
   'publicProfile.unpublish': '公開をやめる',
   'publicProfile.unpublishNote': '公開ページを見えなくします。この端末の曲は削除されません。',
   'publicProfile.unpublishConfirmTitle': '公開をやめますか？',
@@ -288,6 +290,8 @@ export const ja: Record<MessageKey, Message> = {
   'publicProfile.error.usernameRequired': '先にユーザー名を決めてください。',
   'publicProfile.error.displayNameRequired': '表示名を入力してください。',
   'publicProfile.error.autoSave': 'この設定を保存できませんでした。',
+  'publicProfile.error.openFailed': 'ページを開けませんでした。',
+  'publicProfile.error.shareFailed': 'リンクを共有できませんでした。',
   'publicProfile.error.tooManySongs':
     '歌える曲が多すぎて公開できません。一部を練習中か歌いたいに移して、もう一度お試しください。',
   'publicProfile.error.tooLarge':

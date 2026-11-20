@@ -1,7 +1,19 @@
 import { useNavigation, useRouter } from 'expo-router';
 import { usePreventRemove } from 'expo-router/react-navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import {
+  AccessibilityInfo,
+  ActivityIndicator,
+  Alert,
+  Linking,
+  Platform,
+  Pressable,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Switch,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { PublicProfile, UnpublishedChanges } from '../src/domain/types';
@@ -16,7 +28,7 @@ import { getServices } from '../src/services';
 import type { AutoPublishStatus } from '../src/services/autoPublishService';
 import { PublishError } from '../src/services/errors';
 import { PUBLISH_LIMITS } from '../src/services/publishSnapshot';
-import { isValidUsername, normalizeUsernameInput, publicAddress } from '../src/services/username';
+import { isValidUsername, normalizeUsernameInput, publicAddress, publicUrl } from '../src/services/username';
 import { ActionButton } from './ActionButton';
 import { FormField } from './FormField';
 import { FormInput } from './FormInput';
@@ -336,6 +348,22 @@ export function PublicProfileSection() {
       });
   };
 
+  // 公開ページを、端末のブラウザで開く（アプリ内にブラウザを持たない）。見えるのは、最後に Publish した内容（入力中の下書きではない）。
+  const openPage = (username: string) => {
+    Linking.openURL(publicUrl(username)).catch(() => {
+      if (mountedRef.current) setNotice({ kind: 'error', key: 'publicProfile.error.openFailed' });
+    });
+  };
+
+  // リンクを、OSの共有シートで渡す（コピーも、そこから選べる。クリップボードの依存を足さない）。
+  // iOS は `url`、Android は `message` だけを読む（両方渡すと、iOS で同じものが2回入る送り先がある）。閉じただけは、失敗ではない。
+  const shareLink = (username: string) => {
+    const url = publicUrl(username);
+    Share.share(Platform.OS === 'ios' ? { url } : { message: url }).catch(() => {
+      if (mountedRef.current) setNotice({ kind: 'error', key: 'publicProfile.error.shareFailed' });
+    });
+  };
+
   const confirmClaim = () => {
     const username = normalizeUsernameInput(usernameInput);
     if (!isValidUsername(username) || busyRef.current) return;
@@ -514,6 +542,18 @@ export function PublicProfileSection() {
       {profile !== null && (
         <View style={styles.block}>
           <StatusBlock profile={profile} />
+
+          {profile.published && (
+            // 未公開のときは出さない（ページは 404）。
+            <View style={styles.pageActions}>
+              <View style={styles.pageAction}>
+                <ActionButton label={t('publicProfile.openPage')} onPress={() => openPage(profile.username)} />
+              </View>
+              <View style={styles.pageAction}>
+                <ActionButton label={t('publicProfile.shareLink')} onPress={() => shareLink(profile.username)} />
+              </View>
+            </View>
+          )}
 
           <FormField label={t('publicProfile.displayName')} required>
             <FormInput
@@ -778,6 +818,8 @@ const styles = StyleSheet.create({
   address: { fontSize: 15, lineHeight: 22 },
   counter: { fontSize: 13, lineHeight: 18, textAlign: 'right' },
   changes: { fontSize: 15, lineHeight: 22 },
+  pageActions: { flexDirection: 'row', gap: 12 },
+  pageAction: { flex: 1 },
   auto: { gap: 4 },
   switchRow: { minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   switchLabel: { flexShrink: 1 },

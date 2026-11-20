@@ -326,6 +326,8 @@ export const en = {
   'publicProfile.republishTitle': 'Publish again?',
   'publicProfile.republishMessage':
     'This profile was unpublished since you opened this screen. Continue to publish it again with this device’s Display Name, Bio, Ready songs, and public tags. Anyone can see them at {address}. My Key, Private Note, and status are never shared.',
+  'publicProfile.openPage': 'Open Page',
+  'publicProfile.shareLink': 'Share Link',
   'publicProfile.unpublish': 'Unpublish Profile',
   'publicProfile.unpublishNote': 'Hides your public page. Songs on this device are not deleted.',
   'publicProfile.unpublishConfirmTitle': 'Unpublish your profile?',
@@ -344,6 +346,8 @@ export const en = {
   'publicProfile.error.usernameRequired': 'Choose a username first.',
   'publicProfile.error.displayNameRequired': 'Enter a Display Name.',
   'publicProfile.error.autoSave': 'Couldn’t save this setting.',
+  'publicProfile.error.openFailed': 'Couldn’t open the page.',
+  'publicProfile.error.shareFailed': 'Couldn’t share the link.',
   'publicProfile.error.tooManySongs':
     'You have too many Ready songs to publish. Move some to Practice or Want and try again.',
   'publicProfile.error.tooLarge':

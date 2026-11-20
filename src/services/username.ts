@@ -27,3 +27,8 @@ export function isValidUsername(normalized: string): boolean {
 export function publicAddress(username: string): string {
   return `${PUBLIC_HOST}/${username}`;
 }
+
+/** 公開ページを開く・共有するときのURL（`https://singfolio.app/karaoke_fan`。正規のURL。Worker の正規形と同じ小文字の `username`）。 */
+export function publicUrl(username: string): string {
+  return `https://${publicAddress(username)}`;
+}

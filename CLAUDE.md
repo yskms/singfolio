@@ -252,7 +252,8 @@ PNGのモックアップは画面の参考イメージであり、機能・表�
     空のローカルから公開を消す事故を、これが止める）。進めるのは、Publish・Unpublish の応答と、置き換えの確認（`replaceVersion`）だけ。曲ごとのハッシュに `sortOrder` を含めない
     （曲を足すと、あとの曲が全部「変更あり」になる）。`published_songs` を `songs` の外部キーにしない（曲を消したあとも、公開した記録を残す）。公開タグは、利用者が選んだタグだけ（下の「公開するタグの選び方」）。`publishSnapshot.ts` に正規表現の後読みを書かない（Hermes で未確認。起動の失敗になりうる。テストが検出する）。`publishSnapshot.test.ts` は `worker/src/snapshot.ts` を import する（実行時のコードは共有しない）ので、そのファイルに Workers の型や `worker/` の依存を持ち込まない。
 -   **Public Profile 画面（`app/public-profile.tsx`・`ui/PublicProfileSection.tsx`。7.4.7）。** 詳細は `docs/singfolio-publishing-backend.md` §8「アプリ側の Public Profile 画面」。
-    入口（Profile）もルートも `account.available` のゲートの後ろ（Account と同じ。リリースのビルドでは閉じる）。**Display Name・Bio の下書きは、この画面だけが持ち、保存しない**
+    入口（Profile）もルートも `account.available` のゲートの後ろ（Account と同じ。リリースのビルドでは閉じる）。**公開ページのリンクのコピーは、RN の `Share`（OSの共有シート）で行う。
+    `expo-clipboard` を足さない**（ネイティブの依存が増え、再ビルド・第三者ライセンスの再生成・R8の確認が付く。コピーは共有シートから選べる。`Open Page` は `Linking.openURL`）。**Display Name・Bio の下書きは、この画面だけが持ち、保存しない**
     （初期値はサーバーの `PublicProfile`。端末の `publish_state` ではない）。保存先を足さない（Auto Publish は、Display Name・Bio を載せず、端末が最後に Publish した値で曲の変更だけを送ると決めた。7.4.9b）。最初の公開・Unpublish・`username` の確保・
     版の食い違いの置き換えの確認は外さない（人に見える状態になる・変更できない）。公開中と見て確認なしで送ったのにサーバーが非公開だったときは、置き換えの文言にせず、公開の確認の文言にする。`username` の形の規則は `src/services/username.ts` に、Workerと同じ値を別に持つ。日時は `Intl` を使わない
     （`src/i18n/dateTime.ts`）。失敗の文言は `src/i18n/publishErrors.ts`（Publish の `network` だけ「公開できたか分からない」）。

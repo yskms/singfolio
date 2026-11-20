@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { USERNAME_PATTERN as WORKER_PATTERN } from '../../worker/src/username.ts';
-import { isValidUsername, normalizeUsernameInput, publicAddress, USERNAME_PATTERN } from './username.ts';
+import { isValidUsername, normalizeUsernameInput, publicAddress, publicUrl, USERNAME_PATTERN } from './username.ts';
 
 describe('username', () => {
   it('規則は Worker と同じ（別に持つ値の食い違いを検出する）', () => {
@@ -28,5 +28,9 @@ describe('username', () => {
 
   it('公開ページのアドレスは、ホスト名と名前をつなぐ', () => {
     assert.equal(publicAddress('karaoke_fan'), 'singfolio.app/karaoke_fan');
+  });
+
+  it('開く・共有するURLは、https の正規のURL（アドレスに https:// を付けたもの）', () => {
+    assert.equal(publicUrl('karaoke_fan'), 'https://singfolio.app/karaoke_fan');
   });
 });

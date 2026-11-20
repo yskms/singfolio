@@ -1712,8 +1712,7 @@ Free の CPU 時間は1リクエスト10ms。「isolate ごとに、たまに上
 -   **確かめていないこと。** 本番での表示、Safari・iOS・Android のブラウザ、日本語IMEでの入力（変換中の絞り込み）、スクリーンリーダー、リンクのプレビュー（`og:image`）、
     長い曲名・多数のタグでの見た目、本番の CPU 時間、**本番で 304 が実際に返るか**（Cloudflare は、圧縮するときに強い ETag を弱い ETag `W/` に変える。`matchesEtag` は `W/` を外して比べるが、
     本番でヘッダーが残るかは未確認。`curl` で `If-None-Match` を付けて確かめる）。
--   **決めていないこと。** `singfolio.app/`（ルート）は 404 のまま（紹介ページへ移すかは、別に決める）。アプリの Preview・Copy Link（新しいネイティブの依存を入れるかの判断が要る。
-    画面設計「Public Profile」）。Google の同意画面のホームページに `singfolio.app` を使うか（ストア掲載の §6）。
+-   **決めていないこと。** `singfolio.app/`（ルート）は 404 のまま（紹介ページへ移すかは、別に決める）。Google の同意画面のホームページに `singfolio.app` を使うか（ストア掲載の §6）。
     （サイトの `sitemap.xml`・`robots.txt` は置かない。`noindex` のため。）
 
 ### Cloudflare

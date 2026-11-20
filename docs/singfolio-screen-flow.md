@@ -427,7 +427,7 @@ v1.0では公開プロフィールではなく、端末内のプロフィール�
 Profile の `Public Profile` から開く画面（`app/public-profile.tsx`。連打で重ねない）。`username` の確保・Display Name と Bio・Publish Now・Unpublish・
 状態の表示。アカウントが使えるビルドだけで、画面も、リンク `singfolio://public-profile` では開かず、先頭の画面へ戻す（Account と同じ）。
 **ログインを要求しない**: サインインしていなくても、v1.0の機能は何も変わらない。ここでの失敗は、すべてこの画面の中で伝える（ErrorBoundary には伝えない）。
-公開ページ（7.5.1）はできた。Preview・Copy Link は 7.5.3（コピーに新しい依存が要るかの判断が先）。Auto Publish（7.4.9b）と「N unpublished changes」（7.4.9a）は下。公開するタグの選び方は、下の「Public Tags」（7.4.8）。
+公開ページ（7.5.1）はできた。`Open Page`・`Share Link`（7.5.3）は下。Auto Publish（7.4.9b）と「N unpublished changes」（7.4.9a）は下。公開するタグの選び方は、下の「Public Tags」（7.4.8）。
 
 ``` text
 Public Profile
@@ -475,6 +475,11 @@ Hides your public page. ...
     置き換えるなら、サーバーの今の版で送り直す。**ただし、公開中と見て確認なしで送ったのに、サーバーは非公開だったとき**（画面を開いたあとに、別の端末で非公開にされた）は、
     置き換えの文言ではなく、「もう一度公開しますか」（公開の確認と同じ内容: 誰でも見られるようになる・キーなどは公開されない）を出す。画面の状態は、確認の前に、サーバーの今の内容
     （非公開）に合わせる（取りやめても、今の状態が出る）。
+-   **`Open Page` / `Share Link`**（公開中のときだけ。状態とアドレスの下に2つ並べる。未公開のページは 404 なので出さない）: `Open Page` は、公開ページ
+    （`https://singfolio.app/<username>`）を端末のブラウザで開く（`Linking.openURL`。アプリ内にブラウザを持たない）。見えるのは最後に Publish した内容で、入力中の下書きではない。
+    `Share Link` は、同じURLをOSの共有シート（RN の `Share`）に渡す。**コピーも、そこから選べる**ので、クリップボードの依存（`expo-clipboard`）は足さない
+    （ネイティブの再ビルド・第三者ライセンスの再生成・R8の確認が要らない）。iOS は `url`、Android は `message` だけを渡す（両方渡すと、iOS で同じ文字が2回入る送り先がある）。
+    共有シートを閉じただけは失敗ではない。開けない・共有できないときは、画面の上に1行で出す（ErrorBoundary には伝えない）。
 -   **未公開の変更の数**（Publish Now の上の1行。公開中で、数えられるときだけ）: 最後に Publish したあとの、曲の変更の数（「3 unpublished changes」。変更が無ければ「No unpublished changes」）。
     曲ごとに1つ（追加・曲名やアーティストや公開タグの変更・Ready でなくなった／削除）。並び・Practice や Want の曲・My Key・Private Note は数えない。**Display Name・Bio の下書きも数えない**
     （入力欄が、変更の有無を持つ）。この端末の記録が、画面が最後に読んだサーバーの公開内容と合わないとき（再インストール後・別の端末が Publish したと分かったあと）は出さない（Publish は、置き換えの確認を通る）。
