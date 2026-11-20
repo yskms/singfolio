@@ -1614,7 +1614,8 @@ Android、ダークモード、VoiceOver・TalkBack（状態の行は `accessibi
 手元の測定（約5ms。「余裕2倍」の根拠）より、エッジは遅かった。Free の上限（10ms）を超えた回があったが、打ち切りはされなかった。Cloudflare の資料（Workers の Limits）には、次のように書いてある。
 Free の CPU 時間は1リクエスト10ms。「isolate ごとに、たまに上限を超える場合のための余裕が組み込まれている」。「継続的に上限に達すると、設定された上限で実行が打ち切られる」（クライアントには Error 1102）。
 **「継続的」の基準（回数・割合・期間）は書かれていない**ので、1000曲の Publish が打ち切られる側に入るかは、資料からは分からない。CPU 時間は、`fetch()`・KV・データベースの待ちを数えない（D1・R2 は
-名指しされていない）。Worker の起動の時間を数えるかは書かれていない。`exceededCpu` は analytics と Logpush の outcome として書かれていて、`wrangler tail` の出力についての記述は無い（実測では、`outcome` の欄に `ok` が出た）。
+名指しされていない）。Worker の起動の時間を数えるかは書かれていない。`exceededCpu` は analytics と Logpush の outcome として書かれていて、`wrangler tail` の出力についての記述は無い（実測では、`outcome` の欄に `ok` が出た）。ダッシュボードの Metrics の説明には、CPU 時間の高い分位が上限を超えて見えても、上限を下回るリクエストの CPU 時間の繰り越し（rollover）の仕組みで、
+エラーにならない場合がある、と書かれている（「たまに」の余裕の正体は、この繰り越しだと読めるが、資料はそうは書いていない。繰り越しなら、軽いリクエストが多い間は超過が通り、重い Publish が続くと通りにくくなりうる）。
 
 **見つけたこと**（コードは直していない）
 
@@ -1623,6 +1624,13 @@ Free の CPU 時間は1リクエスト10ms。「isolate ごとに、たまに上
     413（`too-large`）には専用の文言があり、理由が出るが、400 と想定外の失敗では出ない。直す候補は、(a) 案内を「もう一度お試しください」に寄せる、(b) 停止の理由（`rejected` か `error` か）で文言を分ける。
     検証用に SQL で入れた、UUID でない曲 ID で再現した。アプリが作る曲 ID は UUID なので、普通は起きない。
 -   iOS では、SQLite の不正な UTF-8 は、JS に渡る前に U+FFFD に置き換わる。対になっていないサロゲートは、SQLite 経由では再現できない（Node のテストでだけ確かめている）。
+-   **CPU の上限で打ち切られたとき、予約のあとなら、D1 の版だけが +1 になり、R2 は前のままになる。** `handlePublish` は、本文の解析（`readJsonObject`）と検証（`parseSnapshotContent`）を、D1 の版の予約より前に行い、
+    `buildSnapshot`・`serializeSnapshot` と R2 への書き込みを、予約のあとに行う。CPU の打ち切りが例外として `catch`（版の戻し）に届くかは、Cloudflare の資料に書かれていない。届かないとすると、予約のあとで
+    打ち切られた Publish は、D1 の版と控え（Display Name・Bio）が新しいまま、R2 が前の内容のままになり、次の Publish は版の食い違い（置き換えの確認）に、Auto Publish は `stopped(version-conflict)` で止まる
+    （応答が途切れたときと同じ状態。冪等キーの判断と同じ問題）。データは壊れない（`published_at` は立ったまま）。手元の Node のベンチ（1000曲、初回）の内訳は、JSON の解析 約0.7ms・検証 約2.5ms・
+    文字列化 約0.4ms（合計 約3.6ms）で、**約9割が予約より前**。本番の内訳は測っていないが、打ち切りが予約のあとに起きるのは、合計が上限をわずかに超える範囲（予約前の割合が約9割なら、上限の1.1倍まで）に限られる、
+    と推定される。**対応の案**: `serializeSnapshot(buildSnapshot(…))` を予約の前に移す（版は `baseVersion + 1`、時刻は `now` で、予約の前に決まる）。D1 と R2 の書き込みの順序は変えない（CLAUDE.md の「順序は変えない」に
+    反しない）。予約のあとの CPU が、R2 への書き込みの呼び出しだけになる。リリース後は、ダッシュボードの Metrics（Errors の Invocation Statuses の `Exceeded CPU Time Limits`）で見張る（WBS 7.7）。
 -   公開中のアカウントの Publish Now は、変更が0件でも `POST` を送り、版が +1 になる。**この挙動は、決めたものではなく、現状のまま**（`publishService.publish` に0件の分岐は無く、決定は docs にも無い）。
     副作用として、別の端末の Auto Publish が、版の食い違いで止まる。Publish Now は「この端末の内容で置き換える」明示の操作なので、変えるかは未決（案: 曲にも Display Name・Bio にも差が無いときは、確認を出す、または送らない）。
 
@@ -1633,10 +1641,11 @@ Free の CPU 時間は1リクエスト10ms。「isolate ごとに、たまに上
     利用者にどれだけ出て、どれだけ困るか。通信が不安定な環境での頻度を、実機で見る。
 -   Android（Bio のキーボードの余白、スイッチのつまみの色）、ダークモード、VoiceOver・TalkBack、英語の表示。
 -   1000曲の確認・Publish の所要時間の実機での値（Simulator では、画面の表示に約1.2秒、Publish Now の完了まで約2秒）。
--   しばらく使っていない状態（冷えた状態）の CPU 時間。
+-   しばらく使っていない状態（冷えた状態）の CPU 時間と、1000曲の Publish を連続して20回程度送ったときに、打ち切りが出ないか（`exceededCpu`・Error 1102。Metrics の Errors by invocation status と、tail の `outcome` で見る）。
+    判断の基準は、打ち切りが起きるかどうかの1点（案。WBS 7.7）。
 
 **未決**（リリースの前に決める。WBS 7.7）: 曲数の上限（1000）と CPU 時間（上の実測と、Cloudflare の資料の記述。保つか、下げるか、有料プランにするか）、Auto Publish の停止の文言、
-変更0件の Publish Now の扱い、冪等キーの要否。
+変更0件の Publish Now の扱い、冪等キーの要否、CPU の打ち切りと予約の順序（上の案）。
 
 ### Cloudflare
 

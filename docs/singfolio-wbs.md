@@ -410,6 +410,10 @@ v1.0より後（公開機能・Requests）の実装順序は、
     -   7.3.12 の「ユーザーの判断・作業が要る点」（iOS の App プライバシー・Google の同意画面の本番化・Play Console の申告・ポリシーの施行日）と、ポリシー・ストアの申告の反映
         （`singfolio-privacy-policy-next.md` を `privacy-policy.md` に。`singfolio-store-listing.md` §6）。
     -   リリースの手順: `ACCOUNT_ENABLED`（`src/services/index.ts`）と `eas.json` の `account-test` を外す。7.3.13 の確認用ビルドはリリースしない（CLAUDE.md「アカウント（アプリ側）」）。
-    -   7.3.13 の「アカウントを出す版のリリース前に見る」と、7.4.11 の「アカウントを出す版のリリース前に、Android・実機で見る」（Android は Pixel 3 を使う。Google のサインインは Play 署名のビルドが要る）。
-    -   **判断（7.4.11 の所見。§8「7.4.11 の本番での確認の結果」）**: 1000曲の Publish の CPU 時間（保つ・下げる・有料プラン。冷えた状態を含めて、リリース前に測り直す）、Auto Publish の停止の文言、
-        変更0件の Publish Now の扱い、冪等キーの要否。
+    -   7.3.13 の「アカウントを出す版のリリース前に見る」と、7.4.11 の「アカウントを出す版のリリース前に、Android・実機で見る」（Android は実機で。Google のサインインは Play 署名のビルドが要る）。
+    -   **判断（7.4.11 の所見。§8「7.4.11 の本番での確認の結果」）**: (1) 1000曲の Publish の CPU 時間（保つ・下げる・有料プラン）。**基準は、打ち切りが起きるかどうかの1点（案）**: 冷えた状態を含め、1000曲の Publish を
+        連続して20回程度送り、`exceededCpu`・Error 1102 が1回でも出たら、下げるか有料プランにする。出なければ保つ。(2) CPU の打ち切りが予約のあとに起きたときの不整合を防ぐ、`serializeSnapshot` を予約の前に
+        移す変更（§8）。(3) Auto Publish の停止の文言。(4) 変更0件の Publish Now の扱い。(5) 冪等キーの要否。
+    -   **リリース後の見張り**: ダッシュボードの Workers の Metrics（Errors の Invocation Statuses の `Exceeded CPU Time Limits`、CPU Time per execution の分位）。Workers Logs が無効でも見られるかは、
+        資料に前提として書かれていないが、確かめていない（デプロイした Worker で確かめる）。Error 1102 に付く HTTP ステータスは資料に無く、アプリが 5xx（`unavailable`）として受け取るかは未確認
+        （利用者の報告では気づけない前提で、Metrics を見る）。
