@@ -313,27 +313,42 @@ Apple へ送る検索語があるため、次の1項目を申告する。他は�
 プライバシーポリシーは `docs/singfolio-privacy-policy-next.md` に下書きがある（反映の手順はそのファイル先頭）。
 サーバーが保存するもの・保存期間・削除は、`docs/singfolio-publishing-backend.md` §8 が正。
 
+**公開機能（7.4。Public Profile・Publish）を含む版の申告も、ここに足した（7.4.10）。** 公開ページ（7.5）が出る版と一緒に出す前提。
+7.5（視聴者のアクセス）・7.6（Requests。視聴者の入力・ニックネーム・Turnstile）の申告は、その作業で足す。
+公開機能を含まない版（アカウントだけ）を先に出すなら、「公開される内容」と、公開に関する行（下で「公開機能」と付けたもの）は外す。
+
 ### 共通
 
 -   **削除の窓口**: プライバシーポリシーの「アカウントの削除」の節（英語 `#delete-account`、日本語 `#delete-account-ja`）。
     連絡先は `yskms.studio@gmail.com`（メール）。アプリ内の削除（Settings > Account > Delete account）が主で、メールは手順の案内まで。
-    運営者は、メールからアカウントを引けない（メールアドレスも名前も保存しない）ので、サインインできない人は、1年の自動削除を待つ。
+    運営者は、メールからアカウントを引けない（メールアドレスも名前も保存しない）ので、サインインできない人は、1年の自動削除を待つ
+    （**公開ページのあるアカウントは自動削除の対象外**なので、サインインできない人の公開ページは、自動では消えない。下の「公開機能」）。
     ポリシーにそのまま書いた。
--   **保存期間**: 削除するまで、または最後に使ってから1年。削除後も、D1の自動の復旧履歴に最大30日残りうる
+-   **保存期間**: 削除するまで、または最後に使ってから1年（公開ページのあるアカウントは、公開をやめるか削除するまで）。削除後も、D1の自動の復旧履歴に最大30日残りうる
     （[D1 Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/)。Freeは7日、Paidは30日）。
 -   サーバーが受け取るが保存しないもの: Googleのトークンの `email`・`name`・`picture` など（`sub` だけを読む）。
     Appleは、名前もメールも求めない（スコープが空）。
+-   **公開機能: 公開される内容**（Publish したとき。誰でも開ける公開ページに載る）: Display Name・Bio（利用者が入力した文字）、`username`（最初の公開の前に決める。変更できない）、
+    ステータスが Ready の曲の曲名・アーティスト・曲のID・並び順、利用者が公開に選んだタグ（既定は全部非公開）。**公開しないもの**: My Key・Private Note・ステータス（Practice・Want の曲は
+    曲ごと公開しない）・選んでいないタグ・アカウントの識別子。いずれも、サーバーに、最初から送らない（許可リストで作る。§8「公開スナップショットの形と上限」）。
+-   **公開機能: 削除したあとに残るもの**: `username` だけ。ユーザーIDと結びつけずに残し、ほかの人が取れないようにする（配ったURLが、別の人のページを指さないため）。
+    公開をやめると（Unpublish）、公開用のコピーは消えるが、`username` と、最後の Display Name・Bio の控えは、アカウントの削除まで残る。
+    アカウントの削除では、公開用のコピーも、控えも消える（`username` を除く）。**Play の「データの削除」の申告は、この残るものを書く**。ポリシーにそのまま書いた。
 
 ### App Store（iOS）
 
--   **App プライバシー**（アカウントを出す版）: 次の2項目を申告する。他は「収集しない」。
+-   **App プライバシー**（アカウントを出す版）: 次の項目を申告する。他は「収集しない」。
 
 | データの種類 | 収集 | ユーザーに紐付け | トラッキング | 目的 |
 |---|---|---|---|---|
 | 検索履歴（Search History） | する | しない | しない | アプリの機能 |
 | ユーザーID（User ID） | する | する | しない | アプリの機能 |
+| その他のユーザーコンテンツ（Other User Content）。公開機能 | する | する | しない | アプリの機能 |
 
-    -   ユーザーIDは、サーバーが保存する、AppleまたはGoogleが付ける識別子（`sub`）。アカウントに紐付く。
+    -   ユーザーIDは、サーバーが保存する、AppleまたはGoogleが付ける識別子（`sub`）と、公開機能の `username`（利用者が決める。画面名・ハンドルに当たる）。アカウントに紐付く。
+    -   その他のユーザーコンテンツは、公開機能（Publish）で送る Bio・Ready の曲の曲名とアーティスト・公開タグの名前。公開ページに載り、アカウントに紐付く。
+    -   **決めること（提出の画面で、データの種類の説明文を読んで）**: 利用者が Display Name に実名を入れうる。Apple の「名前（Name）」に当たるかは、説明文で確かめる
+        （当たるなら、表に足す。サーバーは Display Name を、アカウントの名前とは別の、利用者が打った文字として保存する）。
     -   名前・メールアドレスは、サーバーが保存しないので、収集に数えない（トークンの中を通るだけ）。Appleの定義で「収集」にならないことを、
         申告の画面の説明文で、提出のときに確かめる。
     -   **決めること（SDK のマニフェスト）**: 下の「SDK のプライバシーマニフェスト」参照。Googleのサインインを iOS に入れる限り、この表で足りるかを決める必要がある。
@@ -343,11 +358,17 @@ Apple へ送る検索語があるため、次の1項目を申告する。他は�
 -   **App Review のメモ**に足す文（§2 の英文の「No account or sign-in is required.」を、次に直す）:
 
 ```text
-An account is optional. Nothing in the app requires one, and signing in does not upload any songs. Settings tab > Account offers Sign in with Apple and Sign in with Google. A reviewer can sign in with their own Apple Account and delete the account from the same screen (Delete account asks for the same sign-in again). The server stores only an opaque account identifier and when it was last used; it stores no name or email address. Accounts unused for one year are deleted automatically. Deleting an account does not delete songs, which stay on the device.
+An account is optional. Nothing in the app requires one, and signing in does not upload any songs. Settings tab > Account offers Sign in with Apple and Sign in with Google. A reviewer can sign in with their own Apple Account and delete the account from the same screen (Delete account asks for the same sign-in again). The server stores only an opaque account identifier and when it was last used; it stores no name or email address. Accounts unused for one year are deleted automatically, except accounts with a published profile. Deleting an account does not delete songs, which stay on the device.
+
+Optionally, a signed-in user can publish a public profile (Profile tab > Public Profile). The Display Name, Bio, and username they type, their songs marked Ready (title and artist), and the tags they choose to make public are then shown on a web page at singfolio.app/<username>. Nothing is published until the user taps Publish Now, and Unpublish Profile removes it. My Key, private notes, and status are never sent. Delete account also removes the published profile.
 ```
 
-    審査用のデモアカウントは不要（アカウントが無いと使えない機能が無い）。「サインインが必要です」はオフのまま。
--   **年齢指定（Age Rating）**: 変わらない（ユーザー生成コンテンツを他の人へ共有する機能は無い）。
+    審査用のデモアカウントは不要（アカウントが無いと使えない機能が無い。公開は、審査員が自分のAppleアカウントで、username を決めて試せる）。「サインインが必要です」はオフのまま。
+    公開機能を含まない版では、後半の段落（Optionally, ...）は書かない。
+-   **年齢指定（Age Rating）**: **見直す**。v1.0 は、ユーザーが作る内容が端末内にとどまるので「ユーザー生成コンテンツ」を「いいえ」にしていたが、公開機能では、利用者が入力した文字
+    （Display Name・Bio・曲名・タグ）が、公開ページで他の人に見える。提出の画面の質問文を読んで、「ユーザー生成コンテンツ」などの答えを決める（Yes にすると、
+    ガイドライン 1.2 の要件が関わるかを、審査の見立てとして `../singfolio-private` に書いた）。公開ページには、視聴者どうしのやり取りは無い（Requests は 7.6）。
+    「制限のないWebアクセス」は、アプリ内にブラウザを持たないので「いいえ」のまま（公開ページを開く Preview を足すときに見直す。7.5）。
 
 ### Google Play（Android）
 
@@ -358,6 +379,14 @@ An account is optional. Nothing in the app requires one, and signing in does not
 | アプリのアクティビティ > アプリ内の検索履歴 | する | する（Apple） | アプリの機能 | 任意（設定の「候補」で、オフにできる） |
 | 個人情報 > ユーザーID | する | しない | アプリの機能・アカウント管理 | 任意（サインインしなければ、収集しない） |
 | 個人情報 > 名前、メールアドレス | する（一時的に処理） | しない | アカウント管理 | 任意（Googleでサインインしたときだけ） |
+| アプリのアクティビティ > その他のユーザー作成コンテンツ。公開機能 | する | しない（利用者が公開する） | アプリの機能 | 任意（公開しなければ、収集しない） |
+| 個人情報 > 名前（Display Name）。公開機能 | する | しない（利用者が公開する） | アプリの機能 | 任意（公開するときだけ） |
+
+    -   **ユーザーID**に、公開機能の `username` も含む（Play の「ユーザーID」は、アカウント名も含むと読む。フォームで確かめる）。
+    -   **その他のユーザー作成コンテンツ**: 公開機能（Publish）で送る Bio・Ready の曲の曲名とアーティスト・公開タグの名前。公開ページに載る。
+    -   **名前（Display Name）の行**: 利用者が打つ文字で、実名とは限らないが、入れうる。上の「名前、メールアドレス（一時的に処理）」の行とは別で、こちらは**保存する**
+        （サーバーが、最後に公開した Display Name・Bio を控えとして持つ）。データの種類をどれに当てるかは、フォームで確かめる。
+    -   「共有」: 利用者が自分で公開するデータは、サービス提供者や第三者への転送ではなく、利用者の操作で公開する、と読む。Playの定義は、申告のときに確かめる。
 
     -   **名前・メールアドレスの行（一時的な処理）**: Googleのトークン（`email`・`name`・`picture`）は、サーバーに届く。保存せず、ログにも出さず、`sub` だけを読む。
         Play の「収集」は、端末の外へ送ることを指す。Playの資料は、リアルタイムの要求を処理する間だけメモリに置くデータ（一時的な処理）も、フォームの回答には
@@ -368,7 +397,8 @@ An account is optional. Nothing in the app requires one, and signing in does not
     -   データは、転送中に暗号化される（HTTPS）。
     -   **削除をリクエストする手段**: アプリ内（Settings > Account > Delete account）は、ある。**Webの窓口は、実態として案内のみ**で、Webから削除を
         リクエストして実行させることは、できない。ポリシーの節（`#delete-account`）には、メールの連絡先と、アプリ内の手順、サインインできない人は
-        1年の自動削除を待つこと、保存期間（最大30日の復旧履歴）が書いてある。メールは、手順の案内までで、運営者は、メールからアカウントを引けない
+        1年の自動削除を待つこと（公開ページのあるアカウントは除く。その人は、ページのアドレスと理由をメールで送る。個別に判断する、と書いた暫定の文。7.5 で窓口を決める）、
+        保存期間（最大30日の復旧履歴）、削除後に残る `username` が書いてある。メールは、手順の案内までで、運営者は、メールからアカウントを引けない
         （メールアドレスも名前も保存しない）。Playは、Webの窓口に、アプリを入れ直させずに、削除をリクエストできることを求める（Play Console ヘルプ
         「Understanding Google Play's app account deletion requirements」。自動でなくてよく、単純なフォームと後日の対応でもよい、とされる）。
         **この窓口が要件を満たすと読まれるかは、未確認。「設ける」と申告する前に、実態どおりか確かめる。**
@@ -380,7 +410,11 @@ An account is optional. Nothing in the app requires one, and signing in does not
     プライバシーポリシーのURLが要る（ホームページは検証済みのドメインに置く、とGoogleの資料にある。`yskms.github.io` が条件を満たすかは、資料に書かれていない。
     満たさないなら、`singfolio.app`（7.5 の公開Web）にポリシーを置く）。基本のスコープ（`openid`・`email`・`profile`）だけなので、機密のスコープの検証は不要
     （Googleの資料。テストユーザー以外で入れるかは、7.3.13 で確かめる）。ロゴを付けない間は、同意画面にアプリ名ではなくドメインが出る。
--   **ターゲット ユーザー・コンテンツのレーティング**: 変わらない。
+-   **ターゲット ユーザー**: 変わらない。
+-   **コンテンツのレーティング**（IARC の質問）と、**ユーザー作成コンテンツ（UGC）の申告**: 公開機能を含む版は、**見直す**。利用者が入力した文字が、公開ページで他の人に見える。
+    質問文を読んで答える（iOS の年齢指定と同じ理由）。公開ページには、視聴者どうしのやり取りは無い（Requests は 7.6）。
+-   **アプリ内で一部のデータだけを削除する手段**: 「公開をやめる」（Public Profile > Unpublish Profile）で、公開用のコピーを消せる（アカウントは残る）。
+    Play のフォームで、アカウント全体の削除とは別の手段として申告できるかは、フォームで確かめる。残るもの（`username`・控えの Display Name・Bio）は、上の「削除したあとに残るもの」のとおり書く。
 
 ### SDK のプライバシーマニフェスト（iOS。読み直した版: 2026-11-18）
 
