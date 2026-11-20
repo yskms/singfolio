@@ -17,11 +17,13 @@
 
   7.4.10: 公開機能（Public Profile・Publish。7.4）の内容を足した（「Public profile」の節。要約・保存するもの・削除・自動削除の説明も直した）。
   公開ページ（7.5）が出る版と一緒に出す前提で書いている（公開ページが無いと「誰でも開ける」が成り立たない）。
-  まだ入っていないもの: 7.5（視聴者のアクセス。Cloudflare が視聴者のIPを扱うこと、キャッシュによる削除の反映の遅れ、検索エンジン）と、
-  7.6（Requests。視聴者の入力・Turnstile・ニックネーム）。「サインインできない人の公開ページ」の文は、7.5 で取り下げの窓口を決めるまでの暫定。
-  スナップショットの `version`・`publishedAt`（最後に公開した時刻と内部の版の番号）は、「What is published」に載せ済み。
-  7.5 で、公開ページがこれらを出さないと決めたら、「What is published」から外す（R2 のスナップショットには入っているので、
-  外す場合は、公開用のコピーに含まれることを、保存するものの側に書き直す）。
+  7.5（公開ページ）: 「Visitors to a public profile」の節（視聴者のアクセス）を足し、取り下げの窓口（ページ末尾の「Report this page」とメール）を書いた。
+  公開ページは、スナップショットの `version`・`publishedAt`（最後に公開した時刻と内部の版の番号）と、曲の識別子を出さないので、
+  前者は「What is published」から外し、保存するものの側（R2 の公開用のコピー）に書き直した。**7.6（Requests）で曲の識別子をページに出すなら、
+  「What is published」の曲の項目は、そのままでよい（識別子は、すでに載せてある）。**
+  まだ入っていないもの: 7.6（Requests。視聴者の入力・Turnstile・ニックネーム）。
+  **「Visitors」の節の事実（Cloudflare が扱う情報、開発者が個別の閲覧のログを持たないこと）は、アカウントを出す版のリリースの前に、実際の設定で確かめる**
+  （Workers Logs は無効で、`worker/test/config.test.ts` が固定している。Cloudflare のダッシュボードの解析・セキュリティのイベントに、何が出るかは、本番で見る。WBS 7.7）。
   事実の出どころは §8 の「Publish と Unpublish のエンドポイント」「公開スナップショットの形と上限」「公開するタグの選び方」「Auto Publish」
   「未使用のアカウントの自動削除」。公開する項目・自動削除の対象外の条件を変えるときは、ここも一緒に直す。
 -->
@@ -93,7 +95,6 @@ What is published:
 - Your username. You choose it before your first publish, and it becomes part of the page’s address. It cannot be changed afterwards.
 - Your songs whose status is Ready: title and artist, an identifier the App made up for the song, and the order in which they appear.
 - Tags: only the tags you have turned on in Public Tags, and only on the Ready songs that have them. No tag is public by default.
-- The time of your last publish, and an internal version number that changes each time you publish.
 
 What is not published: your key, private notes, and status (so songs you are practicing or want to sing are not published at all), tags you have not turned on, your account identifier, and your sign-in method.
 
@@ -104,11 +105,22 @@ How publishing works:
 - *Publish Now* sends your Display Name, Bio, and Ready songs to the developer’s server. The server saves them as one published copy, replacing the previous copy. What visitors see is the last published copy, not your current list; changes on your device appear only when you publish again.
 - *Publish changes automatically* is off by default, and you can turn it on only while your profile is published. When it is on, the App sends changes to your songs and public tags a short time after you make them, together with the Display Name and Bio you published last. The App does not publish a Display Name or Bio you are still typing.
 - Publishing connects to the developer’s server while you are signed in, as does opening Public Profile. This counts as using your account (see below).
-- The published copy is stored on Cloudflare (R2). The server also keeps, in its database, your username, the time and version number of your last publish, and a copy of the Display Name and Bio you last published, so that the App can show them again on a new device.
+- The published copy is stored on Cloudflare (R2). It also contains the time of your last publish and an internal version number that changes each time you publish; the page does not show them. The server also keeps, in its database, your username, the time and version number of your last publish, and a copy of the Display Name and Bio you last published, so that the App can show them again on a new device.
 
 *Unpublish Profile* removes the published copy from the server, and the page stops being shown. The server keeps your username (still reserved for you) and the copy of your last Display Name and Bio until your account is deleted, either by you or automatically after one year without use (an unpublished account is no longer exempt from automatic deletion). Your songs on your device are not changed. Copies that others made while the page was visible, for example screenshots, are outside the developer’s control.
 
 When you delete your account, the published copy and everything else the server stores about the account are deleted. **The one thing that stays is your username**, kept without any link to you or your account, so that no one else can take over an address you may have shared. Please choose a username you are comfortable with being kept this way. The copy of your Display Name and Bio can remain for up to 30 days in the hosting provider’s automatic database recovery history, like other account data (see below).
+
+### Visitors to a public profile {#visitors}
+
+Anyone can open a public profile page, without signing in or installing the App. The page is served by the developer’s server on Cloudflare.
+
+- **What the page shows.** Only what is listed under “Public profile (optional)” above. Nothing else is shown, and there is nothing to sign in to.
+- **What happens when someone opens a page.** As with any website, Cloudflare processes technical information about each request, such as the visitor’s IP address and the browser’s headers, to deliver the page and to protect it from abuse. The developer does not keep logs of individual visits and does not receive a list of visitors. Cloudflare gives the developer aggregate traffic statistics, such as the number of requests.
+- **Cookies, analytics, and other sites.** The page does not set cookies, does not use advertising or analytics services, and does not load fonts, scripts, or images from other sites. Search and tag filtering run in the visitor’s browser; what a visitor types is not sent anywhere. The page has links to the Singfolio introduction page (hosted on GitHub Pages) and a “Report this page” link that opens an email; those open only when the visitor chooses to, and are governed by the other service’s own practices.
+- **Search engines.** The page asks search engines not to list it (`noindex`). This is a request: the developer cannot remove copies that a search engine or another service has already made.
+- **When you unpublish or delete.** The page stops being shown from the next time anyone opens it (browsers check with the server on every visit). A tab that is already open, or a page a browser shows with its back button, can still show what it had loaded.
+- **Reporting a page.** Every page has a “Report this page” link at the bottom. It opens an email to the address below, with the page’s address in the subject. The developer reviews reports and can take a page down.
 
 ### Signing out and deleting your account (Singfolio, by yskms) {#delete-account}
 
@@ -119,7 +131,7 @@ When you delete your account, the published copy and everything else the server 
 
 **If you cannot sign in** (for example, your Apple or Google account is no longer available, or you lost your device). The developer’s server does not store names or email addresses, so the developer cannot find your account from an email address, and cannot verify who you are. Instead, an account that has not been used for one year is deleted automatically, **unless it has a published profile**. “Used” means signing in, signing out, or using another feature that connects to the developer’s server: “Sign out of other devices”, and, while you are signed in, opening Public Profile, publishing, unpublishing, and automatic publishing when it sends changes. Opening the Account screen does not connect to the server, and neither does using the App on your device alone. So unless you do one of those things within a year, your account can be deleted even if you keep using the App for your songs. If you claimed a username but never published, your username is kept as described under “Public profile (optional)” when the account is deleted. When an account is deleted automatically, the connection under “Sign in with Apple” in your Apple Account settings stays until you remove it yourself.
 
-**If your profile is published and you cannot sign in.** An account with a published profile is not deleted automatically, so the page stays until you unpublish it or delete the account, which you can only do while signed in. If you need a page taken down and cannot sign in, email the address below with the page’s address (`singfolio.app/<username>`) and the reason. The developer cannot verify who owns an account, so such requests are handled case by case. If you unpublish, the account is again subject to automatic deletion after one year without use.
+**If your profile is published and you cannot sign in.** An account with a published profile is not deleted automatically, so the page stays until you unpublish it or delete the account, which you can only do while signed in. If you need a page taken down and cannot sign in, use the “Report this page” link at the bottom of the page, or email the address below with the page’s address (`singfolio.app/<username>`) and the reason. The developer cannot verify who owns an account, so such requests are handled case by case. If you unpublish, the account is again subject to automatic deletion after one year without use.
 
 **How long data is kept.** Account data is kept until you delete the account, or for one year after you last used it as described above. A published profile, and the account that has it, are kept until you unpublish or delete. After deletion, account data (including the saved Display Name and Bio) can remain for up to 30 days in the hosting provider’s automatic database recovery history, and is then gone. Your username is the one exception: it is kept, with no link to you or your account.
 
@@ -210,7 +222,6 @@ Appleから受け取った結果は、候補の表示以外には使いません
 - ユーザー名。最初の公開の前に、自分で決めます。ページのアドレスの一部になり、あとから変更できません。
 - ステータスがReadyの曲: 曲名とアーティスト、本アプリが曲につけた識別子、並び順。
 - タグ: 「公開タグ」でオンにしたタグだけが、そのタグの付いたReadyの曲に表示されます。どのタグも、初期状態では公開されません。
-- 最後に公開した時刻と、公開するたびに変わる、内部の版の番号。
 
 公開されないもの: 自分のキー、非公開メモ、ステータス（練習中・歌いたい曲は、曲ごと公開されません）、オンにしていないタグ、アカウントの識別子、サインインの手段。
 
@@ -221,11 +232,22 @@ Appleから受け取った結果は、候補の表示以外には使いません
 - 「今すぐ公開」は、表示名・自己紹介・Readyの曲を、開発者のサーバーへ送ります。サーバーは、それを1つの公開用のコピーとして保存し、前のコピーを置き換えます。閲覧する人に見えるのは、最後に公開したコピーで、今の曲のリストではありません。端末での変更は、もう一度公開したときに反映されます。
 - 「変更を自動で公開」は、初期状態でオフで、公開している間だけ、オンにできます。オンのときは、曲や公開タグを変えてから少し待って、その変更を、最後に公開した表示名・自己紹介と一緒に送ります。入力の途中の表示名・自己紹介は、公開しません。
 - 公開するとき、また「公開プロフィール」の画面を開いたとき、サインイン中の本アプリは、開発者のサーバーにつながります。これは、アカウントを「使った」に数えます（下を参照）。
-- 公開用のコピーは、Cloudflare（R2）に保存します。サーバーのデータベースには、ユーザー名、最後に公開した時刻と版の番号、最後に公開した表示名・自己紹介のコピーも保存します（新しい端末でも、公開中の内容を本アプリに表示するためです）。
+- 公開用のコピーは、Cloudflare（R2）に保存します。コピーには、最後に公開した時刻と、公開するたびに変わる内部の版の番号も入っていますが、ページには表示しません。サーバーのデータベースには、ユーザー名、最後に公開した時刻と版の番号、最後に公開した表示名・自己紹介のコピーも保存します（新しい端末でも、公開中の内容を本アプリに表示するためです）。
 
 「公開をやめる」は、公開用のコピーをサーバーから削除し、ページは表示されなくなります。ユーザー名（引き続き、あなたのために確保されます）と、最後の表示名・自己紹介のコピーは、アカウントが削除されるまで（ご自身での削除、または1年間使わなかったときの自動削除。公開をやめたアカウントは、自動削除の対象外ではなくなります）、サーバーに残ります。端末内の曲は変わりません。ページが見えていた間に、ほかの人が作ったコピー（スクリーンショットなど）は、開発者の手の届かないところにあります。
 
 アカウントを削除すると、公開用のコピーと、アカウントについてサーバーが保存しているものは、すべて削除されます。**残るのは、ユーザー名だけです。** あなたやアカウントとは結びつけずに残し、あなたが配ったかもしれないアドレスを、ほかの人が使えないようにします。このように残っても構わないユーザー名を選んでください。表示名・自己紹介のコピーは、ほかのアカウントのデータと同様に、運用先の自動のデータベース復旧用の履歴に、最大30日間残ることがあります（下を参照）。
+
+### 公開プロフィールを見る人 {#visitors-ja}
+
+公開プロフィールのページは、誰でも、サインインも本アプリのインストールもせずに開けます。ページは、Cloudflare上の開発者のサーバーが配信します。
+
+- **ページに表示されるもの。** 上の「公開プロフィール（任意）」に書いたものだけです。それ以外は表示せず、サインインする場所もありません。
+- **ページを開いたとき。** ほかのWebサイトと同じく、Cloudflareは、ページを配信し、不正から守るために、リクエストの技術的な情報（見る人のIPアドレス、ブラウザのヘッダーなど）を処理します。開発者は、個別の閲覧のログを保存せず、閲覧した人の一覧も受け取りません。Cloudflareからは、リクエスト数などの集計の統計だけを受け取ります。
+- **Cookie・アクセス解析・ほかのサイト。** ページは、Cookieを設定せず、広告サービス・アクセス解析サービスを使わず、ほかのサイトのフォント・スクリプト・画像を読み込みません。検索とタグの絞り込みは、見る人のブラウザの中で動き、入力した文字はどこにも送られません。ページには、Singfolioの紹介ページ（GitHub Pagesにあります）へのリンクと、メールを開く「このページを報告」のリンクがあります。これらは、見る人が選んだときだけ開き、相手のサービス自体の扱いに従います。
+- **検索エンジン。** ページは、検索エンジンに載せないよう求めています（`noindex`）。これはお願いで、検索エンジンやほかのサービスがすでに作ったコピーを、開発者は消せません。
+- **公開をやめる・削除したとき。** そのあと誰かが開いたときから、ページは表示されなくなります（ブラウザは、開くたびにサーバーに確かめます）。すでに開いているタブや、ブラウザの「戻る」で出るページには、読み込んだ内容が残ることがあります。
+- **ページの報告。** どのページにも、末尾に「このページを報告」のリンクがあります。下のメールアドレスあてのメールが開き、件名にページのアドレスが入ります。開発者は報告を確認し、ページを取り下げることがあります。
 
 ### サインアウトとアカウントの削除（Singfolio、yskms） {#delete-account-ja}
 
@@ -236,7 +258,7 @@ Appleから受け取った結果は、候補の表示以外には使いません
 
 **サインインできない場合**（たとえば、AppleやGoogleのアカウントが使えなくなった、端末をなくした）。開発者のサーバーは、名前もメールアドレスも保存しないため、開発者は、メールアドレスからアカウントを探せず、本人かどうかも確かめられません。代わりに、1年間使われなかったアカウントは、自動で削除します。**ただし、公開プロフィールを公開しているアカウントは除きます。** 「使った」とは、サインイン、サインアウト、またはそのほかの、開発者のサーバーにつながる機能を使うことです。「ほかの端末をすべてサインアウト」と、サインイン中の、「公開プロフィール」の画面を開く・公開する・公開をやめる、また「変更を自動で公開」が変更を送ったときです。「アカウント」の画面を開くだけではサーバーにつながらず、端末の中だけで本アプリを使っても、サーバーにはつながりません。そのため、1年のあいだに、これらのどれかをしないと、曲の管理を続けていても、アカウントが削除されることがあります。ユーザー名を決めただけで公開しなかった場合も、アカウントを削除するときに、ユーザー名は「公開プロフィール（任意）」に書いたとおり残ります。自動で削除したときは、Apple Accountの設定の「Appleでサインイン」の連携は、ご自身で削除するまで残ります。
 
-**公開プロフィールを公開していて、サインインできない場合。** 公開プロフィールを公開しているアカウントは、自動では削除しません。そのため、公開をやめるか、アカウントを削除するまで、ページは残ります（どちらも、サインインしているときだけできます）。サインインできず、ページを取り下げたいときは、下のメールアドレスへ、ページのアドレス（`singfolio.app/<ユーザー名>`）と理由を送ってください。開発者は、アカウントの持ち主を確かめられないため、こうした依頼は、個別に判断します。公開をやめると、アカウントは、1年間使わなければ自動で削除される対象に戻ります。
+**公開プロフィールを公開していて、サインインできない場合。** 公開プロフィールを公開しているアカウントは、自動では削除しません。そのため、公開をやめるか、アカウントを削除するまで、ページは残ります（どちらも、サインインしているときだけできます）。サインインできず、ページを取り下げたいときは、ページ末尾の「このページを報告」のリンクを使うか、下のメールアドレスへ、ページのアドレス（`singfolio.app/<ユーザー名>`）と理由を送ってください。開発者は、アカウントの持ち主を確かめられないため、こうした依頼は、個別に判断します。公開をやめると、アカウントは、1年間使わなければ自動で削除される対象に戻ります。
 
 **保存期間。** アカウントのデータは、アカウントを削除するまで、または上のとおり最後に使ってから1年間、保存します。公開プロフィールと、それを持つアカウントは、公開をやめる、または削除するまで、保存します。削除したあとも、アカウントのデータ（保存してある表示名・自己紹介を含む）は、運用先の自動のデータベース復旧用の履歴に、最大30日間残ることがあり、その後、なくなります。ユーザー名だけは例外で、あなたやアカウントと結びつけずに、残します。
 

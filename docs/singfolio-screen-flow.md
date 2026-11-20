@@ -427,7 +427,7 @@ v1.0では公開プロフィールではなく、端末内のプロフィール�
 Profile の `Public Profile` から開く画面（`app/public-profile.tsx`。連打で重ねない）。`username` の確保・Display Name と Bio・Publish Now・Unpublish・
 状態の表示。アカウントが使えるビルドだけで、画面も、リンク `singfolio://public-profile` では開かず、先頭の画面へ戻す（Account と同じ）。
 **ログインを要求しない**: サインインしていなくても、v1.0の機能は何も変わらない。ここでの失敗は、すべてこの画面の中で伝える（ErrorBoundary には伝えない）。
-Preview・Copy Link は公開ページ（7.5）ができてから。Auto Publish（7.4.9b）と「N unpublished changes」（7.4.9a）は下。公開するタグの選び方は、下の「Public Tags」（7.4.8）。
+公開ページ（7.5.1）はできた。Preview・Copy Link は 7.5.3（コピーに新しい依存が要るかの判断が先）。Auto Publish（7.4.9b）と「N unpublished changes」（7.4.9a）は下。公開するタグの選び方は、下の「Public Tags」（7.4.8）。
 
 ``` text
 Public Profile
