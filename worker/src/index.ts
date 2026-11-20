@@ -6,12 +6,14 @@ import { handleLogin, handleLogout, handleLogoutOthers, handleNonce } from './au
 import { httpsRequiredResponse, isInsecureRequest } from './https.ts';
 import { runInactiveAccountDeletion } from './inactiveAccounts.ts';
 import { handleClaimUsername, handleGetProfile } from './profile.ts';
+import { handlePublicPage, insecurePublicPageRedirect, publicPageTarget } from './publicPage.ts';
 import { handlePublish, handleUnpublish } from './publish.ts';
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     // 何よりも先に、HTTPSでないリクエストを、中身を見ずに拒否する（src/https.ts）。
-    if (isInsecureRequest(request)) return httpsRequiredResponse();
+    // ただし、公開ページ（7.5）の GET・HEAD だけは、HTTPS の正規のURLへ移す（秘密が無い。理由は src/publicPage.ts）。
+    if (isInsecureRequest(request)) return insecurePublicPageRedirect(request) ?? httpsRequiredResponse();
 
     const { pathname } = new URL(request.url);
     if (pathname === '/auth/nonce') return handleNonce(request, env, Date.now());
@@ -27,6 +29,9 @@ export default {
     if (pathname === '/me/username') return handleClaimUsername(request, env, Date.now());
     if (pathname === '/me/publish') return handlePublish(request, env, Date.now());
     if (pathname === '/me/unpublish') return handleUnpublish(request, env, Date.now());
+    // 公開ページ（7.5）。`/<username>`。上のパスは、予約語（src/username.ts）なので、公開ページとぶつからない。
+    const page = publicPageTarget(pathname);
+    if (page !== null) return handlePublicPage(request, env, page);
 
     return new Response('Not Found', {
       status: 404,
