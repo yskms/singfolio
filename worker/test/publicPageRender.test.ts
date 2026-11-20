@@ -179,9 +179,9 @@ describe('公開ページのHTML', () => {
     );
   });
 
-  it('通報のリンクの件名に、ユーザー名を入れる', () => {
+  it('通報のリンクの件名に、ページのアドレスを入れる', () => {
     const html = renderProfilePage(snapshotOf([song(1)]), 'yu_sings', 'en');
-    assert.match(html, /mailto:yskms\.studio@gmail\.com\?subject=Singfolio%20page%20report%3A%20yu_sings/);
+    assert.match(html, /mailto:yskms\.studio@gmail\.com\?subject=Singfolio%20page%20report%3A%20singfolio\.app%2Fyu_sings"/);
   });
 
   it('スクリプトは </script> を含まない（埋め込みが途切れない）', () => {

@@ -97,7 +97,7 @@ describe('公開ページ（GET /<username>）', () => {
   it('ヘッダー: 共有キャッシュに載せず毎回再確認・noindex・CSP・sniffing禁止・Referrerなし', async () => {
     const username = await publishedPage();
     const response = await get(`/${username}`);
-    assert.equal(response.headers.get('cache-control'), 'no-cache');
+    assert.equal(response.headers.get('cache-control'), 'private, no-cache');
     assert.doesNotMatch(response.headers.get('cache-control') ?? '', /max-age|public|s-maxage/);
     assert.equal(response.headers.get('x-robots-tag'), 'noindex');
     assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
@@ -168,6 +168,7 @@ describe('公開ページ（GET /<username>）', () => {
       const response = await get(pathname);
       assert.equal(response.status, 301, pathname);
       assert.equal(response.headers.get('location'), `https://singfolio.app/${username}`);
+      assert.equal(response.headers.get('cache-control'), 'private, no-cache', pathname);
     }
   });
 
@@ -175,13 +176,13 @@ describe('公開ページ（GET /<username>）', () => {
     const username = await publishedPage();
     const first = await get(`/${username}`);
     const etag = first.headers.get('etag') as string;
-    assert.match(etag, /^"[0-9a-f]+\.\d+\.en"$/);
+    assert.match(etag, /^"[0-9a-f]+\.\d+\.en\.[A-Za-z0-9_-]{8}"$/);
 
     const same = await get(`/${username}`, { headers: { 'if-none-match': etag } });
     assert.equal(same.status, 304);
     assert.equal(await same.text(), '');
     assert.equal(same.headers.get('etag'), etag);
-    assert.equal(same.headers.get('cache-control'), 'no-cache');
+    assert.equal(same.headers.get('cache-control'), 'private, no-cache');
     // 弱い比較の形・複数の候補・`*` でも一致する。
     assert.equal((await get(`/${username}`, { headers: { 'if-none-match': `W/${etag}` } })).status, 304);
     assert.equal((await get(`/${username}`, { headers: { 'if-none-match': `"x", ${etag}` } })).status, 304);
@@ -202,14 +203,41 @@ describe('公開ページ（GET /<username>）', () => {
     assert.equal(ja.status, 200);
   });
 
-  it('HEAD: ヘッダーだけ（本文なし）。ETag は GET と同じ', async () => {
+  it('ETag に CSS・スクリプト・CSP の指紋が入る（変えたとき、304 で古い HTML に新しい CSP を当てない）', async () => {
+    const username = await publishedPage();
+    const response = await get(`/${username}`);
+    const csp = response.headers.get('content-security-policy') as string;
+    const fingerprint = createHash('sha256').update(csp).digest('base64').slice(0, 8).replace(/\+/g, '-').replace(/\//g, '_');
+    assert.ok((response.headers.get('etag') as string).endsWith(`.${fingerprint}"`), 'ETag の末尾が CSP の指紋');
+  });
+
+  it('HEAD: GET と同じステータス・ヘッダー（本文だけ無い）', async () => {
     const username = await publishedPage();
     const getResponse = await get(`/${username}`);
     const head = await get(`/${username}`, { method: 'HEAD' });
     assert.equal(head.status, 200);
     assert.equal(await head.text(), '');
-    assert.equal(head.headers.get('etag'), getResponse.headers.get('etag'));
-    assert.equal(head.headers.get('x-robots-tag'), 'noindex');
+    for (const name of ['etag', 'content-security-policy', 'cache-control', 'x-robots-tag', 'content-language', 'vary']) {
+      assert.equal(head.headers.get(name), getResponse.headers.get(name), name);
+    }
+    // 再確認が一致するときは、GET と同じく 304。
+    const etag = getResponse.headers.get('etag') as string;
+    assert.equal((await get(`/${username}`, { method: 'HEAD', headers: { 'if-none-match': etag } })).status, 304);
+  });
+
+  it('HEAD: 曲が無いページの CSP も GET と同じ。読めない本文は GET と同じく 503', async () => {
+    const empty = `page_user_${counter++}`;
+    await bucket.put(snapshotKey(empty), serializeSnapshot(buildSnapshot({ ...content, songs: [] }, 1, NOW)));
+    const emptyGet = await get(`/${empty}`);
+    const emptyHead = await get(`/${empty}`, { method: 'HEAD' });
+    assert.match(emptyHead.headers.get('content-security-policy') ?? '', /script-src 'none'/);
+    assert.equal(emptyHead.headers.get('content-security-policy'), emptyGet.headers.get('content-security-policy'));
+
+    const broken = await publishedPage({ body: '{"schema":1' });
+    const brokenHead = await get(`/${broken}`, { method: 'HEAD' });
+    assert.equal(brokenHead.status, 503);
+    assert.equal(brokenHead.headers.get('retry-after'), '30');
+    assert.equal(await brokenHead.text(), '');
   });
 
   it('Unpublish（R2から消える）と、次のリクエストから 404。公開の有無は区別しない', async () => {
@@ -316,6 +344,17 @@ describe('HTTP で届いた公開ページ', () => {
   it('クエリは引き継がない', async () => {
     const response = await http('/yskms?utm=1&code=secret');
     assert.equal(response.headers.get('location'), 'https://singfolio.app/yskms');
+  });
+
+  it('URL が https: のまま X-Forwarded-Proto が http のときは、リダイレクトしない（同じURLへの繰り返しを避ける）。403', async () => {
+    for (const method of ['GET', 'HEAD']) {
+      const response = await worker.fetch(
+        new Request('https://singfolio.app/yskms', { method, headers: { 'x-forwarded-proto': 'http' } }),
+        env,
+      );
+      assert.equal(response.status, 403, method);
+      assert.equal(response.headers.has('location'), false, method);
+    }
   });
 
   it('GET・HEAD 以外・公開ページでないパス・予約語は、これまでどおり 403（HTTPS required）', async () => {

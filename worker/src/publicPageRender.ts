@@ -232,7 +232,7 @@ function footer(lang: PageLanguage, username: string | null): string {
   const report =
     username === null
       ? ''
-      : `<p><a href="mailto:${REPORT_EMAIL}?subject=${encodeURIComponent(`Singfolio page report: ${username}`)}">${t.report}</a></p>\n`;
+      : `<p><a href="mailto:${REPORT_EMAIL}?subject=${encodeURIComponent(`Singfolio page report: ${PUBLIC_ORIGIN.replace(/^https:\/\//, '')}/${username}`)}">${t.report}</a></p>\n`;
   return `<footer class="wrap foot">
 <p><a href="${INTRO_URL[lang]}">${t.madeWith}</a></p>
 ${report}</footer>

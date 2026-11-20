@@ -406,7 +406,7 @@ v1.0より後（公開機能・Requests）の実装順序は、
 -   [ ] 7.5 公開Web（`singfolio.app/username`）。プライバシーポリシーを直す（視聴者のアクセス）。内容は `singfolio-publishing-backend.md` §4・§8「公開ページ（7.5）」。
     Requests（7.6）は入れない（曲のIDは、まだ HTML に出さない）。
     -   [x] 7.5.1 公開ページの Worker（`worker/src/publicPage.ts`・`publicPageRender.ts`）。`GET|HEAD /<username>` を、R2 のスナップショットだけから表示する（D1に触れない）。
-        **決定**: 小文字の正規のURLへ 301（大文字・末尾のスラッシュ）、キャッシュしない（`no-cache` と ETag。Unpublish・削除は次のリクエストから 404）、`noindex`、
+        **決定**: 小文字の正規のURLへ 301（大文字・末尾のスラッシュ）、キャッシュしない（`private, no-cache` と ETag。Unpublish・削除は次のリクエストから 404）、`noindex`、
         存在しない・未公開・取り下げは同じ 404、R2 の失敗・読めない本文は 503、CSP はハッシュ方式（`'unsafe-inline'` なし。外へ何も読みに行かない）、
         公開ページの `GET`・`HEAD` だけ HTTP を HTTPS へ 308、`Accept-Language` で日本語・英語、通報のリンク（`mailto:`）。内容は、表示名・自己紹介・曲数・検索・タグ（1つ）・アーティスト別の見出し。
         Nodeのテスト（ページのスクリプトは、描画したHTMLから作った最小のDOMで実行）、`wrangler dev`（workerd）、ヘッドレスの Chrome（幅390px。ライト・ダーク・CSP違反なし）で確かめた。
@@ -418,7 +418,8 @@ v1.0より後（公開機能・Requests）の実装順序は、
         ネイティブの再ビルド・第三者ライセンスの再生成・R8入りの確認が付いてくる。依存を入れずに、OSの共有シート（RN の `Share`）にする案もある（コピーも、そこから選べる）。
         公開ページを開くのは、既存の `expo-web-browser`・`Linking`（依存の追加なし）。ストアの「制限のないWebアクセス」の答えは、アプリ内にブラウザを持たないので変わらない
         （外部のブラウザで開く。アプリ内で開くなら見直す）
-    -   [ ] 7.5.4 本番での確認。Worker のデプロイ（利用者の確認のあと）、公開した本物のスナップショットでの表示、`http://` の 308、Unpublish で 404、Workers の Metrics での CPU 時間。
+    -   [ ] 7.5.4 本番での確認。Worker のデプロイ（利用者の確認のあと）、公開した本物のスナップショットでの表示、`http://` の 308、Unpublish で 404、Workers の Metrics での CPU 時間（1000曲のページ。10ms を超えて打ち切られると Error 1102 で、503 にならない）、
+        `If-None-Match` を付けた `curl` で 304 が返ること（Cloudflare が ETag を `W/` に変えても一致すること）。
         **確かめていないこと**: Safari・iOS・Android のブラウザ、日本語IMEでの入力、スクリーンリーダー、リンクのプレビュー（`og:image`）、長い曲名・多数のタグでの見た目（§8「公開ページ（7.5）」）
 -   [ ] 7.6 Requests（所有者がアプリ内の一覧で受け取る）。プライバシーポリシー・ストアの申告を直す
     （視聴者のRequest。Turnstileとレート制限が扱う情報、ニックネーム）

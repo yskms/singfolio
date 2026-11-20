@@ -3,7 +3,7 @@
 // HTMLの組み立ては src/publicPageRender.ts。ここは、URLの正規化・R2の読み取り・キャッシュ・ヘッダー。
 //
 // 決めたこと（理由は docs §8「公開ページ（7.5）」）:
-// - 反映は即時。公開ページは共有キャッシュに載せず、ブラウザには毎回再確認させる（`no-cache` と ETag）。
+// - 反映は即時。公開ページは共有キャッシュに載せず、ブラウザには毎回再確認させる（`private, no-cache` と ETag）。
 //   Unpublish・アカウントの削除でR2から消えたら、次のリクエストから 404 になる。**`max-age` を足さない**
 //   （足すと、取り下げたページが、その間、見え続ける）。
 // - `noindex`（ヘッダーとメタ）。取り下げたページが検索結果に残るのは、こちらから消せないため。robots.txt では塞がない
@@ -94,6 +94,22 @@ export async function contentSecurityPolicy(withScript: boolean): Promise<string
   ].join('; ');
 }
 
+let cachedAssetsTag: string | undefined;
+
+/**
+ * ETag に入れる、CSS・スクリプト・CSP の指紋（CSP のハッシュ付きの文字列の SHA-256 の先頭）。
+ * **これを ETag に入れないと、CSS・スクリプトを変えたとき、版の上げ忘れで、ページが壊れる**: 304 のヘッダー（新しい CSP）は
+ * ブラウザが保存済みの応答に反映するので、保存済みの古い HTML のインラインの `<style>`・`<script>` が、新しい CSP のハッシュと
+ * 合わず、止まる（Chrome で確認。docs §8「公開ページ（7.5）」）。値を持つだけで、Promise は共有しない。
+ */
+async function assetsTag(): Promise<string> {
+  cachedAssetsTag ??= (await sha256Base64(await contentSecurityPolicy(true)))
+    .slice(0, 8)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_');
+  return cachedAssetsTag;
+}
+
 function pageHeaders(csp: string, lang: PageLanguage, extra: Record<string, string> = {}): Headers {
   return new Headers({
     'content-type': 'text/html; charset=utf-8',
@@ -125,8 +141,12 @@ async function messageResponse(
   });
 }
 
-// ETag は、スナップショット（R2のetag）・言語・ページの作り（テンプレートの版）で決まる。ページの作りを変えたら、
-// 版を上げる（上げないと、ブラウザが 304 で古い作りのページを使い続ける）。
+// 共有キャッシュには載せず（`private`）、ブラウザには毎回再確認させる（`no-cache`）。`max-age` を足さない。
+const PAGE_CACHE_CONTROL = 'private, no-cache';
+
+// ETag は、スナップショット（R2のetag）・言語・ページの作り（テンプレートの版）・CSS/スクリプト/CSP の指紋で決まる。
+// CSS・スクリプト・CSP の変更は指紋が拾うので、版は要らない。**HTML の構造・文言を変えたら、版を上げる**
+// （上げないと、ブラウザが 304 で古い作りのページを使い続ける。古いだけで、動きは壊れない）。
 export const PAGE_TEMPLATE_VERSION = 1;
 
 function matchesEtag(header: string | null, etag: string): boolean {
@@ -144,7 +164,7 @@ export async function handlePublicPage(request: Request, env: Env, target: Publi
     // 正規のURLへ。ユーザー名は変更も再利用もされないので、恒久的なリダイレクトにしてよい。
     return new Response(null, {
       status: 301,
-      headers: { location: new URL(`/${target.username}`, request.url).toString(), 'cache-control': 'no-cache' },
+      headers: { location: new URL(`/${target.username}`, request.url).toString(), 'cache-control': PAGE_CACHE_CONTROL },
     });
   }
 
@@ -158,17 +178,16 @@ export async function handlePublicPage(request: Request, env: Env, target: Publi
   }
   if (object === null) return messageResponse('not_found', lang, head);
 
-  const etag = `"${object.etag}.${PAGE_TEMPLATE_VERSION}.${lang}"`;
+  const etag = `"${object.etag}.${PAGE_TEMPLATE_VERSION}.${lang}.${await assetsTag()}"`;
   // 本文はまだ読んでいない。再確認が一致するときは、読まずに 304（R2からの転送を止める）。
-  const unchanged = matchesEtag(request.headers.get('if-none-match'), etag);
-  if (unchanged || head) {
+  if (matchesEtag(request.headers.get('if-none-match'), etag)) {
     object.body.cancel().catch(() => {});
-    // 304・HEAD でも、スクリプトを載せるかで CSP が変わる。HEAD は読まないので、載せる場合の CSP を返す
-    // （曲が無いページでは、本文の CSP のほうが厳しい。HEAD の CSP は、ヘッダーの確認用で、実際の表示は GET）。
+    // 本文を読まないので、曲の有無が分からない。スクリプトを許可する側の CSP を返す（曲が無いページでは、保存済みの応答の
+    // `script-src 'none'` が、ハッシュの許可に置き換わる。そのページにスクリプトは無いので、動きは変わらない）。
     const csp = await contentSecurityPolicy(true);
     return new Response(null, {
-      status: unchanged ? 304 : 200,
-      headers: pageHeaders(csp, lang, { etag, 'cache-control': 'no-cache' }),
+      status: 304,
+      headers: pageHeaders(csp, lang, { etag, 'cache-control': PAGE_CACHE_CONTROL }),
     });
   }
 
@@ -188,9 +207,10 @@ export async function handlePublicPage(request: Request, env: Env, target: Publi
     return messageResponse('unavailable', lang, head);
   }
   const csp = await contentSecurityPolicy(withScript);
-  return new Response(html, {
+  // HEAD も、GET と同じ道を通って（読めない本文なら 503、CSP も GET と同じ）、本文だけを返さない。
+  return new Response(head ? null : html, {
     status: 200,
-    headers: pageHeaders(csp, lang, { etag, 'cache-control': 'no-cache' }),
+    headers: pageHeaders(csp, lang, { etag, 'cache-control': PAGE_CACHE_CONTROL }),
   });
 }
 
@@ -203,6 +223,9 @@ export async function handlePublicPage(request: Request, env: Env, target: Publi
 export function insecurePublicPageRedirect(request: Request): Response | null {
   if (request.method !== 'GET' && request.method !== 'HEAD') return null;
   const url = new URL(request.url);
+  // URL が既に https: のときは移さない（`X-Forwarded-Proto: http` で「平文」と判定された場合。移し先が同じURLで、
+  // ヘッダーが付き続けるクライアントでは、同じURLへのリダイレクトが繰り返される）。これまでどおり 403。
+  if (url.protocol === 'https:') return null;
   const target = publicPageTarget(url.pathname);
   if (target === null) return null;
   const secure = new URL(`/${target.username}`, url);
