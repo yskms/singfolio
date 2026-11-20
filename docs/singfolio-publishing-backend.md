@@ -1629,8 +1629,9 @@ Free の CPU 時間は1リクエスト10ms。「isolate ごとに、たまに上
     打ち切られた Publish は、D1 の版と控え（Display Name・Bio）が新しいまま、R2 が前の内容のままになり、次の Publish は版の食い違い（置き換えの確認）に、Auto Publish は `stopped(version-conflict)` で止まる
     （応答が途切れたときと同じ状態。冪等キーの判断と同じ問題）。データは壊れない（`published_at` は立ったまま）。手元の Node のベンチ（1000曲、初回）の内訳は、JSON の解析 約0.7ms・検証 約2.5ms・
     文字列化 約0.4ms（合計 約3.6ms）で、**約9割が予約より前**。本番の内訳は測っていないが、打ち切りが予約のあとに起きるのは、合計が上限をわずかに超える範囲（予約前の割合が約9割なら、上限の1.1倍まで）に限られる、
-    と推定される。**対応の案**: `serializeSnapshot(buildSnapshot(…))` を予約の前に移す（版は `baseVersion + 1`、時刻は `now` で、予約の前に決まる）。D1 と R2 の書き込みの順序は変えない（CLAUDE.md の「順序は変えない」に
-    反しない）。予約のあとの CPU が、R2 への書き込みの呼び出しだけになる。リリース後は、ダッシュボードの Metrics（Errors の Invocation Statuses の `Exceeded CPU Time Limits`）で見張る（WBS 7.7）。
+    と推定される。**対応**: `serializeSnapshot(buildSnapshot(…))` を、予約の前に移した（版は `baseVersion + 1`、時刻は `now` で、予約の前に決まる。版の食い違いの 409 は、その前に返すので、文字列化しない）。
+    D1 と R2 の書き込みの順序は変えていない（CLAUDE.md の「順序は変えない」に反しない）。予約のあとの CPU は、R2 への書き込みの呼び出しだけになる。Node のテスト（`publish.test.ts`）が、本文の組み立てが失敗しても
+    D1 に何も書かれないことで、順序を固定している（旧い順序では、このテストが失敗することを確かめた）。本番へは、次のデプロイで入る。リリース後は、ダッシュボードの Metrics（Errors の Invocation Statuses の `Exceeded CPU Time Limits`）で見張る（WBS 7.7）。
 -   公開中のアカウントの Publish Now は、変更が0件でも `POST` を送り、版が +1 になる。**この挙動は、決めたものではなく、現状のまま**（`publishService.publish` に0件の分岐は無く、決定は docs にも無い）。
     副作用として、別の端末の Auto Publish が、版の食い違いで止まる。Publish Now は「この端末の内容で置き換える」明示の操作なので、変えるかは未決（案: 曲にも Display Name・Bio にも差が無いときは、確認を出す、または送らない）。
 
@@ -1645,7 +1646,7 @@ Free の CPU 時間は1リクエスト10ms。「isolate ごとに、たまに上
     冷えた状態と連続を、1回の測定にまとめる。繰り越しがあるなら、最も厳しい条件）。判断の基準は、打ち切りが起きるかどうかの1点（案。WBS 7.7）。
 
 **未決**（リリースの前に決める。WBS 7.7）: 曲数の上限（1000）と CPU 時間（上の実測と、Cloudflare の資料の記述。保つか、下げるか、有料プランにするか）、Auto Publish の停止の文言、
-変更0件の Publish Now の扱い、冪等キーの要否、CPU の打ち切りと予約の順序（上の案）。
+変更0件の Publish Now の扱い、冪等キーの要否。
 
 ### Cloudflare
 
