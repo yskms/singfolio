@@ -68,6 +68,7 @@ function setup(results: Array<PendingPublishResult | Error>, enabled = true) {
   const clock = fakeTimers();
   const calls = { publish: 0 };
   let on = enabled;
+  let foreground = true;
   const queue = [...results];
   const service = createAutoPublishService({
     settings: {
@@ -85,10 +86,20 @@ function setup(results: Array<PendingPublishResult | Error>, enabled = true) {
       },
     },
     timers: clock.timers,
+    isForeground: () => foreground,
   });
   const events: AutoPublishEvent[] = [];
   service.subscribe((event) => events.push(event));
-  return { service, clock, calls, events, isOn: () => on };
+  return {
+    service,
+    clock,
+    calls,
+    events,
+    isOn: () => on,
+    setForeground: (value: boolean) => {
+      foreground = value;
+    },
+  };
 }
 
 const NO_CHANGES: PendingPublishResult = { kind: 'idle', reason: 'no-changes' };
@@ -181,6 +192,40 @@ describe('Auto Publish: 待ってまとめて送る', () => {
   });
 });
 
+describe('Auto Publish: 背景では確認を始めない', () => {
+  it('待ちのタイマーが背景で発火しても試さず、前面に戻ったときの flush が、同じ差を拾う', async () => {
+    const { service, clock, calls, setForeground } = setup([PUBLISHED]);
+    service.notifyChanged();
+    setForeground(false);
+    await clock.advance(AUTO_PUBLISH_DEBOUNCE_MS);
+    assert.equal(calls.publish, 0);
+    assert.deepEqual(service.getStatus(), { kind: 'idle' });
+    assert.equal(clock.pendingCount, 0);
+    // 背景のまま、flush が呼ばれても試さない（呼ぶ側は前面に戻ったときだけだが、防御として）。
+    await service.flush();
+    assert.equal(calls.publish, 0);
+    setForeground(true);
+    await service.flush();
+    assert.equal(calls.publish, 1);
+    service.dispose();
+  });
+
+  it('再送の待ちが背景で発火しても試さない。状態は retrying のまま、前面に戻ったときの flush で再送する', async () => {
+    const { service, clock, calls, setForeground } = setup([new AuthError('network'), PUBLISHED]);
+    await service.flush();
+    assert.deepEqual(service.getStatus(), { kind: 'retrying' });
+    setForeground(false);
+    await clock.advance(AUTO_PUBLISH_RETRY_MS[0]!);
+    assert.equal(calls.publish, 1);
+    assert.deepEqual(service.getStatus(), { kind: 'retrying' });
+    setForeground(true);
+    await service.flush();
+    assert.equal(calls.publish, 2);
+    assert.deepEqual(service.getStatus(), { kind: 'idle' });
+    service.dispose();
+  });
+});
+
 describe('Auto Publish: 通信の失敗は再送する（Pending は端末に残っている）', () => {
   it('通信の失敗は retrying。間隔を延ばしながら再送し、成功したら idle に戻って、間隔もやり直す', async () => {
     const { service, clock, calls, events } = setup([
@@ -244,6 +289,63 @@ describe('Auto Publish: 通信の失敗は再送する（Pending は端末に残
     assert.deepEqual(service.getStatus(), { kind: 'idle' });
     await clock.advance(AUTO_PUBLISH_RETRY_MS[0]! * 10);
     assert.equal(calls.publish, 1);
+    service.dispose();
+  });
+
+  it('再送を待っている間の編集の通知は、再送の時刻を前倒ししない（オフラインのまま編集しても、30秒に戻らない）', async () => {
+    const { service, clock, calls } = setup([new AuthError('network'), new AuthError('network'), PUBLISHED]);
+    await service.flush();
+    // 1回目の失敗のあと、最初の間隔（30秒）で2回目。2回目の失敗のあとの間隔は、2番目の値（60秒）。
+    await clock.advance(AUTO_PUBLISH_RETRY_MS[0]!);
+    assert.equal(calls.publish, 2);
+    // 再送を待つあいだ、編集が続く。通知のたびに、待ちが 30 秒に戻ってはいけない。
+    await clock.advance(AUTO_PUBLISH_RETRY_MS[1]! - 10_000);
+    service.notifyChanged();
+    await clock.advance(5_000);
+    service.notifyChanged();
+    assert.equal(calls.publish, 2);
+    // 最初に決めた再送の時刻（2回目の失敗から60秒）に、再送される。
+    await clock.advance(5_000);
+    assert.equal(calls.publish, 3);
+    assert.deepEqual(service.getStatus(), { kind: 'idle' });
+    service.dispose();
+  });
+
+  it('失敗した確認の実行中に来た再確認の予約も、再送の待ちを30秒に上書きしない', async () => {
+    let release: (() => void) | undefined;
+    const clock = fakeTimers();
+    let calls = 0;
+    const service = createAutoPublishService({
+      settings: { getAutoPublishEnabled: async () => true, setAutoPublishEnabled: async () => {} },
+      publish: {
+        publishPendingChanges: async () => {
+          calls += 1;
+          if (calls === 1) throw new AuthError('network');
+          if (calls === 2) {
+            await new Promise<void>((resolve) => {
+              release = resolve;
+            });
+            throw new AuthError('network');
+          }
+          return PUBLISHED;
+        },
+      },
+      timers: clock.timers,
+    });
+    await service.flush();
+    // 1回目の失敗のあと、30秒で2回目が始まる。2回目は通信の途中で止まっている。
+    await clock.advance(AUTO_PUBLISH_RETRY_MS[0]!);
+    assert.equal(calls, 2);
+    // 実行中に、再確認の予約が入る（前面復帰の flush）。
+    const second = service.flush();
+    release!();
+    await second;
+    assert.deepEqual(service.getStatus(), { kind: 'retrying' });
+    // 2回目の失敗のあとの間隔は 60秒。予約が、30秒に上書きしてはいけない。
+    await clock.advance(AUTO_PUBLISH_RETRY_MS[1]! - 1);
+    assert.equal(calls, 2);
+    await clock.advance(1);
+    assert.equal(calls, 3);
     service.dispose();
   });
 });

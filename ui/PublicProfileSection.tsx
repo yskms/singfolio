@@ -425,7 +425,8 @@ export function PublicProfileSection() {
             // 失敗として扱う（文言を出して、サーバーの状態を読み直し、`username` の確保から始める）。
             if (profile === null) throw new PublishError('username-required');
             // 入力中の下書きは、そのまま残す（非公開にしても、Display Name・Bio の控えはサーバーに残る）。
-            setView((current) => (current.kind === 'ready' ? { ...current, profile } : current));
+            // Auto Publish の設定は、Service が非公開にしたときにオフへ戻している（公開中だけ使う設定）。画面の値もそろえる。
+            setView((current) => (current.kind === 'ready' ? { ...current, profile, autoPublish: false } : current));
             refreshChanges(profile);
             return 'publicProfile.unpublished';
           }),
@@ -567,21 +568,28 @@ export function PublicProfileSection() {
                 </Text>
                 <Switch
                   accessibilityLabel={t('publicProfile.auto.label')}
-                  value={autoEnabled}
-                  disabled={disabled}
+                  // 公開中だけ使える（公開していなければ、オンにできない。非公開にすると、Service がオフへ戻す）。
+                  value={autoEnabled && profile.published}
+                  disabled={disabled || !profile.published}
                   onValueChange={toggleAutoPublish}
                   trackColor={{ false: colors.border, true: colors.primary }}
                   // Android のつまみの色・iOS の背景は、Settings の Suggestions と同じ理由（`SettingsSection`）。
                   thumbColor={
-                    Platform.OS === 'android' ? (autoEnabled ? colors.textPrimary : colors.textSecondary) : undefined
+                    Platform.OS === 'android'
+                      ? autoEnabled && profile.published
+                        ? colors.textPrimary
+                        : colors.textSecondary
+                      : undefined
                   }
                   ios_backgroundColor={colors.border}
                   style={styles.switch}
                 />
               </View>
               <Text style={[styles.note, { color: colors.textSecondary }]}>{t('publicProfile.auto.note')}</Text>
-              {autoEnabled && !profile.published && (
-                <Text style={[styles.note, { color: colors.textSecondary }]}>{t('publicProfile.auto.notYet')}</Text>
+              {!profile.published && (
+                <Text style={[styles.note, { color: colors.textSecondary }]}>
+                  {t('publicProfile.auto.onlyWhilePublished')}
+                </Text>
               )}
               {autoEnabled && profile.published && autoStatus.kind === 'retrying' && (
                 <Text accessibilityLiveRegion="polite" style={[styles.note, { color: colors.textSecondary }]}>

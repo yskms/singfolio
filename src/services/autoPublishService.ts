@@ -44,6 +44,11 @@ export interface AutoPublishDeps {
   publish: { publishPendingChanges(): Promise<PendingPublishResult> };
   /** 待ち時間の計り方。テストが差し替える（既定は `setTimeout`。Nodeでは、プロセスの終了を止めない） */
   timers?: AutoPublishTimers;
+  /**
+   * アプリが前面にあるか（既定は常に真）。**偽のあいだは、確認を始めない**（待ちのタイマーが背景で発火しても、何も送らず、前面に戻ったときの
+   * `flush` に任せる）。Service は RN に依存しないので、アプリ（`index.ts`）が `AppState` から渡す。
+   */
+  isForeground?: () => boolean;
 }
 
 const defaultTimers: AutoPublishTimers = {
@@ -66,11 +71,19 @@ const defaultTimers: AutoPublishTimers = {
  *   次の確認が同じ差を見つける。通信の失敗は `retrying` にして、間隔を延ばしながら再送する（成功・新しい確認でやり直す）。
  * - **オンでも、公開していなければ何も送らない**（最初の公開は確認つきの Publish Now だけ）。設定は端末のもので、アカウントごとではないが、
  *   別のアカウントの記録を捨てるとき（`publishService`）にオフへ戻す。
- * - **背景に移るときは、送らない**（`flush` は前面へ復帰したときだけ）。通信の途中でアプリが止まると、サーバーでは済んでいるのに、端末は結果を
- *   記録できず、次の確認が版の食い違い（`stopped`）になる。
+ * - **背景では、確認を始めない**（待ちのタイマーが背景で発火しても、`isForeground` が偽なら試さない。`flush` は前面へ復帰したときに呼ばれ、
+ *   試せなかった分を拾う）。通信の途中でアプリが止まると、サーバーでは済んでいるのに、端末は結果を記録できず、次の確認が版の食い違い
+ *   （`stopped`）になる。**始めた確認の途中で背景に移ることは、防げない**（だから、背景に移ったときに通信を起こさないだけで、確実にはならない）。
+ * - **通信に失敗して再送を待っている間は、編集があっても、再送の時刻を前倒ししない**（`retrying` の間の `notifyChanged`・実行中の変更の再確認は、
+ *   待っているタイマーを残す。オフラインのまま編集を続けると、30秒の待ちに戻り続け、間隔を延ばす意味が無くなる）。前面への復帰の `flush` は、すぐ試す。
  * - 同時に1つだけ実行する。実行中に来たきっかけは、終わったあとに、もう一度待ってから試す。
  */
-export function createAutoPublishService({ settings, publish, timers = defaultTimers }: AutoPublishDeps) {
+export function createAutoPublishService({
+  settings,
+  publish,
+  timers = defaultTimers,
+  isForeground = () => true,
+}: AutoPublishDeps) {
   let status: AutoPublishStatus = { kind: 'idle' };
   let timer: unknown = null;
   let running: Promise<void> | null = null;
@@ -110,6 +123,8 @@ export function createAutoPublishService({ settings, publish, timers = defaultTi
   }
 
   async function attempt(): Promise<void> {
+    // 背景では試さない。状態は変えない（前面に戻ったときの `flush` が、同じ差を見つけて試す）。
+    if (!isForeground()) return;
     if (!(await settings.getAutoPublishEnabled())) {
       failures = 0;
       setStatus({ kind: 'idle' });
@@ -154,7 +169,8 @@ export function createAutoPublishService({ settings, publish, timers = defaultTi
         running = null;
         if (rerun) {
           rerun = false;
-          schedule(AUTO_PUBLISH_DEBOUNCE_MS);
+          // 再送を待っている（通信の失敗の直後）ときは、そのタイマーを残す（30秒に上書きしない）。
+          if (timer === null) schedule(AUTO_PUBLISH_DEBOUNCE_MS);
         }
       });
     return running;
@@ -196,6 +212,8 @@ export function createAutoPublishService({ settings, publish, timers = defaultTi
 
     /** 公開内容が変わったかもしれない（端末のDBに書き込んだ）。待ってから確認する（連続した変更は、まとめて1回）。 */
     notifyChanged(): void {
+      // 通信に失敗して、再送を待っているときは、編集があっても、再送の時刻を前倒ししない。
+      if (status.kind === 'retrying' && timer !== null) return;
       schedule(AUTO_PUBLISH_DEBOUNCE_MS);
     },
 

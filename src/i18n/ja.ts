@@ -248,10 +248,10 @@ export const ja: Record<MessageKey, Message> = {
   'publicProfile.auto.label': '変更を自動で公開',
   'publicProfile.auto.note':
     '曲の変更は、編集を止めてしばらくしてから、公開ページへ送ります。表示名と自己紹介は、「今すぐ公開」したときだけ更新されます。',
-  'publicProfile.auto.notYet': '自動での公開は、プロフィールを最初に公開してから始まります。',
+  'publicProfile.auto.onlyWhilePublished': '自動での公開は、プロフィールを公開している間だけ使えます。',
   'publicProfile.auto.retrying': '変更を送れませんでした。自動でやり直します。',
   'publicProfile.auto.stoppedConflict':
-    '停止中: 別の端末から公開ページが変更されました。「今すぐ公開」で置き換えられます。',
+    '停止中: この端末が最後に公開したあとに、公開ページが変わりました。「今すぐ公開」で置き換えられます。',
   'publicProfile.auto.stoppedTooMany': '停止中: 歌える曲が{limit}曲を超えています。',
   'publicProfile.auto.stoppedOther': '停止中: 自動で公開できませんでした。「今すぐ公開」で理由を確かめてください。',
   'publicProfile.tooManySongs':

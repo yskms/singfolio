@@ -350,7 +350,13 @@ export function createPublishService({ db, access, publish, state, show, publicT
               const server = await publish.getProfile(session);
               await reconcile(server);
               if (server === null) return { kind: 'idle', reason: 'no-record' } as const;
-              if (!server.published) return { kind: 'idle', reason: 'not-published' } as const;
+              if (!server.published) {
+                // 公開していないと分かった（別の端末で非公開にされた）。Auto Publish は、公開中だけ使う設定にする: オフへ戻す
+                // （オンのまま残すと、端末の記録との差があるかぎり、確認のたびに認証つきの通信が出て、アカウントの最後に使った時刻が進み続ける。
+                // 公開していないアカウントは、未使用の自動削除の対象で、端末の中だけの利用で時刻を進めない決まりに反する）。
+                await db.transaction((tx) => settings.set(tx, AUTO_PUBLISH_KEY, 'off'));
+                return { kind: 'idle', reason: 'not-published' } as const;
+              }
               const current = await state.get(db);
               if (current === null) return { kind: 'idle', reason: 'no-record' } as const;
               if (current.baseVersion !== server.version) return { kind: 'stopped', reason: 'version-conflict' } as const;
@@ -396,6 +402,9 @@ export function createPublishService({ db, access, publish, state, show, publicT
           // 端末の記録は、サーバーで済んだあとの後始末。読めなくても、非公開にできたことは変わらない。
           await recordQuietly(() =>
             db.transaction(async (tx) => {
+              // 非公開にしたら、Auto Publish もオフへ戻す（公開中だけ使う設定。`publishPendingChanges` の `not-published` と同じ理由）。
+              // 記録を捨てる経路（`profile === null`）も同じ（`reconcile` と揃える）。
+              await settings.set(tx, AUTO_PUBLISH_KEY, 'off');
               if (profile === null) {
                 await state.clear(tx);
                 return;

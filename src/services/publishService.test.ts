@@ -595,6 +595,21 @@ describe('unpublish', () => {
     await t.service.unpublish();
     assert.deepEqual(await t.service.getState(), { username: 'karaoke_fan', baseVersion: 5, displayName: '', bio: '' });
   });
+
+  it('非公開にしたら、Auto Publish の設定もオフに戻す（公開中だけ使う設定。オンのままだと、確認のたびに認証つきの通信が出る）。記録を捨てる経路も同じ', async () => {
+    const t = await setup();
+    await t.add('A', 'X');
+    await t.service.publish(INPUT);
+    t.sqlite.exec("INSERT OR REPLACE INTO settings (key, value) VALUES ('auto_publish', 'on')");
+    await t.service.unpublish();
+    assert.equal(await t.services.settings.getAutoPublishEnabled(), false);
+
+    const gone = await setup({ profile: null });
+    gone.sqlite.exec(`INSERT INTO publish_state (id, username, base_version, display_name, bio) VALUES (1, 'old', 1, 'x', 'y')`);
+    gone.sqlite.exec("INSERT OR REPLACE INTO settings (key, value) VALUES ('auto_publish', 'on')");
+    assert.equal(await gone.service.unpublish(), null);
+    assert.equal(await gone.services.settings.getAutoPublishEnabled(), false);
+  });
 });
 
 describe('別のアカウントに切り替えたあと（レビュー指摘）', () => {
@@ -915,6 +930,18 @@ describe('publishPendingChanges（Auto Publish が使う。7.4.9b）', () => {
     assert.deepEqual(await t.service.publishPendingChanges(), { kind: 'idle', reason: 'not-published' });
     assert.deepEqual(t.server.calls, ['getProfile']);
     assert.equal(t.server.published.length, 0);
+  });
+
+  it('公開していないと分かったら（別の端末で非公開にされた）、設定をオフに戻す。以後の確認は、サーバーに触れない（最後に使った時刻を進め続けない）', async () => {
+    const t = await published();
+    autoOn(t);
+    await t.add('B', 'X');
+    t.server.profile = { ...t.server.profile!, version: 2, published: false };
+
+    assert.deepEqual(await t.service.publishPendingChanges(), { kind: 'idle', reason: 'not-published' });
+    assert.equal(await t.services.settings.getAutoPublishEnabled(), false);
+    // 記録は残す（username は同じアカウントのまま。Publish Now の置き換えの確認に使う）。
+    assert.equal((await t.service.getState())?.username, 'karaoke_fan');
   });
 
   it('別の端末が Publish していたら（版の食い違い）、上書きせず stopped(version-conflict)。本文を送らず、記録の版も進めない', async () => {

@@ -302,10 +302,10 @@ export const en = {
   'publicProfile.auto.label': 'Publish changes automatically',
   'publicProfile.auto.note':
     'Sends song changes to your public page a short while after you stop editing. Display Name and Bio are only updated with Publish Now.',
-  'publicProfile.auto.notYet': 'This starts after you publish your profile for the first time.',
+  'publicProfile.auto.onlyWhilePublished': 'Available while your profile is published.',
   'publicProfile.auto.retrying': 'Couldn’t send your changes. Trying again automatically.',
   'publicProfile.auto.stoppedConflict':
-    'Paused: your public page was changed from another device. Use Publish Now to replace it.',
+    'Paused: your public page has changed since this device last published. Use Publish Now to replace it.',
   'publicProfile.auto.stoppedTooMany': 'Paused: you have more than {limit} Ready songs.',
   'publicProfile.auto.stoppedOther': 'Paused: couldn’t publish automatically. Use Publish Now to see why.',
   'publicProfile.tooManySongs':

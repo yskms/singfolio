@@ -97,8 +97,9 @@ let servicesPromise: Promise<Services> | null = null;
 
 /**
  * Auto Publish を動かし始める（アカウントを使えるビルドだけ。そうでなければ、何も監視せず、何も送らない）。起動の少しあとに、前回送れていない
- * 変更を確認し、アプリが**前面に戻ったとき**にも確認する。背景に移るときは送らない（通信の途中でアプリが止まると、サーバーでは済んでいるのに、
- * 端末は結果を記録できず、次が版の食い違いになる）。`getServices()` が成功したときに1回だけ呼ばれる（Service を使い回す）。
+ * 変更を確認し、アプリが**前面に戻ったとき**にも確認する。背景では確認を始めない（待ちのタイマーが背景で発火しても、`isForeground` が偽なので
+ * 試さず、前面に戻ったときのこの確認に任せる。通信の途中でアプリが止まると、サーバーでは済んでいるのに、端末は結果を記録できず、次が版の
+ * 食い違いになる）。`getServices()` が成功したときに1回だけ呼ばれる（Service を使い回す）。
  */
 function startAutoPublish(services: Services): Services {
   if (!ACCOUNT_ENABLED) return services;
@@ -137,6 +138,8 @@ export function getServices(): Promise<Services> {
         {
           // 曲名・アーティストの候補の外部検索。ここで渡さなければ無効になる。
           catalogFetch: fetch,
+          // Auto Publish は、背景では確認を始めない（待ちのタイマーが背景で発火しても、前面に戻ったときの `flush` に任せる）。
+          isForeground: () => AppState.currentState === 'active',
           // アカウントの通信・保存と、各社のサインイン（`idTokenProviders`）。画面が呼ぶまで、何も送らない。
           // Appleのネイティブのサインインは iOS だけ。AndroidのAppleは Web 経由（Custom Tab。認可コードを返し、
           // IDトークンへの交換はWorkerがする）。Googleは両OS（自作のExpoモジュール。ネイティブ側が無いビルドでも、

@@ -381,7 +381,8 @@ v1.0より後（公開機能・Requests）の実装順序は、
         Display Name・Bio は載せない（端末が最後に Publish した値で、曲の変更だけ送る。下書きの保存先は足さない）、最初の公開・再公開・置き換えは自動でしない
         （サーバーが公開中で、記録の版が合うときだけ送る）。`createServices` が `observeCommits` でDBへの書き込みを拾い（`auth` を注入したビルドだけ）、`autoPublishService`
         が30秒の debounce・起動後5秒の確認・前面への復帰での確認・通信の失敗の再送（30秒から10分）・状態（`idle`/`retrying`/`stopped`）を持つ。送る中身の判断は `publishService.publishPendingChanges`
-        （差が0なら通信しない。Pending は端末の記録との差で、別に保存しない）。背景に移るときは送らない。画面は Public Profile のスイッチと状態の行。Nodeのテストと、iOS Simulator（偽のService）で確かめた
+        （差が0なら通信しない。Pending は端末の記録との差で、別に保存しない）。背景では確認を始めない（タイマーが背景で発火しても `isForeground` で止める）。設定は公開中だけ使う
+        （Unpublish・公開していないと分かったときにオフへ戻し、公開前はオンにできない）。画面は Public Profile のスイッチと状態の行。Nodeのテストと、iOS Simulator（偽のService）で確かめた
         （§8「Auto Publish（7.4.9b）」）。既知の限界: 応答を受け取れなかった自動の Publish のあとは、`stopped(version-conflict)` になり、Publish Now の置き換えで解決する（冪等キーは未実装）
     -   [ ] 7.4.10 文書。`singfolio-privacy-policy-next.md` と `singfolio-store-listing.md` §6 に、公開される内容（Display Name・Bio・Ready の曲・公開タグ・`username`）を足し、
         自動削除の説明を直す。公開中の `privacy-policy.md` は、アカウントを出す版が出るまで書き換えない

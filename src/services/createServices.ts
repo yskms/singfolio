@@ -90,6 +90,8 @@ export interface ServicesOptions {
   auth?: AuthOptions;
   /** Auto Publish の待ち時間の計り方。テストだけが渡す（既定は `setTimeout`） */
   autoPublishTimers?: AutoPublishTimers;
+  /** アプリが前面にあるか。Auto Publish は、背景では確認を始めない（既定は常に前面。`index.ts` が `AppState` から渡す） */
+  isForeground?: () => boolean;
 }
 
 /**
@@ -146,7 +148,12 @@ export function createServices(
     tags: tagRepository,
     settings: settingsRepository,
   });
-  const autoPublish = createAutoPublishService({ settings, publish, timers: options.autoPublishTimers });
+  const autoPublish = createAutoPublishService({
+    settings,
+    publish,
+    timers: options.autoPublishTimers,
+    isForeground: options.isForeground,
+  });
   changeListener.current = () => autoPublish.notifyChanged();
   return {
     songs,
