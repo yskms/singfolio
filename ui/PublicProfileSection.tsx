@@ -209,6 +209,15 @@ export function PublicProfileSection() {
           }
           const published = event.profile;
           if (profileRef.current?.username !== published.username) return;
+          if (event.type === 'unpublished') {
+            // 別の端末で非公開にされた。設定は Service がオフへ戻している（画面の値もそろえる）。公開中の表示（未公開の変更の数・状態の行）をやめる。
+            // 下書きには触れない。
+            setView((current) =>
+              current.kind === 'ready' ? { ...current, profile: published, autoPublish: false } : current,
+            );
+            refreshChanges(published);
+            return;
+          }
           setView((current) => (current.kind === 'ready' ? { ...current, profile: published } : current));
           refreshChanges(published);
         });

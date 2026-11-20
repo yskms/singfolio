@@ -29,7 +29,12 @@ export type AutoPublishEvent =
   /** 状態が変わった */
   | { type: 'status'; status: AutoPublishStatus }
   /** 自動で Publish できた（開いている Public Profile が、最新の公開の状態に合わせる。版が進むので、合わせないと次の数え直しが「数えられない」になる） */
-  | { type: 'published'; profile: PublicProfile };
+  | { type: 'published'; profile: PublicProfile }
+  /**
+   * サーバーが公開中でないと分かった（別の端末で非公開にされた）。設定は、オフへ戻してある（`publishService`）。開いている Public Profile が、
+   * スイッチをオフにし、公開中の表示をやめる（画面を開き直すまで、古い表示のままになるため）。
+   */
+  | { type: 'unpublished'; profile: PublicProfile };
 
 export interface AutoPublishTimers {
   set(task: () => void, ms: number): unknown;
@@ -152,6 +157,7 @@ export function createAutoPublishService({
     }
     setStatus({ kind: 'idle' });
     if (result.kind === 'published') emit({ type: 'published', profile: result.profile });
+    else if (result.kind === 'idle' && result.reason === 'not-published') emit({ type: 'unpublished', profile: result.profile });
   }
 
   function run(): Promise<void> {

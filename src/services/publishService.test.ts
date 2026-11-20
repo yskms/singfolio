@@ -916,7 +916,7 @@ describe('publishPendingChanges（Auto Publish が使う。7.4.9b）', () => {
     await t.service.claimUsername('karaoke_fan');
     t.server.calls.length = 0;
 
-    assert.deepEqual(await t.service.publishPendingChanges(), { kind: 'idle', reason: 'not-published' });
+    assert.deepEqual(await t.service.publishPendingChanges(), { kind: 'idle', reason: 'not-published', profile: t.server.profile });
     assert.deepEqual(t.server.calls, ['getProfile']);
     assert.equal(t.server.published.length, 0);
   });
@@ -927,7 +927,7 @@ describe('publishPendingChanges（Auto Publish が使う。7.4.9b）', () => {
     await t.add('B', 'X');
     t.server.calls.length = 0;
 
-    assert.deepEqual(await t.service.publishPendingChanges(), { kind: 'idle', reason: 'not-published' });
+    assert.deepEqual(await t.service.publishPendingChanges(), { kind: 'idle', reason: 'not-published', profile: t.server.profile });
     assert.deepEqual(t.server.calls, ['getProfile']);
     assert.equal(t.server.published.length, 0);
   });
@@ -938,7 +938,7 @@ describe('publishPendingChanges（Auto Publish が使う。7.4.9b）', () => {
     await t.add('B', 'X');
     t.server.profile = { ...t.server.profile!, version: 2, published: false };
 
-    assert.deepEqual(await t.service.publishPendingChanges(), { kind: 'idle', reason: 'not-published' });
+    assert.deepEqual(await t.service.publishPendingChanges(), { kind: 'idle', reason: 'not-published', profile: t.server.profile });
     assert.equal(await t.services.settings.getAutoPublishEnabled(), false);
     // 記録は残す（username は同じアカウントのまま。Publish Now の置き換えの確認に使う）。
     assert.equal((await t.service.getState())?.username, 'karaoke_fan');

@@ -192,6 +192,19 @@ describe('Auto Publish: 待ってまとめて送る', () => {
   });
 });
 
+describe('Auto Publish: 公開中でないと分かったとき', () => {
+  it('`unpublished` を通知する（開いている画面が、スイッチをオフにして、公開中の表示をやめる）。状態は idle。再送のタイマーは作らない', async () => {
+    const unpublished = { ...PROFILE, published: false, version: 4 };
+    const { service, clock, calls, events } = setup([{ kind: 'idle', reason: 'not-published', profile: unpublished }]);
+    await service.flush();
+    assert.deepEqual(service.getStatus(), { kind: 'idle' });
+    assert.deepEqual(events, [{ type: 'unpublished', profile: unpublished }]);
+    assert.equal(clock.pendingCount, 0);
+    assert.equal(calls.publish, 1);
+    service.dispose();
+  });
+});
+
 describe('Auto Publish: 背景では確認を始めない', () => {
   it('待ちのタイマーが背景で発火しても試さず、前面に戻ったときの flush が、同じ差を拾う', async () => {
     const { service, clock, calls, setForeground } = setup([PUBLISHED]);

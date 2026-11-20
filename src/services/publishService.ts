@@ -49,9 +49,18 @@ export type PendingPublishResult =
       kind: 'idle';
       /**
        * `no-record`: この端末は公開していない（記録が無い・別のアカウントのもの・サーバーに `username` が無い）。`no-changes`: 変更が無い（通信しない）。
-       * `not-published`: サーバーが非公開（最初の公開・再公開は、確認つきの Publish Now だけ）。`not-signed-in`: サインインしていない・401。
+       * `not-signed-in`: サインインしていない・401。
        */
-      reason: 'no-record' | 'no-changes' | 'not-published' | 'not-signed-in';
+      reason: 'no-record' | 'no-changes' | 'not-signed-in';
+    }
+  | {
+      kind: 'idle';
+      /**
+       * `not-published`: サーバーが非公開（最初の公開・再公開は、確認つきの Publish Now だけ）。Auto Publish の設定は、オフへ戻した。
+       * `profile` は、そのときサーバーから読んだ状態（開いている Public Profile が、公開中の表示をやめるのに使う）。
+       */
+      reason: 'not-published';
+      profile: PublicProfile;
     }
   | {
       kind: 'stopped';
@@ -355,7 +364,7 @@ export function createPublishService({ db, access, publish, state, show, publicT
                 // （オンのまま残すと、端末の記録との差があるかぎり、確認のたびに認証つきの通信が出て、アカウントの最後に使った時刻が進み続ける。
                 // 公開していないアカウントは、未使用の自動削除の対象で、端末の中だけの利用で時刻を進めない決まりに反する）。
                 await db.transaction((tx) => settings.set(tx, AUTO_PUBLISH_KEY, 'off'));
-                return { kind: 'idle', reason: 'not-published' } as const;
+                return { kind: 'idle', reason: 'not-published', profile: server } as const;
               }
               const current = await state.get(db);
               if (current === null) return { kind: 'idle', reason: 'no-record' } as const;
