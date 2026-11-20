@@ -1318,7 +1318,10 @@ v1.0では導入しない。公開プロフィール機能を実装する段階�
 -   Display Name・Bio は、`display_name`・`bio` に控えとして残るだけで、公開ページ（7.5）は読まない（R2のスナップショットだけを読む）。
 -   `wrangler dev`（workerd。R2はローカルの代用）で確かめた: username 未確保の Publish は 409、確保、1000曲（約200KB）の Publish が 200、古い版は 409、2回目の Publish、
     R2のオブジェクトに My Key・Private Note が無いこと（`wrangler r2 object get --local`）、Unpublish が 200 で、R2のオブジェクトが消えること。
-    本番のR2での確認は 7.4.11。
+    **本番のR2は `--remote` を付けて読む。** `wrangler r2 object get|put|delete` は、フラグなしだと local が既定（wrangler 4.162.0 で、出力の `Resource location: local` と
+    `Use --remote if you want to access the remote instance.` を確認）。付け忘れると、空のローカルを読み、「無い」「消えた」が誤って合格に見える。出力に `Resource location: remote` が
+    あることまで見て、「存在する → 消えた」の両方を確かめる。`r2 object` に一覧は無く、`wrangler r2 bucket info` の `object_count` は、集計が遅れる（公開直後は 0 のまま）。
+    本番の確認の結果は、「7.4.11 の本番での確認の結果」。
 
 ### 公開スナップショットの形と上限（7.4.2）
 
@@ -1364,6 +1367,7 @@ Publishのリクエストの本文は、`baseVersion`（7.4.4）に、`profile` 
     （余裕2倍）になる1000曲**にした。D1・R2の待ちはCPU時間に数えない。認証（セッションのハッシュ）と本文の読み取りが、これに加わる。曲数の上限を上げたくなったら
     （Workersの有料プランにすれば、CPU時間は大きく取れる）、`npm run bench:snapshot -- <曲数>` と、使い捨てのWorker（`snapshot.ts` を呼ぶだけ。`wrangler dev` に本文を `curl` で送り、
     `time_total` から `GET` の所要を引く）で測り直す。本番の確認は、`wrangler tail` の `outcome` が `exceededCpu` にならないこと（7.4.11）。
+    **本番の実測（7.4.11）では、1000曲の Publish が 8〜19ms で、手元の約5msより遅かった**（「余裕2倍」は成り立たなかった）。詳細は「7.4.11 の本番での確認の結果」。
 
 ### アプリ側の Publish の土台（7.4.6）
 
@@ -1577,6 +1581,53 @@ Public Profile（`ui/PublicProfileSection.tsx`）の、Publish Now の上の1行
 設定の OFF・通信の失敗後の Pending の保持と再送・間隔・直列化・書き込みの通知の配線（`auth` の有無）を確かめた。iOS Simulator（Release のJSだけ差し込み。Service は偽）で、スイッチ ON →
 再送待ちの行 → 停止の行 → 自動で Publish できたあとの「未公開の変更はありません」への更新を確かめた。**未確認**: 本物のサーバーでの自動の Publish（7.4.11）、実機の背景から前面への復帰、
 Android、ダークモード、VoiceOver・TalkBack（状態の行は `accessibilityLiveRegion` で伝える。iOS の読み上げは未実装）、英語の表示、1000曲での確認の所要時間（実機）。
+
+### 7.4.11 の本番での確認の結果
+
+本番（`singfolio.app`。migration 0004 を適用して Worker をデプロイ）に対して、iOS Simulator（Release のJSだけ差し込み。Google でサインイン。通信は本物）から確かめた。テスト用のアカウントは、
+最後にアプリから削除した（D1 の各表が0行、R2 のオブジェクトが無いことを `--remote` で確認。使った `username` は `retired_usernames` に残る）。
+
+**確かめたこと**
+
+-   Publish: R2 のオブジェクトのキーが許可リストと完全に一致する（トップは `schema`・`version`・`publishedAt`・`profile`・`songs`。曲は `id`・`title`・`artist`・`publicTags`・`sortOrder`）。
+    My Key・Private Note（1000曲分に目印を入れた）・Practice と Want の曲・選んでいないタグの名前は入らない。Ready にした曲は、曲名・アーティストだけが載り、Private Note は載らない。
+    公開タグは、選んだものだけが入る。
+-   Auto Publish: Ready にした曲を、debounce のあとに送る。端末の記録の版がサーバーと食い違うと、`GET /me/profile` だけで `POST` を送らず、`stopped(version-conflict)` で止まる。
+-   版の食い違い（D1 の版を +1 して、別の端末が公開した状態を再現）: Publish Now が置き換えの確認を出す。キャンセルでは通信しない。置き換えると公開できる。
+-   空のローカル（公開の記録も曲も無い。再インストール後を再現。セッションは `local_data_id` が同じなので有効）: 置き換えの確認が出て、確認なしには `POST` を送らない。
+-   1000曲を超える（1007曲）: 送らずに断り、画面に理由を出す。
+-   Unpublish: R2 が消え、`published_at` が NULL に戻り、版が +1 になる。そのあと、Auto Publish は OFF に戻り、スイッチは操作できない。
+-   アカウントの削除: R2 のオブジェクトと D1 の行が消え、`username` が `retired_usernames` に移り、端末のセッションが消える。再認証が時間切れ（5分）になると、何も消えず、アプリが理由を出す。
+-   200文字目に絵文字がくる曲名は、ペアを壊さず、200コードポイントで切れる（Hermes）。
+
+**Worker の CPU 時間**（`wrangler tail` の `cpuTime`。すべて `outcome: ok` で、`exceededCpu` は出ていない）
+
+| 操作 | CPU時間 |
+|---|---|
+| 4〜7曲の Publish | 2〜4ms |
+| 1000曲の Publish（約148KB） | 初回 19ms。続けて 11・14・10・8ms。非公開にしたあとの再公開 8ms |
+| Unpublish | 4ms |
+| アカウントの削除（再認証のコードの交換・R2・D1を含む） | 10ms |
+| `GET /me/profile` | 1〜6ms |
+
+手元の測定（約5ms。「余裕2倍」の根拠）より、エッジは遅かった。Free の上限（10ms）を超えた回があったが、強制終了はされなかった。ただし、Cloudflare の資料が、超えたときの挙動をどう書いているかは
+確かめていない。この観測だけで、超えても常に通る、とは言えない。
+
+**見つけたこと**（コードは直していない）
+
+-   Worker が 400 を返したとき、Publish Now は「問題が発生しました。もう一度お試しください。」とだけ出す。Auto Publish の停止の文言（`stoppedOther`）は「『今すぐ公開』で理由を確かめてください」と案内するが、
+    Publish Now でも理由は出ない。アプリが整えた内容は、普通は Worker の検証を通る（検証用に SQL で入れた、UUID でない曲 ID だけで再現した。アプリが作る曲 ID は UUID）。
+-   iOS では、SQLite の不正な UTF-8 は、JS に渡る前に U+FFFD に置き換わる。対になっていないサロゲートは、SQLite 経由では再現できない（Node のテストでだけ確かめている）。
+-   公開中のアカウントの Publish Now は、変更が0件でも `POST` を送り、版が +1 になる（意図した挙動）。
+
+**未確認**（アカウントを出す版のリリース前に、Android・実機で）
+
+-   機内モードでの Pending と復帰後の再送、応答を受け取れなかった自動 Publish と冪等キーの要否、本物の2台での衝突。
+-   Android（Bio のキーボードの余白、スイッチのつまみの色）、ダークモード、VoiceOver・TalkBack、英語の表示。
+-   1000曲の確認・Publish の所要時間の実機での値（Simulator では、画面の表示に約1.2秒、Publish Now の完了まで約2秒）。
+-   しばらく使っていない状態（冷えた状態）の CPU 時間。
+
+**未決**: 曲数の上限（1000）と CPU 時間（上の実測。上限を保つか、下げるか、有料プランにするか）、400 のときの理由の出し方。
 
 ### Cloudflare
 
