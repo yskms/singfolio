@@ -61,9 +61,14 @@ export async function handlePublish(request: Request, env: Env, now: number): Pr
   if (row === null) return json({ error: 'username_required' }, 409);
   if (row.version !== baseVersion) return conflict(row);
 
+  // R2 に書く本文は、**版の予約より前に**作る（版は `baseVersion + 1`、時刻は `now` で、予約の前に決まる）。CPU の上限での打ち切りは
+  // 例外ではないので、下の `catch`（版の戻し）に届くとは限らない（Cloudflare の資料に、届くとは書かれていない）。予約のあとに重い処理
+  // （1000曲の文字列化）を残すと、そこで打ち切られたとき、D1 の版だけが +1 になり、R2 は前の内容のままになる。D1 と R2 の書き込みの順序は変わらない。
+  const version = baseVersion + 1;
+  const text = serializeSnapshot(buildSnapshot(content.content, version, now));
+
   // 版の予約。照合と更新を1文で行うので、同じ版から同時に Publish した端末のうち、1つだけが通る（負けた端末は R2 に書かない）。
   // Display Name・Bio の控えと、「公開中」の印（R2に書く前に立てる）も、ここで書く。
-  const version = baseVersion + 1;
   const { displayName, bio } = content.content.profile;
   const reserve = await env.DB
     .prepare(
@@ -79,7 +84,7 @@ export async function handlePublish(request: Request, env: Env, now: number): Pr
   }
 
   try {
-    await env.SNAPSHOTS.put(snapshotKey(row.username), serializeSnapshot(buildSnapshot(content.content, version, now)), {
+    await env.SNAPSHOTS.put(snapshotKey(row.username), text, {
       httpMetadata: { contentType: 'application/json; charset=utf-8' },
     });
   } catch {

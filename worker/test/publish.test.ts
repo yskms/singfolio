@@ -282,6 +282,31 @@ describe('Publish と Unpublish（POST /me/publish・POST /me/unpublish）', () 
       assert.equal(fixed.status, 200);
       assert.equal((await row(userId))!.published_at, null);
     });
+
+    it('本文の組み立てが失敗しても、D1 には何も書かない（本文は版の予約より前に作る。CPU の打ち切りが予約のあとに来ないように）', async (t) => {
+      const { userId, token, username } = await newAccount();
+      const stringify = JSON.stringify;
+      const mocked = t.mock.method(JSON, 'stringify', ((value: unknown, ...rest: unknown[]) => {
+        // R2 に書く本文（スナップショット）だけ失敗させる。ほかの文字列化（応答など）は、そのまま通す。
+        if (typeof value === 'object' && value !== null && 'schema' in value && 'songs' in value) throw new Error('boom');
+        return (stringify as (...args: unknown[]) => string)(value, ...rest);
+      }) as typeof JSON.stringify);
+      try {
+        // 例外は、Worker の入口では捕まえない（Workers の実行環境が、1101 として扱う）。
+        await assert.rejects(publish(token, body(0)), /boom/);
+      } finally {
+        mocked.mock.restore();
+      }
+      // 予約より前に失敗したので、版・印・控えのどれも変わらず、R2 にも書かれていない。
+      // （予約のあとに組み立てる順序だと、ここで印が立ったままになる: 上の「最初の Publish が R2 に書けなかったとき」と同じ状態。）
+      const saved = await row(userId);
+      assert.equal(saved!.version, 0);
+      assert.equal(saved!.published_at, null);
+      assert.equal(saved!.display_name, '');
+      assert.equal(await stored(username), null);
+      // 直したあとは、同じ baseVersion で Publish できる。
+      assert.equal((await publish(token, body(0))).status, 200);
+    });
   });
 
   describe('Unpublish', () => {
