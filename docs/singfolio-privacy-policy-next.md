@@ -9,13 +9,16 @@
   見出しの `{#…}` は kramdown の明示的なアンカー。Google Play の「アカウントの削除」のURLは、
   `https://yskms.github.io/singfolio/privacy-policy.html#delete-account` を使う（公開後に、実際にこの位置へ飛ぶことを確かめる）。
   日本語の見出しにはアンカー（`#delete-account-ja`）を明示する（自動の ID は、日本語の見出しでは当てにしない）。
+  **`{#…}` の前には空白が要る**（空白が無いと、kramdown 2.6.1 は、`{#…}` を文字のまま出し、ID も付かない。空白を入れて描画し直して確かめた。
+  確かめ方は、kramdown と kramdown-parser-gfm を入れて、`Kramdown::Document.new(src, input: 'GFM').to_html` の `<h3 id=…>` を見る）。
 
   事実の出どころ: docs/singfolio-publishing-backend.md §8（保存するもの・期限・削除・自動削除・Google/Appleのトークン）。
   書いてある数字（90日・1年・30日）を変えるときは、コードの定数（`SESSION_TTL_MS`・`INACTIVE_ACCOUNT_TTL_MS`）とdocsを一緒に直す。
 
   7.4.10: 公開機能（Public Profile・Publish。7.4）の内容を足した（「Public profile」の節。要約・保存するもの・削除・自動削除の説明も直した）。
   公開ページ（7.5）が出る版と一緒に出す前提で書いている（公開ページが無いと「誰でも開ける」が成り立たない）。
-  まだ入っていないもの: 7.5（視聴者のアクセス。Cloudflare が視聴者のIPを扱うこと、キャッシュによる削除の反映の遅れ、検索エンジン）と、
+  まだ入っていないもの: 7.5（視聴者のアクセス。Cloudflare が視聴者のIPを扱うこと、キャッシュによる削除の反映の遅れ、検索エンジン。公開ページが、
+  スナップショットの `version`・`publishedAt` を出す、またはスナップショットをそのまま返す場合の、公開される内容への追記）と、
   7.6（Requests。視聴者の入力・Turnstile・ニックネーム）。「サインインできない人の公開ページ」の文は、7.5 で取り下げの窓口を決めるまでの暫定。
   事実の出どころは §8 の「Publish と Unpublish のエンドポイント」「公開スナップショットの形と上限」「公開するタグの選び方」「Auto Publish」
   「未使用のアカウントの自動削除」。公開する項目・自動削除の対象外の条件を変えるときは、ここも一緒に直す。
@@ -88,6 +91,7 @@ What is published:
 - Your username. You choose it before your first publish, and it becomes part of the page’s address. It cannot be changed afterwards.
 - Your songs whose status is Ready: title and artist, an identifier the App made up for the song, and the order in which they appear.
 - Tags: only the tags you have turned on in Public Tags, and only on the Ready songs that have them. No tag is public by default.
+- The time of your last publish, and an internal version number that changes each time you publish.
 
 What is not published: your key, private notes, and status (so songs you are practicing or want to sing are not published at all), tags you have not turned on, your account identifier, and your sign-in method.
 
@@ -100,7 +104,7 @@ How publishing works:
 - Publishing connects to the developer’s server while you are signed in, as does opening Public Profile. This counts as using your account (see below).
 - The published copy is stored on Cloudflare (R2). The server also keeps, in its database, your username, the time and version number of your last publish, and a copy of the Display Name and Bio you last published, so that the App can show them again on a new device.
 
-*Unpublish Profile* removes the published copy from the server, and the page stops being shown. The server keeps your username (still reserved for you) and the copy of your last Display Name and Bio until you delete your account. Your songs on your device are not changed. Copies that others made while the page was visible, for example screenshots, are outside the developer’s control.
+*Unpublish Profile* removes the published copy from the server, and the page stops being shown. The server keeps your username (still reserved for you) and the copy of your last Display Name and Bio until your account is deleted, either by you or automatically after one year without use (an unpublished account is no longer exempt from automatic deletion). Your songs on your device are not changed. Copies that others made while the page was visible, for example screenshots, are outside the developer’s control.
 
 When you delete your account, the published copy and everything else the server stores about the account are deleted. **The one thing that stays is your username**, kept without any link to you or your account, so that no one else can take over an address you may have shared. Please choose a username you are comfortable with being kept this way. The copy of your Display Name and Bio can remain for up to 30 days in the hosting provider’s automatic database recovery history, like other account data (see below).
 
@@ -173,7 +177,7 @@ Singfolio（以下「本アプリ」）は、歌う人のためのレパート�
 
 Appleから受け取った結果は、候補の表示以外には使いません。この機能がオンの間、候補の欄に「候補の提供元: Apple」と表示します。
 
-### アカウント（任意）{#accounts-ja}
+### アカウント（任意） {#accounts-ja}
 
 設定の「アカウント」から、AppleまたはGoogleでサインインして、アカウントを作れます。本アプリの機能に、アカウントが必要なものはなく、サインインしても、曲はアップロードされません。
 
@@ -194,7 +198,7 @@ Appleから受け取った結果は、候補の表示以外には使いません
 
 アカウントは、サインインの状態を保つこと、サインアウト、アカウントの削除、そして、使うことを選んだ場合の公開プロフィールの運用のためだけに使います。開発者は、これを販売も共有もせず、広告やアクセス解析にも使いません。
 
-### 公開プロフィール（任意）{#public-profile-ja}
+### 公開プロフィール（任意） {#public-profile-ja}
 
 アカウントがあれば、プロフィール > 公開プロフィール から、公開プロフィールを公開できます。自分で操作するまで、何も公開されません。アカウントを作る・サインインするだけでは、公開されません。公開プロフィールは、`singfolio.app/<ユーザー名>` のWebページに表示され、誰でも、サインインせずに開けます。
 
@@ -204,6 +208,7 @@ Appleから受け取った結果は、候補の表示以外には使いません
 - ユーザー名。最初の公開の前に、自分で決めます。ページのアドレスの一部になり、あとから変更できません。
 - ステータスがReadyの曲: 曲名とアーティスト、本アプリが曲につけた識別子、並び順。
 - タグ: 「公開タグ」でオンにしたタグだけが、そのタグの付いたReadyの曲に表示されます。どのタグも、初期状態では公開されません。
+- 最後に公開した時刻と、公開するたびに変わる、内部の版の番号。
 
 公開されないもの: 自分のキー、非公開メモ、ステータス（練習中・歌いたい曲は、曲ごと公開されません）、オンにしていないタグ、アカウントの識別子、サインインの手段。
 
@@ -216,11 +221,11 @@ Appleから受け取った結果は、候補の表示以外には使いません
 - 公開するとき、また「公開プロフィール」の画面を開いたとき、サインイン中の本アプリは、開発者のサーバーにつながります。これは、アカウントを「使った」に数えます（下を参照）。
 - 公開用のコピーは、Cloudflare（R2）に保存します。サーバーのデータベースには、ユーザー名、最後に公開した時刻と版の番号、最後に公開した表示名・自己紹介のコピーも保存します（新しい端末でも、公開中の内容を本アプリに表示するためです）。
 
-「公開をやめる」は、公開用のコピーをサーバーから削除し、ページは表示されなくなります。ユーザー名（引き続き、あなたのために確保されます）と、最後の表示名・自己紹介のコピーは、アカウントを削除するまで、サーバーに残ります。端末内の曲は変わりません。ページが見えていた間に、ほかの人が作ったコピー（スクリーンショットなど）は、開発者の手の届かないところにあります。
+「公開をやめる」は、公開用のコピーをサーバーから削除し、ページは表示されなくなります。ユーザー名（引き続き、あなたのために確保されます）と、最後の表示名・自己紹介のコピーは、アカウントが削除されるまで（ご自身での削除、または1年間使わなかったときの自動削除。公開をやめたアカウントは、自動削除の対象外ではなくなります）、サーバーに残ります。端末内の曲は変わりません。ページが見えていた間に、ほかの人が作ったコピー（スクリーンショットなど）は、開発者の手の届かないところにあります。
 
 アカウントを削除すると、公開用のコピーと、アカウントについてサーバーが保存しているものは、すべて削除されます。**残るのは、ユーザー名だけです。** あなたやアカウントとは結びつけずに残し、あなたが配ったかもしれないアドレスを、ほかの人が使えないようにします。このように残っても構わないユーザー名を選んでください。表示名・自己紹介のコピーは、ほかのアカウントのデータと同様に、運用先の自動のデータベース復旧用の履歴に、最大30日間残ることがあります（下を参照）。
 
-### サインアウトとアカウントの削除（Singfolio、yskms）{#delete-account-ja}
+### サインアウトとアカウントの削除（Singfolio、yskms） {#delete-account-ja}
 
 **本アプリの中で。** 設定の「アカウント」を開きます。
 
