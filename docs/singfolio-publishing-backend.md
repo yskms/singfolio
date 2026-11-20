@@ -1641,8 +1641,8 @@ Free の CPU 時間は1リクエスト10ms。「isolate ごとに、たまに上
     利用者にどれだけ出て、どれだけ困るか。通信が不安定な環境での頻度を、実機で見る。
 -   Android（Bio のキーボードの余白、スイッチのつまみの色）、ダークモード、VoiceOver・TalkBack、英語の表示。
 -   1000曲の確認・Publish の所要時間の実機での値（Simulator では、画面の表示に約1.2秒、Publish Now の完了まで約2秒）。
--   しばらく使っていない状態（冷えた状態）の CPU 時間と、1000曲の Publish を連続して20回程度送ったときに、打ち切りが出ないか（`exceededCpu`・Error 1102。Metrics の Errors by invocation status と、tail の `outcome` で見る）。
-    判断の基準は、打ち切りが起きるかどうかの1点（案。WBS 7.7）。
+-   しばらく放置したあとの1回目から、続けて20回程度、1000曲の Publish を送ったときの CPU 時間と、打ち切りが出ないか（`exceededCpu`・Error 1102。Metrics の Errors by invocation status と、tail の `outcome` で見る。
+    冷えた状態と連続を、1回の測定にまとめる。繰り越しがあるなら、最も厳しい条件）。判断の基準は、打ち切りが起きるかどうかの1点（案。WBS 7.7）。
 
 **未決**（リリースの前に決める。WBS 7.7）: 曲数の上限（1000）と CPU 時間（上の実測と、Cloudflare の資料の記述。保つか、下げるか、有料プランにするか）、Auto Publish の停止の文言、
 変更0件の Publish Now の扱い、冪等キーの要否、CPU の打ち切りと予約の順序（上の案）。
